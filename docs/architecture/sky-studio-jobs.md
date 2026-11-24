@@ -235,6 +235,10 @@ These rules hold:
    - **Started again** when nothing was kept (no ETag / Accept-Ranges, or the server sent everything again): progress back to 0.
    - The result is written beside the destination and moved over only when whole: a half file never stands as the result.
 2. **An HTTP answer is never tried again as it is**, even when its body broke afterwards (a 403 whose body broke is a 403).
+   - What URLSession does (a local probe): an error answer whose body is cut (FIN or RST) completes **without** an error, with its
+     status, so it ends as that answer. An error body that stalls times out with the status held back (`task.response` nil); that
+     counts as broken and is tried once more, since a GET has no side effects and the next one reads the status (unlike a PUT, where
+     an answer that began ends the upload).
    - **403 / 404 / 410** (the address expired or was withdrawn) asks the original job once for a fresh address (`renew`:
      `GET /jobs/{id}`, only a read) and tries it when it differs and a try is left. The same address again, a second refusal or
      a failed renewal ends the download as refused. **Nothing is ever submitted again.**
@@ -267,9 +271,9 @@ Checks:
   - one drop mid-body: the second GET resumes (Range, If-Range), progress never goes back, the file is byte-identical;
   - without validators the next GET starts again (progress back to 0); a reset then a cut then the rest;
   - three drops: interrupted after three GETs, nothing left, and a later download of the same address gets the identical file;
-  - a 403 renewed once to a fresh address that works; a 404 without renewal, the same address again, a second refusal and a 500 each
-    end refused (never the same GET again); a TLS failure ends as could not connect; a cancel mid-body and during the pause stop
-    promptly and leave nothing.
+  - a 403 renewed once to a fresh address that works; a 404 without renewal, a 404 whose body broke after its head, the same address
+    again, a second refusal and a 500 each end refused (never the same GET again); a TLS failure ends as could not connect; a cancel
+    mid-body and during the pause stop promptly and leave nothing.
 - `VoiceChangeDownloadChecks` in `scripts/check-voice-recovery.sh` (real App objects): three lost connections fail the voice change
   with `download_network`, the row reads the localized line, Download again lands the byte-identical files under the same job id with
   no new upload or `/jobs`, one undo; an expired address renewed with one `GET /jobs/{id}`.

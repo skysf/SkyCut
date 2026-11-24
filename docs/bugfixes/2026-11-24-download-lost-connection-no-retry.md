@@ -72,8 +72,8 @@ Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift` (`download`, `fetch`),
     resumed GET, then the rest: three GETs, pauses `[1, 2]`, identical;
   - three drops: interrupted, 3 GETs, `NSURLErrorDomain -1005`, `download_network`, no file and no partial; a later download of the
     same address gives the identical file;
-  - a 403 then a fresh address: renewed once, old then fresh address, no pause, identical; a 404 without renewal: refused after one
-    GET; a renewal to the same address: refused, one GET; 403 then 410 at the fresh address: refused after two GETs, renewed once; a
+  - a 403 then a fresh address: renewed once, old then fresh address, no pause, identical; a 404 without renewal, and a 404 whose body
+    broke after its head: refused after one GET; a renewal to the same address: refused, one GET; 403 then 410 at the fresh address: refused after two GETs, renewed once; a
     500: refused after one GET, nothing renewed; a TLS failure: could not connect, one GET;
   - a cancel while the body stalls stops in under 2 s and leaves nothing; a cancel during the pause sends no second GET;
   - the words and fields per kind (no proxy, the next step), and the old 404 case in `JobChecks` reads as `download_refused`.

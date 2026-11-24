@@ -368,8 +368,8 @@
   - One drop mid-body is resumed (Range, If-Range; progress never goes back; the file byte-identical); without validators the next GET
     starts again; three drops end as interrupted (`download_network`) after three GETs, with nothing left, and a later download gets
     the identical file.
-  - A 403 renewed once to a fresh address that works; a 404 without renewal, the same address again, a second refusal and a 500 end
-    refused after one or two GETs; a TLS failure ends as could not connect; a cancel mid-body or during the pause stops promptly.
+  - A 403 renewed once to a fresh address that works; a 404 without renewal, a 404 whose body broke, the same address again, a second
+    refusal and a 500 end refused after one or two GETs; a TLS failure ends as could not connect; a cancel mid-body or during the pause stops promptly.
   - The download hook's checks run in the `-D DEBUG` binary (`checks/UploadFault/DownloadFaultChecks.swift`: one cut resumes, three
     end as interrupted, a body whole before the cut is still dropped, an HTTP answer stands, nothing spins); the probe's refusal of the
     debug build must name both hooks.

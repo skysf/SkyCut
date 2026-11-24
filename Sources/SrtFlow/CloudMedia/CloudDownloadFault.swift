@@ -66,10 +66,12 @@ enum CloudDownloadFault {
     static func drop(_ task: URLSessionDownloadTask, delegate: CloudTransferDelegate) async throws {
         let cut = Cut()
         // Waits (sleeping, never spinning) until the part arrived, then cuts. It ends at once when the try already ended or the try is
-        // over (cancelled by the defer below).
+        // over (cancelled by the defer below). A task not started yet (suspended) is waited for: this may look before
+        // CloudTransfer.perform resumes it.
         let cutter = Task {
             let deadline = Date().addingTimeInterval(5)
-            while task.state == .running, task.countOfBytesReceived < cutAfter(expected: task.countOfBytesExpectedToReceive), Date() < deadline {
+            while task.state != .completed, task.state != .canceling,
+                  task.countOfBytesReceived < cutAfter(expected: task.countOfBytesExpectedToReceive), Date() < deadline {
                 do { try await Task.sleep(nanoseconds: 20_000_000) } catch { return }
             }
             guard task.state == .running else { return }
