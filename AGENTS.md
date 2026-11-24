@@ -51,6 +51,11 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - One PR does one thing and stays small. Before opening it, `git fetch origin`, merge the newest `origin/main` once,
   resolve every conflict and verify again: nothing merged in parallel (the user's other windows too) may be lost. Start
   the next task from the newest main, never on an old branch.
+- Review rounds by risk (user, 2026-11-24): Codex reviews every change's first round (docs-only: the coordinator reads
+  it); a fix round goes back to Codex only if it touches money or anything that can lose or overwrite data (in doubt,
+  it does), else the coordinator reads the diff; a PR waiting for a check gets `merge-slot` only once the check clears
+  it; real smokes wherever a change reaches paid providers, the network or production. The log and the revisit
+  point: [Code review rounds](docs/testing/code-review.md).
 - Label the PR as you open it: `gh pr edit N --add-label merge-slot`. The merge slot merges labeled PRs one at a time
   (`--merge`), each after a green run on the exact tree that lands (main + PR), and deletes the branch (build doc,
   "Merge slot"). Never merge it yourself, never squash; a task that names who merges wins.
@@ -423,6 +428,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ### 报告（docs/reports/）
 
+- [Review rounds: the baseline behind the risk-based policy](docs/reports/2026-11-24-review-rounds-baseline.md) — five PRs on 11-23/24: first Codex rounds found 24 issues counted point by point, all 5 serious ones among them; the one second round 5 smaller; real smokes 3 provider facts no review could; time per round.
 - [CI: full-App checks over three shards, cheap flakes](docs/reports/2026-11-20-ci-rebalance.md) — the longest shard 26.9 → 14.5–15.7 min (11-19 median vs #523's and #525's runs), the same 118 checks; uploads can't fail a shard.
 - [合并后 main 上那一轮：树已经验过就不再跑检查](docs/reports/2026-11-13-main-ci-verified-tree.md) — how often a merge's tree was exactly the one its PR's green run tested and why main went red (to 11-13), the options compared, GitHub's tested behaviour.
 - [声音功能的真实冒烟：界面 + AI 工具（2026-11-11）](docs/reports/2026-11-11-voice-real-smoke.md) — 新建 / 设计 / 删声音、变声、读稿、长期授权全过，74.2 积分和账单逐笔对上；撞出的问题修在 #379、#383，音频引擎一直开着当时待拍板。
