@@ -82,38 +82,40 @@ vendor/ffmpeg 和 AI 客户端启动的 MCP 小程序 `skycut-mcp`（都在 `Con
 ## DMG 安装窗口（2026-11-06 起）
 
 根目录只显示 `SkyCut.app` 和指向 `/Applications` 的 `Applications` 软链。首次打开说明直接在
-Finder 背景中展示，不再放「首次打开必读 - Read Me First.txt」。App 仍用原自签名证书、暂不做
-Apple 公证：背景教用户拖入应用程序，以及第一次被拦下时到「系统设置 › 隐私与安全性 › 仍要打开」。
-Since 2026-11-20 (the user's call) the steps are in six languages, English first: English, 简体中文, 繁體中文, Español,
-日本語, Русский. Step 3 gives one guide link for everyone, `www.skycut.app/docs`: the website sends `/docs` to the docs page
-in the visitor's language ([SkyCut 官网](../architecture/skycut-website.md)), and the videos go on those pages.
+Finder 背景中展示，不再放「首次打开必读 - Read Me First.txt」。Step 1 teaches dragging SkyCut to Applications. Since
+2026-11-26 builds are notarized and open directly ([签名与系统权限](../architecture/code-signing-and-permissions.md)), so
+the old step 2, «Blocked on first open? System Settings › Privacy & Security › Open Anyway», is gone in every language
+(user, 2026-11-25: 「装机的那个页面……提示可以简化了」). Since 2026-11-20 (the user's call) step 1 is in six languages,
+English first: English, 简体中文, 繁體中文, Español, 日本語, Русский. Step 2 gives one guide link for everyone,
+`www.skycut.app/docs`: the website sends `/docs` to the docs page in the visitor's language
+([SkyCut 官网](../architecture/skycut-website.md)), and the videos go on those pages.
 终端 `xattr` 兜底由 App 需要时自己显示，不放在安装图上。
 
 - 图稿唯一来源：`scripts/dmg/make-background.swift`，只用系统 AppKit / Core Text / Core Graphics 和系统字体。
   配色是暖白 `#f3f0e8`、森林绿 `#123f32`、深色正文；所有像素使用自己的不透明底色，不跟随系统深浅色变色。
-  每次打包现生成 760×688（72 dpi）和 1520×1376（144 dpi）的 PNG，再用
+  每次打包现生成 760×510（72 dpi）和 1520×1020（144 dpi）的 PNG，再用
   `tiffutil -cathidpicheck` 合成 `/.background/background.tiff` 的两种分辨率。
-- The copy (2026-11-20): every line is 14 pt regular, English in the dark ink `#19221d`, the other five languages in one
-  muted ink `#505b4a`; there is no header. The macOS names are the system's own strings, read from its localization
-  tables on macOS 26.5.2: the Applications folder, System Settings, Privacy & Security and its Open Anyway button.
-  Traditional Chinese follows Taiwan (`zh_TW`). Spanish follows Spain (`es`, like SkyCut's `es.lproj`), and a second line
-  starting «o:» gives Latin America's names (`es_419`: «Configuración del Sistema» … «Abrir de todos modos»). Russian step
-  2 doesn't fit one line, so its path hangs 16 pt under the question, like the Spanish alternative.
+- The copy (2026-11-20; step 2 removed 2026-11-26): every line is 14 pt regular, English in the dark ink `#19221d`, the
+  other five languages in one muted ink `#505b4a`; there is no header. The Applications folder's name is the system's own
+  string in each language, read from its localization tables on macOS 26.5.2. Traditional Chinese follows Taiwan
+  (`zh_TW`); Spanish follows Spain (`es`, like SkyCut's `es.lproj`; Latin America's `es_419` name is the same).
   - Every text run carries its language (`kCTLanguageAttributeName`). Untagged, Core Text draws Traditional Chinese and
     Japanese with Simplified Chinese faces and punctuation (PingFang SC instead of PingFang TC and Hiragino).
   - A line that would cross x 724 or come within 24 pt of the canvas bottom stops the build. Grow the canvas, the window
     frame and both checks together, and keep the window fitting the 13-inch MacBook Air (below).
 - 布局源：`packaging/dmg/DS_Store`，打包时拷成卷根的 `.DS_Store`。窗口框固定
-  `{{120, 120}, {760, 776}}`（为标题栏及用户开启的路径 / 状态栏留出空间，图稿 760×688），图标 128 point，App / Applications
-  中心为 `(200, 164)` / `(560, 164)`，分别在箭头两头；隐藏工具栏和侧栏。
+  `{{120, 120}, {760, 598}}`（为标题栏及用户开启的路径 / 状态栏留出空间，图稿 760×510），图标 128 point，App / Applications
+  中心为 `(200, 164)` / `(560, 164)`，分别在箭头两头；隐藏工具栏和侧栏。The hidden `.background` folder sits at `(380, 800)`, below
+  the canvas: a Finder that shows hidden files would otherwise put its icon on the first free spot, over the steps (seen
+  2026-11-26), and Finder hides it by default either way.
   模板同时声明关闭状态栏 / 路径栏；Finder 可能沿用用户的这两项全局偏好，窗口高度仍能容下完整引导。
   背景 alias 使用卷内 `.background/background.tiff`，不携带开发机路径、卷 UUID 或 inode。
   `scripts/build-dmg.sh` **不控制 Finder、不调用 Apple Events**，正常打包不会申请「控制访达」权限。
   - Where the window lands (seen 2026-11-20, macOS 26.5.2): Finder counts the frame's y from the bottom of the screen
     and moves a window that would reach under the menu bar down to just below it (on a 1440×900 pt screen it opened
-    31 pt from the top). On a 13-inch MacBook Air's default 1470×956 pt screen the window spans 120–896 pt from the
-    bottom, leaving 60 pt for the menu bar and 120 pt for a bottom Dock. The title bar is 32 pt and the path and status
-    bars take 56 pt together, so with the user's bars on, the content area is exactly the 688 pt canvas.
+    31 pt from the top, at 776 pt tall). On a 13-inch MacBook Air's default 1470×956 pt screen the 598 pt window spans
+    120–718 pt from the bottom, leaving 238 pt for the menu bar and 120 pt for a bottom Dock. The title bar is 32 pt and the
+    path and status bars take 56 pt together, so with the user's bars on, the content area is exactly the 510 pt canvas.
 - 模板可重复生成：只在主动改窗口布局时，临时安装 `ds-store==1.3.3`、`mac-alias==2.2.3`
   到 `/private/tmp/skycut-dmg-template-tools`，再执行
   `PYTHONPATH=/private/tmp/skycut-dmg-template-tools python3 scripts/dmg/make-layout.py`。
@@ -137,7 +139,7 @@ Finder 的真实渲染属于人工回归，每次改图稿 / 模板后以及发�
 1. 用开发版本号（例如 `VERSION=0.18.60-dmgtest arch -arm64 /bin/bash scripts/build-app.sh`）
    打测试包，再运行 `arch -arm64 /bin/bash scripts/check-dmg.sh dist/SkyCut-0.18.60-dmgtest-arm64.dmg`。
 2. 挂载到独立临时目录，保留用户已打开的安装盘和 Finder 窗口；在 Finder 新窗口中打开测试卷。
-   确认背景自动显示、两图标在箭头两头、三步六种语言完整，Retina 屏上字体清楚、图标标签能读。
+   确认背景自动显示、两图标在箭头两头、第 1 步六种语言和第 2 步的教程链接完整，Retina 屏上字体清楚、图标标签能读。
    深浅色下背景本身底色不变；不要为了验收打断用户工作、切换全系统外观。
    路径栏 / 状态栏必须按用户原有偏好重开检查；只在当前窗口手动隐藏后的截图不能证明模板生效。
    If another volume named SkyCut is mounted (the user's installer disk, say), the test window shows that volume's

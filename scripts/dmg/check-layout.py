@@ -40,7 +40,7 @@ def check(path):
     pos = block(uint(superblock))
     assert uint(pos) == 0, "unexpected internal node"
     records = uint(pos + 4)
-    assert records == uint(superblock + 8) == 6, "expected exactly six layout records"
+    assert records == uint(superblock + 8) == 7, "expected exactly seven layout records"
     pos += 8
     decoded = {}
     for _ in range(records):
@@ -60,7 +60,7 @@ def check(path):
         pos += length
 
     window = plistlib.loads(decoded[".", b"bwsp"])
-    assert window["WindowBounds"] == "{{120, 120}, {760, 776}}", "window bounds drifted"
+    assert window["WindowBounds"] == "{{120, 120}, {760, 598}}", "window bounds drifted"
     for key in ("ShowSidebar", "ShowToolbar", "ShowStatusBar", "ShowPathbar", "ShowTabView"):
         assert window[key] is False, f"{key} must stay hidden"
     icons = plistlib.loads(decoded[".", b"icvp"])
@@ -70,7 +70,8 @@ def check(path):
     alias = icons["backgroundImageAlias"]
     assert b".background/background.tiff" in alias, "background must use a volume-relative alias"
     assert b"/Users/" not in alias and b"/Volumes/" not in alias, "developer path leaked into alias"
-    for name, point in (("SkyCut.app", (200, 164)), ("Applications", (560, 164))):
+    # .background sits below the canvas, so a Finder that shows hidden files never puts it over the steps.
+    for name, point in (("SkyCut.app", (200, 164)), ("Applications", (560, 164)), (".background", (380, 800))):
         assert struct.unpack(">II", decoded[name, b"Iloc"][:8]) == point, f"{name} moved"
     print("✓ Finder template: fixed window, icons and volume-relative background")
 
