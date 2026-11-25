@@ -379,15 +379,27 @@
   identity, the task row's localized words (the official preparation and a `/jobs` refusal too) and that SkyCut writes no
   limit number.
   Rule: [Reference-image fitting](../architecture/reference-image-fitting.md).
-- SkyCut's daily limit and Sky Studio's balance, as refusals (2026-11-24, MSG1): `scripts/check-sky-studio.sh` → `DailyLimitChecks`
-  (the numbers and the local-midnight reset in a fixed time zone; the suggested limit's friendly steps, float noise and the highest
-  limit; every field and the three options with the exact `set_settings` arguments; `budgetBlocked` / `decide` from a real store; the
-  raise asking through `AISettingsApproval` in full access; the settings path and the panels' line from every real string table)
-  and `BalanceRefusalChecks` (the refusal in request and job errors; the account, the numbers only when sent, the recharge address
-  fallback, the retry; the line and its path in every table). `scripts/check-voice-recovery.sh` → `VoiceChangeBalanceChecks` runs
-  change_voice into a 402 with real App objects (fields, refund, no resend, the user's row), and the voiceover's budget stop checks
-  its options and own resume. `checks/sky-studio-wiring/daily-limit.sh` pins one builder for each, the three panels' note, the race
-  paths, `SettingsNavigator` and the six paid jobs. Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md) section 11.
+- SkyCut's daily limit and Sky Studio's balance, as refusals (2026-11-24, MSG1; review round 2026-11-25):
+  - `scripts/check-sky-studio.sh`:
+    - `DailyLimitChecks`: the numbers; the reset as the ledger's next day (also America/Santiago's skipped midnight); the suggested
+      limit's steps, float noise and highest limit; every field and option; waiting only when a whole day covers the request;
+      option (a)'s question and token (the exact raise passes once with no second question, in full access too, and another value
+      is asked); `budgetBlocked` / `decide` from a real store; the path and both panel lines, with the reset time, from every real
+      string table.
+    - `BalanceRefusalChecks`: the refusal in request and job errors, before admission or not (a 402 with a job id and pending billing
+      queries the original job); the account, the numbers only when sent, the recharge address fallback, the retry; the line and its
+      path in every table; a refused price check names no order or bill.
+    - `SpendChecks`: one moment per reservation across midnight.
+    - `ReferenceTotalChecks`: the actual totals.
+  - `scripts/check-voice-recovery.sh`:
+    - `VoiceChangeBalanceChecks`: change_voice into a plain 402 and into one with pending billing, with real App objects;
+    - the voiceover's budget stop: its options, the numbers read at the refusal, its own resume;
+    - the mid-voiceover fee over the limit, with both ways (`FallbackFeeChecks`).
+  - `checks/sky-studio-wiring/daily-limit.sh` pins:
+    - one builder for each refusal and option (a)'s advance question;
+    - the panels' note and its in-place popover, and the sheets leaving the race to the note;
+    - the voiceover's refusal-time numbers and the six paid jobs.
+  - Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md) section 11.
 - Picture transitions: `scripts/check-mcp.sh` → `TransitionReportChecks` preserves 1.042 seconds when both handles suffice,
   reports shortening limits and reasons, and preserves legacy overlapping seams; `scripts/check-video-fade.sh` checks the
   rendered brightness and total length in both pipelines (`LongCrossfade.swift`). Rule: [Transitions](../architecture/transition-handles.md).

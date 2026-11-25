@@ -1368,11 +1368,15 @@
 
 "AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it." = "La IA se pausa al alcanzar este presupuesto diario. Auméntalo en Ajustes para continuar; ningún modo de permisos lo omite.";
 
-"SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, and this needs %3$@. Raise it in %4$@, or wait until midnight, when it resets." = "Lo detiene el límite diario de créditos de SkyCut, no tu saldo de Sky Studio: hoy llevas %1$@ de %2$@ créditos y esto necesita %3$@. Súbelo en %4$@ o espera a la medianoche, cuando se reinicia.";
+"SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@. Raise it in %5$@, or wait until %6$@, when it resets." = "Lo detiene el límite diario de créditos de SkyCut, no tu saldo de Sky Studio: hoy llevas %1$@ de %2$@ créditos, quedan %3$@ y esto necesita %4$@. Súbelo en %5$@ o espera a las %6$@, cuando se reinicia.";
+
+"SkyCut's own daily credit limit stops this, not your Sky Studio balance: it allows %1$@ credits a day and this needs %2$@, so waiting does not help. Raise it in %3$@." = "Lo detiene el límite diario de créditos de SkyCut, no tu saldo de Sky Studio: permite %1$@ créditos al día y esto necesita %2$@, así que esperar no sirve. Súbelo en %3$@.";
 
 "Change Limit…" = "Cambiar límite…";
 
-"Open Settings at Sky Studio, where the daily limit for AI is set" = "Abre Ajustes en Sky Studio, donde se fija el límite diario para la IA";
+"Change SkyCut's daily limit for AI here; it is the same setting as in Settings" = "Cambia aquí el límite diario de SkyCut para la IA; es el mismo ajuste que en Ajustes";
+
+"The same setting as in %@." = "Es el mismo ajuste que en %@.";
 
 "Not enough Sky Studio credits: your balance is %1$@ and this needs %2$@. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %3$@." = "No hay suficientes créditos de Sky Studio: tu saldo es %1$@ y esto necesita %2$@. Es tu saldo de Sky Studio, no el límite diario de SkyCut. Añade créditos en %3$@.";
 
