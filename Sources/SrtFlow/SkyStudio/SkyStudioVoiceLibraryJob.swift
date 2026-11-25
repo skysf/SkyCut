@@ -27,6 +27,8 @@ final class SkyStudioVoiceLibraryJob {
     private let status: SkyStudioMediaStatus?
     /// 做完那一刻写给 AI 的下一步（建 MiniMax 版：回去再调 add_voiceover）。
     private let nextStep: String
+    /// The caller's next step if it fails, kept with the order so it survives a restart (nil: the generic one for the kind).
+    private let failureStep: String?
     private var serverID: String?
     private var accepted = false
     /// 重启之前交的那一单（SkyStudioVoiceLibraryOrders.resume）：只 GET 跟到底、不再交。
@@ -75,7 +77,8 @@ final class SkyStudioVoiceLibraryJob {
     }
 
     init(kind: AIJobs.Kind, identity: String, request: SkyStudioJobRequest, key: String, reservation: SkyStudioJobGate.Reservation, title: String,
-         modelTitle: String, project: VideoEditProject?, nextStep: String, api: SkyStudioAPI = SkyStudioAPI()) {
+         modelTitle: String, project: VideoEditProject?, nextStep: String, failureStep: String? = nil, api: SkyStudioAPI = SkyStudioAPI()) {
+        self.failureStep = failureStep
         self.kind = kind
         self.identity = identity
         self.request = request
@@ -94,12 +97,12 @@ final class SkyStudioVoiceLibraryJob {
     convenience init(resuming record: SkyStudioVoiceLibraryOrders.Record, kind: AIJobs.Kind, identity: String, jobID: String, key: String,
                      api: SkyStudioAPI) {
         self.init(kind: kind, identity: identity, request: record.request, key: key,
-                  reservation: .init(credits: record.reservedCredits, day: record.reservedDay), title: "", modelTitle: "", project: nil,
-                  nextStep: record.nextStep, api: api)
+                  reservation: .init(credits: record.reservedCredits, day: record.reservedDay, dayKey: record.reservedDayKey), title: "", modelTitle: "", project: nil,
+                  nextStep: record.nextStep, failureStep: record.failureStep, api: api)
         serverID = jobID
         accepted = true
         resumed = jobID
-        onFailure = { _, _ in ["next_step": .string(Self.retryStep(kind))] }
+        onFailure = { _, _ in ["next_step": .string(record.failureStep ?? Self.retryStep(kind))] }
     }
 
     func start() -> AIJobs.Job {
@@ -113,7 +116,8 @@ final class SkyStudioVoiceLibraryJob {
         let job = launch()
         // 交之前落盘：SkyCut 中途退出，重启之后照它接着跟、按这一笔结账（SkyStudioVoiceLibraryOrders）。
         SkyStudioVoiceLibraryOrders.save(.init(kind: kind.rawValue, account: SkyStudioVoiceLibraryOrders.account(key), request: request,
-                                               reservedCredits: reservation.credits, reservedDay: reservation.day, jobID: nil, nextStep: nextStep))
+                                               reservedCredits: reservation.credits, reservedDay: reservation.day, reservedDayKey: reservation.dayKey, jobID: nil, nextStep: nextStep,
+                                               failureStep: failureStep))
         task = Task { @MainActor in await self.execute() }
         return job
     }
@@ -164,6 +168,10 @@ final class SkyStudioVoiceLibraryJob {
                 if refund { held.refund() }
             }
             let outcome: AIJobs.Status = Task.isCancelled ? .cancelled : .failed
+            // The Sky Studio balance (MSG1): the task row stays with the user's line (a row with an issue is not removed).
+            if outcome == .failed, let balance = SkyStudioBalanceRefusal.refusal(of: error, accepted: serverID != nil) {
+                status?.issue = SkyStudioBalanceRefusal.shown(balance)
+            }
             finish(outcome, SkyStudioVoiceLibraryErrors.message(error), detail: await failureDetail(error))
         } catch {
             // 不是 Sky Studio 说的：没受理的退回；受理了的留着记录接着跟。
@@ -201,6 +209,13 @@ final class SkyStudioVoiceLibraryJob {
             if let approved = request.maxCredits { value["credits_approved"] = .number(approved) }
         }
         if let onFailure { value.merge(await onFailure(error.failure?.code, priced)) { _, new in new } }
+        // The Sky Studio balance, not SkyCut's daily limit (MSG1): the numbers and where only the user adds credits, with the
+        // caller's own next step as the way on once they have (a MiniMax version mid-voiceover resumes from its recovery file and
+        // never sends the lines again: MSG1 review, 2026-11-25).
+        if !Task.isCancelled, let balance = SkyStudioBalanceRefusal.refusal(of: error, accepted: serverID != nil) {
+            let callers = value["next_step"]?.stringValue
+            value.merge(SkyStudioBalanceRefusal.fields(balance, retry: callers ?? Self.retryCall(kind))) { _, new in new }
+        }
         return value
     }
 
@@ -220,7 +235,15 @@ final class SkyStudioVoiceLibraryJob {
             record.account == account && AIJobs.Kind(rawValue: record.kind).flatMap { Self.identity($0, request: record.request, key: key) } == identity
         }) else { return }
         held.refund()
-        held = SkyStudioHeldCredits(SkyStudioJobGate.Reservation(credits: earlier.reservedCredits, day: earlier.reservedDay))
+        held = SkyStudioHeldCredits(SkyStudioJobGate.Reservation(credits: earlier.reservedCredits, day: earlier.reservedDay,
+                                                                 dayKey: earlier.reservedDayKey))
+    }
+
+    /// How to try again once the user has added Sky Studio credits (the balance refusal's next step).
+    private static func retryCall(_ kind: AIJobs.Kind) -> String {
+        kind == .voiceDesign
+            ? "call manage_voices action=design again (it quotes the current price and asks the user again)"
+            : "call add_voiceover again with the same lines and voice, or resume the narration's recovery file (it quotes again)"
     }
 
     /// 重启之后接着跟的那一单没做成：起它的那次调用早没了，按种类说下一步。

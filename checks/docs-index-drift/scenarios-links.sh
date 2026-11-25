@@ -146,6 +146,11 @@ s_symlink() { ln -s beta.md docs/architecture/alias.md && edit after "${A}" "${E
 scenario red symlink "符号链接当文档" s_symlink
 scenario red ext "后缀写成 .MD 的文档（不进索引也不红的话就是漏网的）" new_doc docs/architecture/LOUD.MD
 scenario red ext "后缀写成 .markdown 的文档" new_doc docs/architecture/notes.markdown
+# An emptied doc still exists, so its index line and the dead-link check stayed green (PR #555: a script emptied a linked doc).
+s_blank() { printf ' \n\n' > "$1"; }
+scenario red empty_doc "a linked doc emptied to 0 bytes (PR #555)" cp /dev/null docs/architecture/beta.md
+scenario red empty_doc "a case with only blank lines" s_blank docs/bugfixes/2026-01-05-mango-case.md
+scenario red empty_doc "the README that AGENTS.md links, emptied" cp /dev/null README.md
 
 # ── 漏索引 ──
 scenario red unindexed "新的架构文档没进 AGENTS.md" new_doc docs/architecture/delta.md

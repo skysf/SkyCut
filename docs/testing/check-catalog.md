@@ -433,6 +433,39 @@
   identity, the task row's localized words (the official preparation and a `/jobs` refusal too) and that SkyCut writes no
   limit number.
   Rule: [Reference-image fitting](../architecture/reference-image-fitting.md).
+- SkyCut's daily limit and Sky Studio's balance, as refusals (2026-11-24, MSG1; review round 2026-11-25):
+  - `scripts/check-sky-studio.sh`:
+    - `DailyLimitChecks`: the numbers; the reset as the ledger's next day (also America/Santiago's skipped midnight); the suggested
+      limit's steps, float noise and highest limit; every field and option; waiting only when a whole day covers the request;
+      option (a)'s question and token (the exact raise passes once with no second question, in full access too, and another value
+      is asked); `budgetBlocked` / `decide` from a real store; the path and both panel lines, with the reset time, from every real
+      string table.
+    - `BalanceRefusalChecks`: the refusal in request and job errors, before admission or not (a 402 with a job id and pending billing
+      queries the original job); the account, the numbers only when sent, the recharge address fallback, the retry; the line and its
+      path in every table; a refused price check names no order or bill.
+    - `SpendChecks`: one moment per reservation across midnight; a refund after the time zone changed goes back to the day key it was
+      booked on.
+    - `LimitTokenChecks` (2026-11-26): a raise's token void after the limit went to 2,000 and back to 1,000; a used or unknown
+      token replayed with `theme=classic` writes nothing and says to repeat without it; with a mode change it asks.
+    - `SettleChecks` (2026-11-26): a settlement in Tokyo on the booking's day key; a keyless refund or settlement only into a day the
+      ledger proves (Shanghai midnight: none; noon: that day); a settlement writes the ledger once. Each case runs on three clocks,
+      passed to the settlement too: the fixed sample, today, and 120 days ago. The 40-day clean-up never deletes the sample (CXM4).
+    - `ReferenceTotalChecks`: the actual totals.
+  - `scripts/check-voice-recovery.sh`:
+    - `VoiceChangeBalanceChecks`: change_voice into a plain 402 and into one with pending billing, with real App objects; get_job then
+      GETs the original job and settles by its billing;
+    - `VoiceChangeSettleChecks` (2026-11-26): a polled 402 queries the original job; a 402 GET with a final bill of 6.5 settles at
+      6.5; no final bill keeps the 9 and reports no charge (done, or get_job on the original job); a result without its background
+      keeps the 9 until get_job reads the bill; after a 402 GET with a bill, get_job's `spent_today_credits` is read after settling;
+    - the voiceover's budget stop: its options, the numbers read at the refusal, its own resume;
+    - the mid-voiceover fee over the limit, with both ways (`FallbackFeeChecks`).
+  - `checks/sky-studio-wiring/daily-limit.sh` pins:
+    - one builder for each refusal and option (a)'s advance question;
+    - the panels' note and its in-place popover, and the sheets leaving the race to the note;
+    - the voiceover's refusal-time numbers and the six paid jobs;
+    - no constant accepted flag (the voice change's is its job id), the voice change settling only by a final bill and reading a
+      refusal's bill, the booking's day key and the one-write settlement, and no day worked out from a reservation's date.
+  - Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md) section 11.
 - Picture transitions: `scripts/check-mcp.sh` → `TransitionReportChecks` preserves 1.042 seconds when both handles suffice,
   reports shortening limits and reasons, and preserves legacy overlapping seams; `scripts/check-video-fade.sh` checks the
   rendered brightness and total length in both pipelines (`LongCrossfade.swift`). Rule: [Transitions](../architecture/transition-handles.md).
@@ -659,6 +692,8 @@
     都要能从 AGENTS.md 的链接找到。只读 AGENTS.md 的代理打不开索引外的文档，所以漏一行等于那份文档不存在。漏索引、死链、算上限用同一份清单：
     `docs/` 下名字只有字母、数字、`.` `_` `-` 的普通 `.md` 文件（叫 `xxx.md` 的文件夹不算文档；符号链接、`.MD`、名字带空格或括号的红）；
     `docs/bugfixes/` 下只放 `YYYY-MM-DD-<slug>.md`、`TEMPLATE.md`、`INDEX.md`。
+    No doc on that list and no `.md` file at the root is empty (only whitespace counts): an emptied doc still opens, so its index
+    line and the dead-link check stayed green when a script emptied one (PR #555, 2026-11-25; `[empty_doc]`, three self-test cases).
   - 两份都没有死链（大小写也要一字不差）；`INDEX.md` 里的链接按它所在的文件夹解析（同文件夹写 `xxx.md`，别的文件夹写 `../architecture/xxx.md`）。
     AGENTS.md 的「Bug 修复案例索引」一节只留指路的话（每行 ≤ 400 字节、≤ 5 行，只许普通的一行或 `- ` 开头的一行）；这一节和 AGENTS.md 的索引小节里，
     任何指向 `docs/bugfixes/` 下案例的链接都红（`INDEX.md`、`TEMPLATE.md` 除外），不管前面是什么记号（开工早的会话还会照旧规矩往那里补一行）。

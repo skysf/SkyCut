@@ -49,6 +49,8 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
     private var requestSent = false
     private var requestKeys: [String] = []
     private var lastFailure: SkyStudioJobFailure?
+    /// The last failure when it was Sky Studio's balance refusal, with whether it came before admission (SkyStudioBalanceRefusal).
+    private var lastBalance: SkyStudioBalanceRefusal.Refusal?
     private var creditsUnconfirmed = false
     private var serverFinished = false
     private var billing: SkyStudioBilling?
@@ -295,6 +297,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             }
         } catch let error as SkyStudioJobError {
             lastFailure = error.failure
+            lastBalance = SkyStudioBalanceRefusal.refusal(of: error, accepted: submitted.jobID != nil)
             if let billing = lastFailure?.billing { settle(billing) }
             if let id = error.failure?.jobID { submitted.mark(id) }
             throw error
@@ -499,9 +502,16 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             payload["next_step"] = .string(SkyStudioCharacterError.nextStep(code))
         }
         if together { payload["next_step"] = .string(SkyStudioReferenceFitFailure.togetherNextStep(limit: lastFailure?.limit)) }
-        if lastFailure?.code == "insufficient_credits" {
-            payload["recharge_url"] = (lastFailure?.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
-            payload["next_step"] = "Nothing further will be generated. Notify the user in their conversation language of insufficient credits and provide recharge_url. Keep the original task identity; do not repeatedly ask for approval or retry payments."
+        // The Sky Studio balance (not SkyCut's daily limit): the numbers, where only the user adds credits, and the row in the app's
+        // language (MSG1, SkyStudioBalanceRefusal).
+        if let balance = lastBalance {
+            // An official film needs a new quote, a new seam review and a new key; an ordinary generation a new key (or none).
+            let retry = official != nil
+                ? "get a new official quote (generate_media with film and quote_only=true) and review its seams again, then submit "
+                    + "with the new quote_token, seam_review and a new idempotency_key (this one stays bound to this failed job)"
+                : "call generate_media again without idempotency_key or with a new one (this one stays bound to this failed job)"
+            payload.merge(SkyStudioBalanceRefusal.fields(balance, retry: retry)) { _, new in new }
+            self.status.issue = SkyStudioBalanceRefusal.shown(balance)
         }
         // Last, over the generic next step: an upload that did not happen was never submitted, so there is no original job to query.
         if let uploadFailure {

@@ -300,7 +300,7 @@ done
 grep -qF 'try SkyStudioApproval.file(request.originalURL)' "${UP_TOOL}" || fail "${UP_TOOL}：upscale 确认码没有绑定素材身份"
 grep -qF 'try frame.map(SkyStudioApproval.file)' Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift \
   || fail "generate_media：确认码没有绑定首帧文件身份"
-[ "$(count 'record(store, credits)' "${JOB_GATE}")" -eq 4 ] || fail "${JOB_GATE}：记账 record(store, credits) 应恰好四处（额度内直接做 / 收下令牌 / 配音整批预留 / 声音库的一次性费用点过头）"
+[ "$(count 'record(store, credits, now: now)' "${JOB_GATE}")" -eq 4 ] || fail "${JOB_GATE}：记账 record(store, credits, now: now) 应恰好四处（额度内直接做 / 收下令牌 / 配音整批预留 / 声音库的一次性费用点过头；一个时刻：MSG1）"
 movers="$(code_files_with 'SkyStudioSpendStore' | while read -r file; do
   # 只认真动账本的写法（SkyStudioSpendStore.shared.record / refund、拿着它的 store.record / refund）；held?.refund() 是经 SkyStudioHeldCredits 退。
   if grep -qE '(SkyStudioSpendStore\.shared|store)\.(record|refund)\(' <<<"$(sed 's,//.*,,' "${file}")"; then echo "${file}"; fi
@@ -481,7 +481,8 @@ grep -qF 'SkyStudioVoiceRequests.segmentQuote(kind: kind, model: model, voice: v
 grep -qF 'SkyStudioJobRun(api: api, key: try await resolvedKey())' "${VOICE_CLOUD}" && grep -qF 'let done = try await runner.run(request)' "${VOICE_CLOUD}" \
   && grep -qF 'run.checkpoint = ' "${VOICE_CLOUD}" || fail "云端配音没有复用统一任务执行器并持久化原单身份"
 grep -qF 'switch await SkyStudioJobKey.key(.silent)' "${VOICE_SERVICES}" || fail "云端配音不得弹钥匙串框"
-grep -qF 'SkyStudioVoiceBudget.reserve(missingCredits)' "${VOICE_CLOUD}" || fail "恢复补批次没有先预留这几批的报价"
+grep -qF 'SkyStudioVoiceBudgetProblem.reserve(missingCredits)' "${VOICE_CLOUD}" && grep -qF 'SkyStudioVoiceBudget.reserve(credits, now: now)' "${VOICE_SERVICES}" \
+  || fail "恢复补批次没有先预留这几批的报价（MSG1：超了带着那一刻的数）"
 grep -qF 'SkyStudioJobGate.reserveWithoutAsking(credits: total' "${VOICE_BUDGET}" || fail "整批配音没有统一判断每日额度"
 [ "$(count 'AIUndoGrouping.step(project.effectiveUndoManager)' "${VOICE_RUN}")" -eq 1 ] || fail "云端配音落地必须只有一整步撤销"
 for token in 'SkyStudioGenerationActivity.shared.add(status)' 'SkyStudioGenerationActivity.shared.remove(status)' 'OpenProjects.shared.all.contains' 'submission_keys'; do
@@ -566,6 +567,9 @@ source checks/sky-studio-wiring/reference-fit.sh
 
 # 20. Downloads of paid results the network interrupts (2026-11-24): checks/sky-studio-wiring/download-retry.sh.
 source checks/sky-studio-wiring/download-retry.sh
+
+# 21. SkyCut's own daily credit limit stopping a request (2026-11-24, MSG1): checks/sky-studio-wiring/daily-limit.sh.
+source checks/sky-studio-wiring/daily-limit.sh
 
 # 0.18.62 真积分验收后的结果边界：下面每份纯值规则都必须接到实际工具 / 下载 / 刷新路径。
 grep -qF 'characters.map(SkyStudioCharacterSummary.json)' Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift || fail "角色列表绕过有界摘要"

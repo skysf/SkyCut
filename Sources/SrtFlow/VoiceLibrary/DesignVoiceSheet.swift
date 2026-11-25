@@ -64,11 +64,15 @@ struct DesignVoiceSheet: View {
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // Over the limit: which limit, the numbers and where to change it (MSG1), in place of the spent line.
+            if overLimit, let quote = model.quote { DailyCreditLimitNote(needed: quote.credits, spend: spend) }
             Divider()
             HStack(alignment: .center, spacing: 12) {
-                Text(String(format: L10n("Spent today %@ of your %@-credit daily limit"), SkyStudioCredits.text(spend.spentToday()), SkyStudioCredits.text(spend.dailyLimit)))
-                    .font(.caption)
-                    .foregroundStyle(overLimit ? .red : .secondary)
+                if !overLimit {
+                    Text(String(format: L10n("Spent today %@ of your %@-credit daily limit"), SkyStudioCredits.text(spend.spentToday()), SkyStudioCredits.text(spend.dailyLimit)))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer(minLength: 8)
                 Button("Cancel") { dismiss() }
                 Button(VoiceLibraryText.designButton(model.quote), action: order)

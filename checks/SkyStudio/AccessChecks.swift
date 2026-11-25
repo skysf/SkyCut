@@ -13,24 +13,24 @@ func runAccessChecks() {
     checkEqual(AIAccessMode.full.names["zh"]?.stringValue, "全部权限", "Chinese full-access label")
     checkEqual(AIAccessMode.ask.names["zh"]?.stringValue, "请求批准", "Chinese approval label")
     do {
-        _ = try AISettingsApproval.check(AIToolArguments(["confirm_token": []]), mode: nil, limit: nil, access: access, currentLimit: 1_000)
+        _ = try AISettingsApproval.check(AIToolArguments(["confirm_token": []]), mode: nil, limit: nil, access: access, spend: spend)
         check(false, "invalid confirmation fields must not be silently ignored")
     } catch { check(true, "invalid confirmation fields are rejected before any setting changes") }
     access.setMode(.full)
     checkEqual(AIAccessStore(defaults: defaults).mode, .full, "the GUI and MCP share a persisted mode")
     let settings = AIToolArguments(["ai_access_mode": "ask_for_approval", "language": "es"])
-    let asked = try? AISettingsApproval.check(settings, mode: .ask, limit: nil, access: access, currentLimit: 1_000)
+    let asked = try? AISettingsApproval.check(settings, mode: .ask, limit: nil, access: access, spend: spend)
     let token = asked?.payload["confirm_token"]?.stringValue ?? ""
     check(!token.isEmpty, "even full access must ask before changing permissions")
     checkEqual(access.mode, .full, "requesting settings approval changes nothing")
     let changed = AIToolArguments(["ai_access_mode": "ask_for_approval", "language": "en", "confirm_token": .string(token)])
-    let wrong = try? AISettingsApproval.check(changed, mode: .ask, limit: nil, access: access, currentLimit: 1_000)
+    let wrong = try? AISettingsApproval.check(changed, mode: .ask, limit: nil, access: access, spend: spend)
     check(wrong?.payload["confirm_token_refused"] != nil, "changing another setting cannot reuse the approved request")
     let approved = AIToolArguments(["ai_access_mode": "ask_for_approval", "language": "es", "confirm_token": .string(token)])
     do {
-        check(try AISettingsApproval.check(approved, mode: .ask, limit: nil, access: access, currentLimit: 1_000) == nil, "the original approval still works")
+        check(try AISettingsApproval.check(approved, mode: .ask, limit: nil, access: access, spend: spend) == nil, "the original approval still works")
     } catch { check(false, "settings approval: \(error)") }
-    check((try? AISettingsApproval.check(settings, mode: .ask, limit: 2_000, access: access, currentLimit: 1_000)) != nil,
+    check((try? AISettingsApproval.check(settings, mode: .ask, limit: 2_000, access: access, spend: spend)) != nil,
           "raising a hard budget always asks")
     fullAccessQuestionChecks(defaults: defaults)
 
@@ -148,25 +148,26 @@ private func runDraftResolutionChecks() {
 @MainActor
 private func fullAccessQuestionChecks(defaults: UserDefaults) {
     let access = AIAccessStore(defaults: defaults)
+    let spend = SkyStudioSpendStore(defaults: defaults)
     access.setMode(.ask)
     let notice = SkyStudioVoiceStandingNotice(catalog: nil, dailyLimit: 1_000)
     let on = AIToolArguments(["ai_access_mode": "full_access"])
-    let asked = try? AISettingsApproval.check(on, mode: .full, limit: nil, fullAccess: notice, access: access, currentLimit: 1_000)
+    let asked = try? AISettingsApproval.check(on, mode: .full, limit: nil, fullAccess: notice, access: access, spend: spend)
     let token = asked?.payload["confirm_token"]?.stringValue ?? ""
     check(!token.isEmpty && asked?.payload["question"]?.stringValue?.contains(notice.turnOnText) == true,
           "turning Full access on asks with the explanation (fees, daily limit, the standing consent it records)")
     var newer = notice
     newer.statement = SkyStudioVoiceConsentStatement(version: "voice-standing-consent-v2", statement: "A newer statement.")
     let answered = AIToolArguments(["ai_access_mode": "full_access", "confirm_token": .string(token)])
-    check((try? AISettingsApproval.check(answered, mode: .full, limit: nil, fullAccess: newer, access: access, currentLimit: 1_000))?
+    check((try? AISettingsApproval.check(answered, mode: .full, limit: nil, fullAccess: newer, access: access, spend: spend))?
             .payload["confirm_token_refused"] != nil, "the answer covers the statement version shown: a newer one asks again")
     do {
-        check(try AISettingsApproval.check(answered, mode: .full, limit: nil, fullAccess: notice, access: access, currentLimit: 1_000) == nil,
+        check(try AISettingsApproval.check(answered, mode: .full, limit: nil, fullAccess: notice, access: access, spend: spend) == nil,
               "the answer for the version shown is accepted")
     } catch { check(false, "full access approval: \(error)") }
     access.setMode(.full)
     let off = try? AISettingsApproval.check(AIToolArguments(["ai_access_mode": "ask_for_approval"]), mode: .ask, limit: nil, fullAccess: notice,
-                                            access: access, currentLimit: 1_000)
+                                            access: access, spend: spend)
     check(off?.payload["confirm_token"] != nil && off?.payload["question"]?.stringValue?.contains(notice.turnOnText) == false,
           "turning Full access off still asks, without the explanation")
 }

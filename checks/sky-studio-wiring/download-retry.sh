@@ -181,7 +181,7 @@ grep -qF 'let places = VoiceChangeOutputName.places(' "${DOWNLOAD_CHANGE_JOB}" \
   && grep -qF 'for file in placed where !Self.onAnyTimeline(file.url) { ExclusivePlacement.discard(file) }' "${DOWNLOAD_CHANGE_JOB}" \
   && ! grep -qE 'removeItem\(at: (places|file|voice|separated)' "${DOWNLOAD_CHANGE_JOB}" \
   && grep -qF 'if let failure = SkyStudioDownloadFailure.from(error) { throw failure.after(gets) }' "${DOWNLOAD_CHANGE_JOB}" \
-  && grep -qF 'if let charged = done.finalCharge { held.settle(charged: charged); settledBill = done } else { billPending = true }' "${DOWNLOAD_CHANGE_JOB}" \
+  && grep -qF 'if let charged = VoiceChangeBilling.charge(of: done) { held.settle(charged: charged); settledBill = done } else { billPending = true }' "${DOWNLOAD_CHANGE_JOB}" \
   && grep -qF 'let server = settledBill ?? status' "${DOWNLOAD_CHANGE_JOB}" \
   && grep -qF 'job.refresh = { [self] in await refreshBill() }' "${DOWNLOAD_CHANGE_JOB}" \
   || fail "${DOWNLOAD_CHANGE_JOB}: a voice change's files take their names on disk; a failure deletes only a file it placed, while it is still that file and no timeline uses it (a cancel once deleted another process's file and a file that replaced its own); every GET counted; its bill settles only once final"

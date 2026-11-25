@@ -734,6 +734,98 @@ Manual regression before a release (the checks cannot cut a real link):
 
 AI 权限与设置确认合同见 [统一设置](workbench-and-settings.md#ai-操作权限与草稿2026-11-01)。`SkyStudioJobGate` 先检查每日硬预算，再检查草稿越档审批；全部权限和旧确认码均不能让日预算超额。`reserveReplacement` 同样遵守预算。配音超预算现在暂停并提示设置，不再悄悄退到本机音色；手动 upscale 按钮与任务开跑时都核对硬预算。余额不足保留服务器 `balance/needed/recharge_url` 并给出充值入口。未知结果只查原单；本次不改变服务端退款政策。
 
+**What a daily-limit refusal says** (2026-11-24, MSG1, [case](../bugfixes/2026-11-24-daily-limit-refusal-unclear.md); reviewed
+2026-11-25). Every refusal by the daily limit is built from `SkyCutDailyLimit` only: the AI's `daily_budget_exceeded`
+(`SkyStudioJobGate.budgetBlocked`, all paid tools), the paid panels' line (`DailyCreditLimitNote`: Upscale, Design a Voice, Change
+Voice) and an upscale that loses the race to the limit (`SkyCutDailyLimit.userLine` in its task row). It must:
+
+1. name the limit as SkyCut's own setting, not the Sky Studio balance (`blocked_by: skycut_daily_credit_limit`);
+2. give the numbers as they were when the request was refused (a voiceover's missing batches carry them in
+   `SkyStudioVoiceBudgetProblem`, read at the refusal and not when the result is built): the limit, used today, left, this
+   request's estimate, and when the ledger's next day starts (`resets_at`: the end of today's calendar day. It is 00:00 even after a
+   day that skipped its midnight (America/Santiago 2026-09-06), and it is not "this time tomorrow" rounded down: America/Nuuk at
+   2026-03-27 23:30 has no 23:30 the next day);
+3. offer the ways on:
+   - (a) raise it now: `options[0]` is the exact `set_settings` call with a friendly suggested value
+     (`suggested_daily_limit_credits`, enough for this request rounded up: 988 used + 36 needed suggests 1,500). It carries SkyCut's
+     question and a confirm_token for exactly that raise from this limit and permission mode (`AISettingsApproval.limitRaise`, the
+     same identity `check()` computes). The user decided on 2026-11-25 to be asked once (「只问一次」): their yes to that question
+     is the approval. Any other value is asked by set_settings as before, in every mode. The token raises the limit only, never
+     admits the refused request, and is good for one call. It is void once the limit moved: a late yes to 1,000 → 1,500 after the
+     user set 2,000 is asked again, because writing it would lower the limit;
+   - (b) change it at the path the app shows in its own language (`settings_path`, labels read from the string tables, plus
+     `settings_path_english` when the app is not in English). The panels' Change Limit… edits that same row in a popover, in
+     place: it never switches the Settings pane, because Design a Voice is a sheet of the Editing pane and leaving the pane would
+     close it and lose its draft;
+   - (c) wait for the reset, offered only when a whole day's limit covers the request (a limit of 0 or 20 never fits 36).
+
+A panel that loses the race redraws from the store: its note says it, with no second line left over once the limit is raised.
+
+A reservation's check, booking and refund day are one moment, and the day key it was booked on travels with it:
+- `SkyStudioJobGate` passes `now` through;
+- `Reservation.dayKey` is set at booking;
+- `SkyStudioVoiceLibraryOrders` persists it as `reservedDayKey`;
+- a refund and a settlement use that key.
+
+So a reservation booked a second before midnight and refunded after it, or after the Mac's time zone changed, goes back to its own
+day, not the next one.
+
+Third check (Codex CXM3, 2026-11-26):
+
+- **The raise token.** It is bound to the limit's revision (`SkyStudioSpendStore.limitRevision`), so any change of the limit since
+  its question voids it, also a change back to the same value. A call that carries a token has it checked before anything in the
+  call is written. A token that was used, expired, not issued or issued for another change authorizes nothing: set_settings asks
+  again when the call changes the mode or the limit, and otherwise writes nothing and says to repeat the call without the token.
+- **Reservations without a day key.** A voice library order from an older SkyCut has none. It refunds or settles only into a day
+  the ledger proves holds it: of the two or three days its moment falls on around the world (`DailySpendLedger.possibleDayKeys`),
+  the only one that still holds that much. Otherwise the books stay as they are, counting more rather than less, and the log says
+  so. A day worked out in today's time zone once took the next day's 80 down to 20.
+- **One write per settlement** (`SkyStudioSpendStore.settle`). Written as a refund and then a booking, a kill between the two left
+  the refund without the charge. A voice library order is still deleted before the books change: a kill in between can only count
+  more. Deleting the order after the write would let a restart follow the order again and settle it twice.
+
+**What a balance refusal says** (the same day, its twin). Sky Studio's `insufficient_credits` (402 at `/jobs`; `/quote` does not check
+the balance) is said by `SkyStudioBalanceRefusal` in every paid job: generate_media, upscale_clip, add_voiceover, change_voice, voice
+design and MiniMax versions, manage_characters. The AI gets:
+
+- `blocked_by: sky_studio_balance` (the user's Sky Studio account, not SkyCut's daily limit);
+- `balance_credits` and `needed_credits` when Sky Studio sent them;
+- `recharge_url` (Sky Studio's, else the account's);
+- a next step that depends on admission:
+  - **A plain refusal** was not charged. Once the user says they added credits, it follows the job's own retry: a new quote, seam
+    review and key for an official film, and the caller's own step for a voice library job. A MiniMax version mid-voiceover resumes
+    from its recovery file; that step is persisted with the order as `failureStep`, so it holds after a restart.
+  - **A refusal that may have been charged**: one that came with a job id or billing (`billing.status: pending_review`), or one
+    for a job Sky Studio had already accepted (`refusal(of:accepted:)`; a balance error while polling carries no billing). The AI
+    queries that original job and never submits it again. get_job on a failed voice change GETs that job and settles the books by
+    its billing.
+
+A voice change's books move only by its final charge (`SkyStudioJobStatus.finalCharge`, as above; `VoiceChangeBilling.charge`,
+2026-11-26):
+- a bare top-level `credits_charged` of 0 with no bill at all is not one: it is neither settled nor reported as the charge;
+- a refusal's final bill for the original job counts (a 402 billed 6.5), and get_job's reply then reads the books after settling;
+- a default change whose result lacks its background keeps its reservation until a bill comes;
+- get_job's one refresh (`refreshBill`) reads the original job while the bill is pending or after the change failed or stopped.
+
+The task row shows the localized line with the numbers and the path to Add Credits (SkyCut → Settings → Sky Studio → Add Credits,
+or the pane when Sky Studio sent no address). Only `SkyStudioBalanceRefusal` names the code, apart from `SkyStudioJobAdmission`'s
+list (`checks/sky-studio-wiring/daily-limit.sh`). `BalanceRefusalChecks` checks the words and the line in every string table, and
+`scripts/check-voice-recovery.sh` (`VoiceChangeBalanceChecks`) runs change_voice into a plain 402 and into one with pending billing,
+using real App objects. `SpendChecks` covers the reservation across midnight. `LimitTokenChecks` covers the token's revision and
+replays, and `SettleChecks` covers settling on the booking's day, keyless reservations and the one write. `VoiceChangeSettleChecks`
+(real App objects) covers the voice change's bills: a polled 402, a refusal's final bill, no final bill, and a result without its
+background.
+
+Manual regression for both (before a release; no automated check opens a real window or client):
+
+- [ ] With the daily limit below a quote, open Upscale, Design a Voice and Change Voice in English, 简体中文 and Español at the default
+      window size: the red line names SkyCut's limit, the numbers, the path and the reset time, and is not cut off. Change Limit…
+      opens a popover with the limit's row. Raising it there (Return or clicking away) enables the panel's button without reopening
+      the panel, and a Design a Voice draft is still there.
+- [ ] In a real MCP client, a request over the limit: the AI says it is SkyCut's limit (not the balance), with the numbers, and
+      offers the options with SkyCut's question. A yes to that exact value raises the limit with no second question; another value is
+      asked first; nothing changes before the user agrees.
+
 ## 十二、图片目录、换机位与图片放大（2026-11-07 客户端合同）
 
 本节对应 Sky Studio `feat/skycut-image-model-catalog` 的最终 image catalog 合同（Commit 2），角色操作另见第十三节。
