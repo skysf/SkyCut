@@ -65,18 +65,22 @@ final class SkyStudioOfficialRecoveryRun {
                 downloading = result   // its folder cannot be made (a file in the way): held for Download again, as a download would be
                 throw SkyStudioDownloadFailure.notSaved(error)
             }
-            let pathExtension = SkyStudioGeneration.fileExtension(contentType: result.contentType, url: result.url, kind: kind)
-            let original = value.savedOriginal ?? value.savedFile
-                ?? ExportFileName.unoccupied(in: value.folder, stem: value.stem, pathExtension: pathExtension) { FileManager.default.fileExists(atPath: $0.path) }
-            if !FileManager.default.fileExists(atPath: original.path) {
+            let original: URL
+            if let recorded = value.savedOriginal ?? value.savedFile, FileManager.default.fileExists(atPath: recorded.path) {
+                original = recorded
+            } else {
                 status.advance(to: .downloading(fraction: nil), typicalSeconds: nil)
                 downloading = result
                 let key = key
                 let renew: @Sendable () async throws -> URL? = { try await SkyStudioAPI().job(serverID, key: key).result?.url }
-                // Gave up or stopped: SkyStudioDownloadFailure, and the paid output stays held for Download again.
-                try await SkyStudioAPI().download(result.url, to: original, renew: renew) { [weak self] fraction in
+                let place = CloudResultPlace(folder: value.folder, stem: value.stem,
+                                             pathExtension: SkyStudioGeneration.fileExtension(contentType: result.contentType, url: result.url, kind: kind))
+                // Gave up, stopped or never an image that decodes: SkyStudioDownloadFailure, and the paid output stays held for Download
+                // again. It takes its name without replacing or removing anything (the next free number when the name is taken).
+                original = try await SkyStudioAPI().download(result.url, into: place, renew: renew,
+                                                             check: kind == .image ? SkyStudioImageResult.downloadCheck() : nil) { [weak self] fraction in
                     Task { @MainActor in self?.status.advance(to: .downloading(fraction: CloudJobPhase.quantized(fraction)), typicalSeconds: nil) }
-                }
+                }.url
             }
             // The output is on this Mac: nothing is held for it any more.
             held = nil
@@ -84,8 +88,7 @@ final class SkyStudioOfficialRecoveryRun {
             var file = original
             if await SkyStudioGeneratedVideo.needsCopy(original) {
                 let ffmpeg = try await SkyStudioGeneratedVideo.engine()
-                file = value.savedFile ?? ExportFileName.unoccupied(in: value.folder, stem: value.stem, pathExtension: "mp4") { FileManager.default.fileExists(atPath: $0.path) }
-                try await SkyStudioGeneratedVideo.makeCopy(original, to: file, ffmpeg: ffmpeg)
+                file = try await SkyStudioGeneratedVideo.makeCopy(original, in: value.folder, stem: value.stem, ffmpeg: ffmpeg)
             }
             try await recovery.delivered(file: file, original: original)
             finish(job, .done, file: file, message: "Recovered the original output without another generation.")

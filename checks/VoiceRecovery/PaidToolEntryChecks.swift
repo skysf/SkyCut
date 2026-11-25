@@ -13,8 +13,11 @@ import SrtFlowMCPKit
 // - generate_media with a key sent with spaces: the receipt's key (trimmed), sent back, is that same request (it was once refused as
 //   other inputs, CXD3); an output folder a file stands in for: held (download_not_saved, the row's Download again, no file GET), and
 //   once the folder is fixed the job's own key downloads it with no new POST (it once lost the way back);
+// - generate_media into an output folder SkyCut may not write (the real write error): held as download_not_saved after its one GET,
+//   and once the folder is writable the job's own key saves it with no new POST;
 // - upscale_clip: project B asking for project A's source after A's upscale was held is a new job for B: B's clip replaced, A's left
-//   as it was, A's result still held on its own row.
+//   as it was, A's result still held on its own row; an upscale saved while its bill is under review keeps the 75 reserved and says
+//   the bill is pending, and get_job reads the original job until it is final, then the books and the receipt say 72 (CXD4).
 // Both tools need a key on the account (SkyStudioAccount.hasKey), so these run last: the account marks the key as present the way the
 // App does when macOS asks for the keychain's permission (the key itself comes from SkyCut's in-memory cache; the keychain is never
 // read). That writes the MCP provider marker into this run's own Application Support folder, which Main and the script remove.
@@ -29,6 +32,7 @@ func runPaidToolEntryChecks(_ root: URL) async throws {
     try await generateMediaEntryChecks(root.appendingPathComponent("paid-generate", isDirectory: true))
     try await generateMediaKeyAndFolderChecks(root.appendingPathComponent("paid-generate-key", isDirectory: true))
     try await upscaleClipEntryChecks(root.appendingPathComponent("paid-upscale", isDirectory: true))
+    try await upscaleBillUnderReview(root.appendingPathComponent("paid-upscale-review", isDirectory: true))
 }
 
 @MainActor
@@ -158,6 +162,27 @@ private func generateMediaKeyAndFolderChecks(_ folder: URL) async throws {
         require(done["status"] == "done" && file.flatMap { try? Data(contentsOf: $0) } == GenerationHTTP.image && posts() == made
                 && !SkyStudioHeldDownloads.isHeld(id),
                 "once the folder is fixed the same result is saved, with no new POST: \(done)")
+
+        // A folder SkyCut may not write: the system's download cannot be moved in (the real write error, never a network one).
+        try FileManager.default.createDirectory(at: generated, withIntermediateDirectories: true)
+        chmod(generated.path, 0o555)
+        let locked = try await SkyStudioGenerateTool.generate(AIToolArguments(.object(args)), project)
+        guard let lockedID = locked.payload["job_id"]?.stringValue, let lockedKey = locked.payload["idempotency_key"]?.stringValue,
+              let lockedJob = AIJobs.shared.job(lockedID) else {
+            chmod(generated.path, 0o755)
+            return require(false, "generate_media starts a job: \(locked.payload)")
+        }
+        let refused = await finishedJob(lockedJob)
+        chmod(generated.path, 0o755)
+        require(refused["status"] == "failed" && refused["code"] == "download_not_saved" && refused["download_attempts"] == 1
+                && SkyStudioHeldDownloads.isHeld(lockedID),
+                "a folder SkyCut may not write: download_not_saved after its one GET, held for Download again: \(refused)")
+        var lockedArgs = args
+        lockedArgs["idempotency_key"] = .string(lockedKey)
+        let reread = posts()
+        _ = try await SkyStudioGenerateTool.generate(AIToolArguments(.object(lockedArgs)), project)
+        let saved = await finishedJob(lockedJob)
+        require(saved["status"] == "done" && posts() == reread, "once the folder is writable the job's own key saves it, no new POST: \(saved)")
     }
 }
 
@@ -204,5 +229,41 @@ private func upscaleClipEntryChecks(_ folder: URL) async throws {
         require(heldA?.canRetryDownload == true && UpscaleActivity.shared.jobs.contains { $0 === heldA },
                 "A's result is still held on its own row")
         if let heldA { UpscaleActivity.shared.remove(heldA) }
+    }
+}
+
+/// An upscale saved while Sky Studio's bill is under review: the 75 reserved stays, the receipt says the bill is pending; get_job reads
+/// the original job again (still under review: still pending), and once the bill is final the books and the receipt take 72.
+@MainActor
+private func upscaleBillUnderReview(_ folder: URL) async throws {
+    guard let (source, info) = try await upscaleSource(folder),
+          let project = OpenProjects.shared.newProject(savingAs: folder.appendingPathComponent("Review.skycut"), placement: .background) else {
+        return require(false, "a project for the upscale under review")
+    }
+    let clip = EditClip(sourceURL: source, sourceDuration: info.duration, timelineStart: 0, info: info)
+    project.perform { $0.mainClips = [clip] }
+    try await withUpscaleHTTP(serving: source) {
+        UpscaleHTTP.lock.withLock { UpscaleHTTP.charge = .reviewing }
+        let spent = SkyStudioSpendStore.shared.spentToday()
+        let started = try await AIUpscaleTool.upscale(AIToolArguments(["clip_id": .string(AIShortIDs(state: project.state).short(clip.id)),
+                                                                       "tier": "topaz-starlight", "target": "1080p"]), project)
+        guard let id = started.payload["job_id"]?.stringValue, let job = AIJobs.shared.job(id) else {
+            return require(false, "upscale_clip starts: \(started.payload)")
+        }
+        let done = await finishedJob(job)
+        @MainActor func books() -> Double { SkyStudioSpendStore.shared.spentToday() - spent }
+        require(done["status"] == "done" && done["billing_pending"] == true && done["credits_charged"] == .null && done["credits_reserved"] == 75
+                && abs(books() - 75) < 0.001,
+                "saved while the bill is under review: 75 reserved, the bill said pending, never 75 as the charge: \(done), \(books())")
+        let reads = UpscaleHTTP.lock.withLock { UpscaleHTTP.reads }
+        UpscaleHTTP.lock.withLock { UpscaleHTTP.rereadCharge = .reviewing }
+        let still = try await AIExportTools.job(AIToolArguments(["job_id": .string(id)])).payload
+        require(still["billing_pending"] == true && abs(books() - 75) < 0.001 && UpscaleHTTP.lock.withLock { UpscaleHTTP.reads } > reads,
+                "get_job reads the original job; still under review: still pending at 75: \(still)")
+        UpscaleHTTP.lock.withLock { UpscaleHTTP.rereadCharge = .billing }
+        let final = try await AIExportTools.job(AIToolArguments(["job_id": .string(id)])).payload
+        require(final["billing_pending"] == false && final["credits_charged"] == 72 && abs(books() - 72) < 0.001,
+                "once the bill is final, get_job settles it: the books and the receipt say 72: \(final), \(books())")
+        if let file = done["file"]?.stringValue.map({ AIWorkspace.shared.resolve($0) }) { try? FileManager.default.removeItem(at: file) }
     }
 }

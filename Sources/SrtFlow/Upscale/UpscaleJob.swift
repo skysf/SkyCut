@@ -187,7 +187,8 @@ final class UpscaleJob: ObservableObject, Identifiable {
     }
 
     private func complete(_ result: UpscaleOutcome) {
-        held?.settle(charged: result.creditsCharged)
+        // The final charge when Sky Studio's bill is final; otherwise the reservation stays until it is (refreshBill).
+        if let charged = result.creditsCharged { held?.settle(charged: charged) }
         outcome = result
         state = .done
         onFinished?(self)
@@ -248,6 +249,20 @@ final class UpscaleJob: ObservableObject, Identifiable {
                 holdAfter(error, delivery: current)
             }
         }
+    }
+
+    /// A saved upscale whose bill was not final: Sky Studio's original job read again (only a GET), and once its bill is final the day's
+    /// books take that charge and the outcome says it. Returns the final charge, or nil while it is still not final (get_job calls this:
+    /// a bill under review was once left at the quote, CXD4 on PR #554).
+    func refreshBill() async -> Double? {
+        guard let pending = outcome, pending.creditsCharged == nil else { return nil }
+        guard case .success(let key) = await SkyStudioJobKey.key(.silent),
+              let status = try? await SkyStudioAPI().job(pending.jobID, key: key),
+              let charged = UpscaleDelivery.charge(of: status), outcome?.creditsCharged == nil else { return nil }
+        held?.settle(charged: charged)
+        outcome?.creditsCharged = charged
+        outcome?.record.credits = charged
+        return charged
     }
 
     /// Sky Studio made it and SkyCut is downloading or saving it right now: a stop keeps the paid result for Download again.

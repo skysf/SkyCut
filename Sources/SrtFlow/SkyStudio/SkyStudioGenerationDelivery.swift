@@ -1,16 +1,18 @@
 import Foundation
+import os
 import SrtFlowCore
 import SrtFlowMCPKit
 
 // MARK: - A finished generation's delivery: the paid result into the user's folder, made usable here
 //
 // What it covers (moved out of SkyStudioGenerationRun on 2026-11-24, when Download again began to run it again): the result downloaded
-// into the generation folder (SkyStudioAPI.download: resumed, retried, an expired address renewed from the original job), an image's
-// extension fixed by its bytes, an editing copy of a WebM, the optional SRT, the official receipt told, generated music measured.
-// A download that gives up, or is stopped, throws SkyStudioDownloadFailure before anything is saved, and so does an output folder that
-// cannot be made (`notSaved`: a file where it should be once ended the job and lost the way back, CXD3 on PR #554): the run then holds
-// the result for Download again. An SRT that did not come down leaves the video saved and is reported as missing, so the job's own key can fetch only
-// it.
+// into the generation folder (SkyStudioAPI.download: resumed, retried, an expired address renewed from the original job; it takes its
+// name without replacing or removing anything, the next free number when the name is taken), an image checked by its bytes before it
+// takes a name (and named by them), an editing copy of a WebM, the optional SRT, the official receipt told, generated music measured.
+// A download that gives up, is stopped, or never brings an image that decodes throws SkyStudioDownloadFailure before anything is saved,
+// and so does an output folder that cannot be made (`notSaved`: a file where it should be once ended the job and lost the way back,
+// CXD3 on PR #554): the run then holds the result for Download again. An SRT that did not come down leaves the video saved and is
+// reported as missing, so the job's own key can fetch only it.
 // What it does not cover: the job, its billing and ending, holding and Download again (SkyStudioGenerationRun).
 
 @MainActor
@@ -43,46 +45,30 @@ struct SkyStudioGenerationDelivery {
     /// The original job's current result, for a fresh address when one expired (nil: no renewal).
     let current: (@Sendable () async throws -> SkyStudioJobResult?)?
 
-    /// 同时下载的几个任务别挑到同一个文件名（挑名字和写文件之间隔着一次下载）。
-    private static var claimedPaths: Set<String> = []
-
-    /// `saved`: the original's place as soon as it is there (get_job reports it even when a later step fails).
+    /// `saved`: the original's place once it is there and checked (get_job reports it even when a later step fails); until then the
+    /// run keeps the result held for Download again.
     func deliver(_ result: SkyStudioJobResult, api: SkyStudioAPI, saved: (URL) -> Void) async throws -> Delivered {
         let pathExtension = SkyStudioGeneration.fileExtension(contentType: result.contentType, url: result.url, kind: generation.kind)
-        var destination = claim(pathExtension)
-        var claimed = [destination.path]
-        defer { for path in claimed { Self.claimedPaths.remove(path) } }
         do { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
         catch { throw SkyStudioDownloadFailure.notSaved(error) }   // nothing came down yet: held for Download again
         advance(.downloading(fraction: nil))
         let current = current
         let advance = advance
-        // Gave up or stopped: SkyStudioDownloadFailure (a stop with the GETs it sent), and nothing was saved.
-        try await api.download(result.url, to: destination, renew: current.map { read in { try await read()?.url } }) { fraction in
+        let image = generation.kind == .image ? OSAllocatedUnfairLock<SkyStudioImageResult.Format?>(initialState: nil) : nil
+        // Gave up, stopped, or never an image that decodes: SkyStudioDownloadFailure (a stop with the GETs it sent), nothing was saved.
+        let place = CloudResultPlace(folder: folder, stem: stem, pathExtension: pathExtension)
+        let renew = current.map { read in { @Sendable in try await read()?.url } }
+        let downloaded = try await api.download(result.url, into: place, renew: renew, check: image.map(SkyStudioImageResult.downloadCheck)) { fraction in
             Task { @MainActor in advance(.downloading(fraction: CloudJobPhase.quantized(fraction))) }
         }
+        let destination = downloaded.url
         saved(destination)
-        var localImage: SkyStudioImageResult.Format?
-        if generation.kind == .image {
-            let downloaded = destination
-            let measured = await MediaReadQueue.run(on: MediaReadQueue.analysis) { Result { try SkyStudioImageResult.format(at: downloaded) } }
-            let format = try measured.get()
-            destination = try SkyStudioImageResult.finalize(downloaded, format: format) {
-                let corrected = claim($0)
-                claimed.append(corrected.path)
-                return corrected
-            }
-            saved(destination)
-            localImage = format
-        }
+        let localImage = image?.withLock { $0 }
         advance(.finishing)
         var editable = destination
         if await SkyStudioGeneratedVideo.needsCopy(destination) {
             let ffmpeg = try await SkyStudioGeneratedVideo.engine()
-            let copy = claim("mp4")
-            defer { Self.claimedPaths.remove(copy.path) }
-            try await SkyStudioGeneratedVideo.makeCopy(destination, to: copy, ffmpeg: ffmpeg)
-            editable = copy
+            editable = try await SkyStudioGeneratedVideo.makeCopy(destination, in: folder, stem: stem, ffmpeg: ffmpeg)
         }
         var delivered = Delivered(file: editable, original: destination, localImage: localImage)
         if let url = result.captionFile { (delivered.caption, delivered.captionIssue) = await caption(url, api: api) }
@@ -94,27 +80,19 @@ struct SkyStudioGenerationDelivery {
 
     /// The optional SRT: its file, or why it is not there.
     func caption(_ url: URL, api: SkyStudioAPI) async -> (file: URL?, issue: CaptionIssue?) {
-        let file = claim("srt")
-        defer { Self.claimedPaths.remove(file.path) }
         let current = current
+        let downloaded: CloudResultFile
         do {
-            try await api.download(url, to: file, renew: current.map { read in { try await read()?.captionFile } })
+            let place = CloudResultPlace(folder: folder, stem: stem, pathExtension: "srt")
+            downloaded = try await api.download(url, into: place, renew: current.map { read in { @Sendable in try await read()?.captionFile } })
         } catch {
             return (nil, .missing(url))
         }
         if let max = model.limit("max_caption_bytes"),
-           let size = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.size] as? NSNumber, size.doubleValue > max {
-            try? FileManager.default.removeItem(at: file)
+           let size = (try? FileManager.default.attributesOfItem(atPath: downloaded.url.path))?[.size] as? NSNumber, size.doubleValue > max {
+            ExclusivePlacement.discard(downloaded.file)   // only while it is still the file this download placed
             return (nil, .tooLarge)
         }
-        return (file, nil)
-    }
-
-    private func claim(_ pathExtension: String) -> URL {
-        let url = ExportFileName.unoccupied(in: folder, stem: stem, pathExtension: pathExtension) {
-            FileManager.default.fileExists(atPath: $0.path) || Self.claimedPaths.contains($0.path)
-        }
-        Self.claimedPaths.insert(url.path)
-        return url
+        return (downloaded.url, nil)
     }
 }

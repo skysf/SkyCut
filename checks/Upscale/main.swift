@@ -163,11 +163,15 @@ Task {
     let original = root.appendingPathComponent("Shot_鲸鱼.mp4")
     checkEqual(UpscaleOutputName.stem(original: original, outputSize: CGSize(width: 1890, height: 1080), tier: "topaz-precision"),
                "Shot_鲸鱼_1890x1080_topaz-precision", "文件名 = 原名_宽x高_档位")
-    let first = UpscaleOutputName.destination(original: original, outputSize: CGSize(width: 1920, height: 1080), tier: "flux-precise", fallbacks: [], exists: { _ in false })
-    checkEqual(first.lastPathComponent, "Shot_鲸鱼_1920x1080_flux-precise.mp4", "不撞名就是它")
-    checkEqual(first.deletingLastPathComponent(), original.deletingLastPathComponent(), "放在原片旁边")
-    let taken = UpscaleOutputName.destination(original: original, outputSize: CGSize(width: 1920, height: 1080), tier: "flux-precise", fallbacks: []) { $0.lastPathComponent == "Shot_鲸鱼_1920x1080_flux-precise.mp4" }
-    checkEqual(taken.lastPathComponent, "Shot_鲸鱼_1920x1080_flux-precise 2.mp4", "撞名加编号（全 App 同一个规矩）")
+    checkEqual(UpscaleOutputName.folder(original: original, fallbacks: [], isWritable: { _ in true }), original.deletingLastPathComponent(), "放在原片旁边")
+    // 撞名加编号, never replacing: the pipeline's save places its file the way ExclusivePlacement does (2026-11-26).
+    let stem = UpscaleOutputName.stem(original: original, outputSize: CGSize(width: 1920, height: 1080), tier: "flux-precise")
+    try? Data("kept".utf8).write(to: root.appendingPathComponent(stem + ".mp4"))
+    let made = root.appendingPathComponent("made.tmp")
+    try? Data("new".utf8).write(to: made)
+    let placed = try? ExclusivePlacement.place(made, in: root, stem: stem, pathExtension: "mp4", from: 1)
+    checkEqual(placed?.lastPathComponent, "Shot_鲸鱼_1920x1080_flux-precise 2.mp4", "撞名加编号（全 App 同一个规矩）")
+    checkEqual(try? Data(contentsOf: root.appendingPathComponent(stem + ".mp4")), Data("kept".utf8), "the file already there is kept")
     let home = root.appendingPathComponent("home"), downloads = root.appendingPathComponent("downloads")
     checkEqual(UpscaleOutputName.folder(original: original, fallbacks: [home, downloads], isWritable: { $0 != original.deletingLastPathComponent() }), home, "原片的文件夹写不进去：退到工程的家")
     checkEqual(UpscaleOutputName.folder(original: original, fallbacks: [home, downloads], isWritable: { $0 == downloads }), downloads, "家也写不进去：退到下载")

@@ -169,17 +169,17 @@ private func orderChecks() {
             && VoiceChangeOutputName.pathExtension(contentType: nil, url: URL(string: "https://a/b.flac")!) == "flac"
             && VoiceChangeOutputName.pathExtension(contentType: "application/octet-stream", url: URL(string: "https://a/b")!) == "wav",
             "the extension follows the content type, then the link, then wav")
-    let taken: Set<String> = ["/media/采访 01 - Sky.wav"]
-    let places = VoiceChangeOutputName.destinations(original: original, voiceName: "Sky", backgroundLabel: "background", voiceExtension: "wav",
-        backgroundExtension: "wav", fallbacks: [], isWritable: { _ in true }, exists: { taken.contains($0.path) })
-    require(places.voice.lastPathComponent == "采访 01 - Sky 2.wav" && places.background.lastPathComponent == "采访 01 - background.wav"
-            && places.voice.deletingLastPathComponent().path == "/media", "files go next to the source and never replace one")
-    let same = VoiceChangeOutputName.destinations(original: original, voiceName: "background", backgroundLabel: "background", voiceExtension: "wav",
-        backgroundExtension: "wav", fallbacks: [], isWritable: { _ in true }, exists: { _ in false })
-    require(same.voice != same.background, "a voice that happens to be called background does not collide with the background file")
-    let readOnly = VoiceChangeOutputName.destinations(original: original, voiceName: "Sky", backgroundLabel: "background", voiceExtension: "wav",
-        backgroundExtension: "wav", fallbacks: [URL(fileURLWithPath: "/home")], isWritable: { $0.path == "/home" }, exists: { _ in false })
-    require(readOnly.voice.deletingLastPathComponent().path == "/home" && readOnly.background.deletingLastPathComponent().path == "/home",
+    // Where they go (each takes its name on disk when it is whole, never replacing one: VoiceChangeOwnFilesChecks).
+    let places = VoiceChangeOutputName.places(original: original, voiceName: "Sky", backgroundLabel: "background", voiceExtension: "wav",
+        backgroundExtension: "wav", fallbacks: [], isWritable: { _ in true })
+    require(places.voice.stem == "采访 01 - Sky" && places.background.stem == "采访 01 - background" && places.voice.folder.path == "/media",
+            "files go next to the source")
+    let same = VoiceChangeOutputName.places(original: original, voiceName: "background", backgroundLabel: "background", voiceExtension: "wav",
+        backgroundExtension: "wav", fallbacks: [], isWritable: { _ in true })
+    require(same.background.number == 2, "a voice that happens to be called background does not collide with the background file")
+    let readOnly = VoiceChangeOutputName.places(original: original, voiceName: "Sky", backgroundLabel: "background", voiceExtension: "wav",
+        backgroundExtension: "wav", fallbacks: [URL(fileURLWithPath: "/home")], isWritable: { $0.path == "/home" })
+    require(readOnly.voice.folder.path == "/home" && readOnly.background.folder.path == "/home",
             "a source folder that cannot be written falls back to the project's home")
 
     // 面板默认选哪个声音。

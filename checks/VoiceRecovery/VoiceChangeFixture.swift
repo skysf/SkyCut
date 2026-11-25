@@ -53,6 +53,8 @@ final class VoiceChangeHTTP: URLProtocol {
     static var holdFiles = false
     /// How many of the next GETs of a file (`voice.wav`, `background.wav`) get no answer until the task is cancelled.
     static var holdNext: [String: Int] = [:]
+    /// A finished job's bill is under review (`pending_review`, `review_required`), its amount not final.
+    static var billUnderReview = false
 
     static let voiceID = "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d"
     static let session: URLSession = {
@@ -68,7 +70,7 @@ final class VoiceChangeHTTP: URLProtocol {
         libraryFailure = nil; quoteFailure = nil; submitNetworkFailure = false; holdJob = false; released = true; jobFails = false
         voiceExtraSeconds = 0.02; backgroundSeconds = nil; sourceSeconds = 4.0; charged = 7.5
         separationFails = false; quoteIgnoresSkip = false; omitBackground = false; jobDirect = false
-        fileDrops = 0; expireVoiceFile = false; voiceRenamed = false; holdFiles = false; holdNext = [:]
+        fileDrops = 0; expireVoiceFile = false; voiceRenamed = false; holdFiles = false; holdNext = [:]; billUnderReview = false
     }
 
     static var log: [(method: String, path: String, body: JSONValue)] { lock.lock(); defer { lock.unlock() }; return requests }
@@ -201,8 +203,10 @@ final class VoiceChangeHTTP: URLProtocol {
             "padded_seconds": 0, "model": "chatterbox-hd", "fallback_used": false, "skip_separation": .bool(jobDirect)
         ]
         if !jobDirect && !omitBackground { result["background_url"] = "http://127.0.0.1/files/background.wav" }
+        let bill: JSONValue = billUnderReview ? ["status": "pending_review", "review_required": true, "credits_charged": .number(charge)]
+            : ["status": "charged", "credits_charged": .number(charge)]
         return ["job_id": "convert-1", "kind": "voice_convert", "status": "done", "credits_charged": .number(charge),
-                "billing": ["status": "charged", "credits_charged": .number(charge)], "result": .object(result)]
+                "billing": bill, "result": .object(result)]
     }
 }
 

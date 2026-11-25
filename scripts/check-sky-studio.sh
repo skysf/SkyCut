@@ -208,6 +208,7 @@ xcrun swiftc \
   Sources/SrtFlow/CloudMedia/CloudUploadFault.swift \
   Sources/SrtFlow/CloudMedia/CloudDownloadFault.swift \
   Sources/SrtFlow/CloudMedia/CloudResultDownload.swift \
+  Sources/SrtFlow/CloudMedia/CloudResultPlace.swift \
   Sources/SrtFlow/CloudMedia/CloudJobPhase.swift \
   checks/Shared/ScratchDefaults.swift \
   checks/SkyStudio/main.swift \
@@ -301,6 +302,8 @@ xcrun swiftc \
   Sources/SrtFlow/CloudMedia/CloudUploadFault.swift \
   Sources/SrtFlow/CloudMedia/CloudDownloadFault.swift \
   Sources/SrtFlow/CloudMedia/CloudResultDownload.swift \
+  Sources/SrtFlow/CloudMedia/CloudResultPlace.swift \
+  Sources/SrtFlow/MediaReadQueue.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioUploadRetry.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioUploadFailure.swift \

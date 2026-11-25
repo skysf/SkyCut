@@ -32,11 +32,19 @@ import SrtFlowMCPKit
             try await runVoiceChangeDirectChecks(root)
             try await runVoiceChangeDownloadChecks(root)
             try await runVoiceChangeOwnFilesChecks(root)
+            // Every paid job the download checks start gives its job slot back once its Sky Studio job ended: a held download,
+            // Download again, a stop, a bill still pending never keep one (three slots stay with LibraryRestartChecks' parked jobs).
+            let slotsBefore = SkyStudioJobSlots.shared.snapshot.running[.shared] ?? 0
+            defer {
+                let after = SkyStudioJobSlots.shared.snapshot.running[.shared] ?? 0
+                require(after == slotsBefore, "every paid job the download checks started gave its job slot back (\(slotsBefore) before, \(after) after)")
+            }
             try await runGenerationDownloadChecks(root)
             try await runVoiceoverDownloadChecks(root)
             try await runUpscaleJobDownloadChecks(root)
             try await runPaidToolEntryChecks(root)   // last: it marks a key on the account
             try await runOfficialRecoveryDownloadChecks(root)   // after it: the account verified against the fake /me
+            try await runOfficialFilmRunChecks(root)
         } catch {
             VoiceCheckLog.failures += 1
             print("FAIL: production voice recovery checks: \(error)")
@@ -77,11 +85,14 @@ import SrtFlowMCPKit
             + "was dismissed, a stop and empty answers keep it, a missing SRT is fetched alone; a voiceover row's Download again runs its "
             + "recovery once, never after a resume landed it, and survives a stop; an upscale's books at the charge from either field, "
             + "Cancel while downloading again keeps it on its row, its bill under review keeps the reservation; an official recovery held "
-            + "through a 503 then downloaded by its key through generate_media; a voice change's files are its own (claimed names, a "
-            + "cancel deletes only what it wrote and no timeline uses, every GET counted)"
+            + "through a 503 then downloaded by its key through generate_media; an official film generation's next step through the "
+            + "flow; a voice change's files take their names on disk (never another process's file), a cancel deletes only a file it "
+            + "placed while it is still that file and no timeline uses it, every GET counted, its bill kept reserved until get_job "
+            + "reads it final; PNG headers held until the image is saved; a folder at the name left whole"
             + "; through the tools: generate_media's own key downloads the held job with no POST, key-less and 9:16 are new jobs, "
-            + "another key is a new job, a spaced key sent back is the same job, a blocked output folder holds the result; upscale_clip "
-            + "from project B is B's own new job")
+            + "another key is a new job, a spaced key sent back is the same job, a blocked or read-only output folder holds the result; "
+            + "upscale_clip from project B is B's own new job, one saved while its bill is under review stays reserved until get_job "
+            + "reads it final")
         exit(0)
     }
 

@@ -1,4 +1,5 @@
 import Foundation
+import SrtFlowCore
 import SrtFlowMCPKit
 
 // MARK: - 一次 upscale 从原片到落盘的流水线（不碰界面、不碰账本、不碰钥匙串）
@@ -50,8 +51,10 @@ struct UpscaleOutcome: Sendable {
     var info: MediaInfo
     var record: ClipUpscaleRecord
     var jobID: String
-    /// Sky Studio 实收的积分（做完的那一份状态里的 `credits_charged`；没报就是同意的价）。
-    var creditsCharged: Double
+    /// Sky Studio's final charge (UpscaleDelivery.charge(of:)); nil while its bill is not final (under review, a refund pending, still
+    /// reserved, or not said): the reservation stays on the day's books, and get_job reads the original job until it is final
+    /// (UpscaleJob.refreshBill; a bill under review was once reported and booked at the quote, CXD4 on PR #554).
+    var creditsCharged: Double?
     /// 原片的声音封回去了（原片没声音时也算 true：没什么可封的）；ffmpeg 不在时是 false，文件没有声音。
     var audioRestored: Bool
     var elapsed: Double
@@ -67,16 +70,10 @@ struct UpscaleDelivery: Sendable {
     var offset: Double
     var started: Date
 
-    /// The final charge a job's status reports, from whichever field Sky Studio sent: the bill's net `credits_charged`, else the
-    /// top-level one (a status with only the billing block once left 75 reserved on the day's books for 72 charged, the review of PR
-    /// #554). nil while the bill is not final (under review, a refund pending, still reserved): the reservation stays on the day's books
-    /// until it is (a bill under review once settled at its 72 and was reported as charged, CXD3 on PR #554), and when neither says.
-    static func charge(of status: SkyStudioJobStatus) -> Double? {
-        if let billing = status.billing, !billing.isFinal { return nil }
-        let charged = status.billing?.netCharged ?? status.creditsCharged
-        guard let charged, charged.isFinite, charged >= 0 else { return nil }
-        return charged
-    }
+    /// The final charge a job's status reports (SkyStudioJobStatus.finalCharge: the bill's net `credits_charged`, else the top-level
+    /// one; a status with only the billing block once left 75 reserved for 72 charged). nil while the bill is not final: the reservation
+    /// stays on the day's books until it is (a bill under review once settled at its 72 and was reported as charged, CXD3 on PR #554).
+    static func charge(of status: SkyStudioJobStatus) -> Double? { status.finalCharge }
 }
 
 /// The paid upscale did not come down here: its download gave up or was stopped (SkyStudioDownloadFailure, after
@@ -208,27 +205,30 @@ enum UpscalePipeline {
             guard last.swap(next) else { return }
             report(next)
         }
-        try FileManager.default.createDirectory(at: workFolder, withIntermediateDirectories: true)
+        do { try FileManager.default.createDirectory(at: workFolder, withIntermediateDirectories: true) }
+        catch { throw UpscaleUndelivered(failure: .notSaved(error), delivery: delivery) }
         let stamp = UUID().uuidString
-        let temporaries = [workFolder.appendingPathComponent("\(stamp)-out.mp4"), workFolder.appendingPathComponent("\(stamp)-muxed.mp4")]
-        defer { for url in temporaries { try? FileManager.default.removeItem(at: url) } }
+        let muxed = workFolder.appendingPathComponent("\(stamp)-muxed.mp4")
+        defer { try? FileManager.default.removeItem(at: muxed) }   // a private name in SkyCut's work folder
         phase(.downloading(fraction: nil))
         let id = delivery.jobID
         var renew: (@Sendable () async throws -> URL?)?
         if let key { renew = { try await api.job(id, key: key).result?.url } }
-        let gets: Int
+        let downloaded: CloudResultFile
         do {
-            gets = try await api.download(delivery.result.url, to: temporaries[0], renew: renew) { fraction in
+            let place = CloudResultPlace(folder: workFolder, stem: "\(stamp)-out", pathExtension: "mp4")
+            downloaded = try await api.download(delivery.result.url, into: place, renew: renew) { fraction in
                 phase(.downloading(fraction: CloudJobPhase.quantized(fraction)))
             }
         } catch let failure as SkyStudioDownloadFailure {
             throw UpscaleUndelivered(failure: failure, delivery: delivery)   // gave up or stopped: held for Download again
         }
+        defer { ExclusivePlacement.discard(downloaded.file) }   // the work folder's copy, only while it is still the one placed
         do {
-            return try await save(request, delivery, downloaded: temporaries[0], muxed: temporaries[1], ffmpeg: ffmpeg, phase: phase)
+            return try await save(request, delivery, downloaded: downloaded.url, muxed: muxed, ffmpeg: ffmpeg, phase: phase)
         } catch where error is CancellationError || Task.isCancelled {
             // Stopped once it was here but before it was saved: still held, with the GETs that brought it.
-            throw UpscaleUndelivered(failure: .stopped(attempts: gets), delivery: delivery)
+            throw UpscaleUndelivered(failure: .stopped(attempts: downloaded.gets), delivery: delivery)
         }
     }
 
@@ -256,17 +256,18 @@ enum UpscalePipeline {
         }
         try Task.checkCancellation()
 
-        // 4. 起名落盘（原片旁边；撞名加编号）。
-        let destination = UpscaleOutputName.destination(
-            original: request.originalURL, outputSize: info.displaySize, tier: request.tier.id, fallbacks: request.fallbackFolders
-        )
+        // 4. 起名落盘（原片旁边；撞名加编号）: it takes its name without replacing or removing anything (ExclusivePlacement: the next
+        // free number when the name is taken at that moment).
+        let folder = UpscaleOutputName.folder(original: request.originalURL, fallbacks: request.fallbackFolders)
+        let stem = UpscaleOutputName.stem(original: request.originalURL, outputSize: info.displaySize, tier: request.tier.id)
+        let destination: URL
         do {
-            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try FileManager.default.moveItem(at: file, to: destination)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            destination = try await CloudResultPlace(folder: folder, stem: stem, pathExtension: "mp4").place(file).url
         } catch {
             throw UpscalePipelineError.save(error.localizedDescription)
         }
-        let charged = delivery.creditsCharged ?? request.credits
+        let charged = delivery.creditsCharged   // nil: the bill is not final yet (the reservation stays)
         let record = ClipUpscaleRecord(
             originalURL: request.originalURL, sourceOffset: offset, tier: request.tier.id, originalInfo: request.originalInfo, madeAt: Date(),
             credits: charged

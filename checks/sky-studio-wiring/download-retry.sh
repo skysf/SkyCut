@@ -10,20 +10,23 @@
 #   - a result's GET exists once, in CloudResultDownload.fetch (and the debug-only hook), inside the retry loop, asking for identity
 #     bytes and never redirected by the system; an answer that began is read before the error; an answer whose status was held back
 #     never sends the same address again; resume data comes only from the system's own error, never an encoded answer's; a result is
-#     checked whole before it is moved into place, and only a result checked against its length replaces a file already there; only
-#     CloudResultDownload builds a failure, a stop included (with its GETs), and flows say .stopped / .notSaved;
+#     checked whole (and by the flow's own check) before it takes its name, and it takes it through ExclusivePlacement only: nothing in
+#     the download or placement code replaces, moves over or removes a file at the name; only CloudResultDownload builds a failure, a
+#     stop included (with its GETs), and flows say .stopped / .notSaved;
 #   - every paid download passes `renew:` (the job's current address, never a new job) and goes through SkyStudioAPI.download;
 #   - every flow keeps its paid result for Download again on the job's own row / id / key until it has come down, an output folder
 #     that cannot be made included; nothing maps a new request to an old held job by its parameters (generate_media's key, as SkyCut
 #     reads it, is part of what a request is bound to; upscale_clip, change_voice and the panels start a new paid job: user,
-#     2026-11-25); voiceover's row runs its recovery from the record on disk; an upscale's charge reaches the day's books once its bill
-#     is final; a voice change writes under its own claimed names and deletes only what it wrote and no timeline uses;
+#     2026-11-25); voiceover's row runs its recovery from the record on disk; an upscale's or a voice change's charge reaches the day's
+#     books only once its bill is final (get_job reads it again until it is); a voice change's files take their names on disk and a
+#     failure deletes only a file it placed, while it is still that file and no timeline uses it;
 #   - the user's lines name the network, never a proxy;
 #   - SRTFLOW_TEST_DOWNLOAD_DROPS exists only in debug builds, and scripts/debug-hook-probe.sh guards the release binary.
 # Long-term rules: docs/architecture/sky-studio-jobs.md, "Downloads that the network interrupts".
 
 DOWNLOAD_API="Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift"
 DOWNLOAD_GETS="Sources/SrtFlow/CloudMedia/CloudResultDownload.swift"
+DOWNLOAD_PLACE="Sources/SrtFlow/CloudMedia/CloudResultPlace.swift"
 DOWNLOAD_STATUS="Sources/SrtFlow/SkyStudio/SkyStudioMediaStatus.swift"
 DOWNLOAD_HELD="Sources/SrtFlow/SkyStudio/SkyStudioHeldDownloads.swift"
 DOWNLOAD_REQUESTS="Sources/SrtFlow/SkyStudio/SkyStudioGenerationRequests.swift"
@@ -44,7 +47,7 @@ DOWNLOAD_CHANGE_PANEL="Sources/SrtFlow/VoiceChange/VoiceChangePanel.swift"
 DOWNLOAD_CHANGE_MODEL="Sources/SrtFlow/VoiceChange/VoiceChangePanelModel.swift"
 DOWNLOAD_ROWS="Sources/SrtFlow/CloudMedia/CloudTaskRows.swift"
 DOWNLOAD_FAULT="Sources/SrtFlow/CloudMedia/CloudDownloadFault.swift"
-for file in "${DOWNLOAD_API}" "${DOWNLOAD_GETS}" "${DOWNLOAD_STATUS}" "${DOWNLOAD_HELD}" "${DOWNLOAD_REQUESTS}" "${DOWNLOAD_RUN}" "${DOWNLOAD_DELIVERY}" \
+for file in "${DOWNLOAD_API}" "${DOWNLOAD_GETS}" "${DOWNLOAD_PLACE}" "${DOWNLOAD_STATUS}" "${DOWNLOAD_HELD}" "${DOWNLOAD_REQUESTS}" "${DOWNLOAD_RUN}" "${DOWNLOAD_DELIVERY}" \
             "${DOWNLOAD_TOOL}" "${DOWNLOAD_OFFICIAL}" "${DOWNLOAD_RECOVERY}" "${DOWNLOAD_VOICEOVER}" "${DOWNLOAD_PIPELINE}" \
             "${DOWNLOAD_UPSCALE_JOB}" "${DOWNLOAD_UPSCALE_TOOL}" "${DOWNLOAD_UPSCALE_PANEL}" "${DOWNLOAD_UPSCALE_INSPECTOR}" \
             "${DOWNLOAD_CHANGE_JOB}" "${DOWNLOAD_CHANGE_TOOL}" "${DOWNLOAD_CHANGE_PANEL}" "${DOWNLOAD_CHANGE_MODEL}" "${DOWNLOAD_ROWS}" \
@@ -81,9 +84,10 @@ grep -qF 'if answer == nil && delegate.answerStarted { return .heldBack(detail: 
 grep -qF 'switch SkyStudioDownloadRetry.wholeness(status: status, contentRange: answer?.value(forHTTPHeaderField: "Content-Range"),' "${DOWNLOAD_GETS}" \
   && grep -qF 'encoding: answer?.value(forHTTPHeaderField: "Content-Encoding")) {' "${DOWNLOAD_GETS}" \
   || fail "${DOWNLOAD_GETS}: a result must be checked whole (a short or encoded 206, an empty answer) before it is moved into place"
-grep -qF 'if let unchecked, FileManager.default.fileExists(atPath: destination.path) {' "${DOWNLOAD_GETS}" \
-  && grep -qF 'if unchecked == nil { try? FileManager.default.removeItem(at: destination) }' "${DOWNLOAD_GETS}" \
-  || fail "${DOWNLOAD_GETS}: only a result checked against its length replaces a file already at the destination (a gzip 206 once overwrote a whole file)"
+grep -qF 'file = CloudResultFile(file: try await place.place(partial, pathExtension: corrected), gets: gets)' "${DOWNLOAD_GETS}" \
+  && grep -qF 'Result { try ExclusivePlacement.placeOwned(partial, in: folder, stem: stem, pathExtension: pathExtension, from: number) }' "${DOWNLOAD_PLACE}" \
+  && ! grep -qE '\.moveItem\(|replaceItemAt|removeItem\(at: (destination|place|file)' "${DOWNLOAD_GETS}" "${DOWNLOAD_PLACE}" \
+  || fail "${DOWNLOAD_GETS}: a whole result takes its name only through ExclusivePlacement, never replacing, moving over or removing what is at the name (a gzip 206 overwrote a file; a folder at the name was removed)"
 grep -qF 'guard SkyStudioDownloadRetry.renewableStatuses.contains(status), attempt < attempts, try await moveToFreshAddress() else {' "${DOWNLOAD_GETS}" \
   || fail "${DOWNLOAD_GETS}: only an expired address (403 / 404 / 410) asks for a fresh one, once, while a try is left"
 grep -qF 'throw SkyStudioDownloadFailure.stopped(attempts: gets)' "${DOWNLOAD_GETS}" \
@@ -153,8 +157,12 @@ grep -qF 'if let download, recovery != nil { status.holdDownload(download) { [se
 # again reads it; anything after that holds the result on the job's own row; Cancel during the paid download keeps it there.
 grep -qF 'onMade(delivery)' "${DOWNLOAD_PIPELINE}" \
   && grep -qF 'creditsCharged: UpscaleDelivery.charge(of: done)' "${DOWNLOAD_PIPELINE}" \
-  && grep -qF 'if let billing = status.billing, !billing.isFinal { return nil }' "${DOWNLOAD_PIPELINE}" \
-  && grep -qF 'throw UpscaleUndelivered(failure: .stopped(attempts: gets), delivery: delivery)' "${DOWNLOAD_PIPELINE}" \
+  && grep -qF 'static func charge(of status: SkyStudioJobStatus) -> Double? { status.finalCharge }' "${DOWNLOAD_PIPELINE}" \
+  && grep -qF 'if let billing, !billing.isFinal { return nil }' Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \
+  && grep -qF 'if let charged = result.creditsCharged { held?.settle(charged: charged) }' "${DOWNLOAD_UPSCALE_JOB}" \
+  && grep -qF 'aiJob.refresh = { [finished] in' "${DOWNLOAD_UPSCALE_TOOL}" \
+  && grep -qF 'destination = try await CloudResultPlace(folder: folder, stem: stem, pathExtension: "mp4").place(file).url' "${DOWNLOAD_PIPELINE}" \
+  && grep -qF 'throw UpscaleUndelivered(failure: .stopped(attempts: downloaded.gets), delivery: delivery)' "${DOWNLOAD_PIPELINE}" \
   && grep -qF 'Task { @MainActor in self?.settleMade(delivery) }' "${DOWNLOAD_UPSCALE_JOB}" \
   && grep -qF 'if let charged = UpscaleDelivery.charge(of: fresh) {' "${DOWNLOAD_UPSCALE_JOB}" \
   && grep -qF '} catch where made.value != nil {' "${DOWNLOAD_UPSCALE_JOB}" \
@@ -167,12 +175,13 @@ grep -qF 'return hold(failure, result: result, server: done)' "${DOWNLOAD_CHANGE
   && grep -qF 'if let failure { status.holdDownload(failure, retry: retry) } else { status.retryDownload = retry }' "${DOWNLOAD_CHANGE_JOB}" \
   && grep -qF 'if case .conversion(let current)? = try? await services.api.job(pending.server.jobID, key: key).voiceResult { result = current }' "${DOWNLOAD_CHANGE_JOB}" \
   || fail "${DOWNLOAD_CHANGE_JOB}: a voice change made and paid must stay held for Download again on its own row"
-grep -qF 'let places = VoiceChangeOutputName.claim(' "${DOWNLOAD_CHANGE_JOB}" \
-  && grep -qF 'defer { VoiceChangeOutputName.release(places) }' "${DOWNLOAD_CHANGE_JOB}" \
-  && grep -qF 'for file in wrote where !Self.onAnyTimeline(file) { try? FileManager.default.removeItem(at: file) }' "${DOWNLOAD_CHANGE_JOB}" \
-  && ! grep -qF 'removeItem(at: places.' "${DOWNLOAD_CHANGE_JOB}" \
+grep -qF 'let places = VoiceChangeOutputName.places(' "${DOWNLOAD_CHANGE_JOB}" \
+  && grep -qF 'for file in placed where !Self.onAnyTimeline(file.url) { ExclusivePlacement.discard(file) }' "${DOWNLOAD_CHANGE_JOB}" \
+  && ! grep -qE 'removeItem\(at: (places|file|voice|separated)' "${DOWNLOAD_CHANGE_JOB}" \
   && grep -qF 'if let failure = SkyStudioDownloadFailure.from(error) { throw failure.after(gets) }' "${DOWNLOAD_CHANGE_JOB}" \
-  || fail "${DOWNLOAD_CHANGE_JOB}: a voice change writes under its own claimed names and deletes only the files it wrote that no timeline uses (a cancel once deleted another job's files), counting every GET"
+  && grep -qF 'if let charged = done.finalCharge { held.settle(charged: charged) } else { billPending = true }' "${DOWNLOAD_CHANGE_JOB}" \
+  && grep -qF 'job.refresh = { [self] in await refreshBill() }' "${DOWNLOAD_CHANGE_JOB}" \
+  || fail "${DOWNLOAD_CHANGE_JOB}: a voice change's files take their names on disk; a failure deletes only a file it placed, while it is still that file and no timeline uses it (a cancel once deleted another process's file and a file that replaced its own); every GET counted; its bill settles only once final"
 ! grep -qE 'attempt \+= 1|attempt < 3' "${DOWNLOAD_CHANGE_JOB}" \
   || fail "${DOWNLOAD_CHANGE_JOB}: no download loop of its own (SkyStudioAPI.download tries three times in all; two loops would multiply the GETs)"
 grep -qF 'if let retry = run.retryDownload {' "${DOWNLOAD_ROWS}" && grep -qF 'if job.canRetryDownload {' "${DOWNLOAD_ROWS}" \

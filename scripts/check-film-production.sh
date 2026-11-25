@@ -148,6 +148,7 @@ xcrun swiftc \
   Sources/SrtFlow/CloudMedia/CloudUploadFault.swift \
   Sources/SrtFlow/CloudMedia/CloudDownloadFault.swift \
   Sources/SrtFlow/CloudMedia/CloudResultDownload.swift \
+  Sources/SrtFlow/CloudMedia/CloudResultPlace.swift \
   Sources/SrtFlow/TimelineRenderSize.swift \
   Sources/SrtFlow/VideoEditAudioMeter.swift \
   Sources/SrtFlow/VideoEditSoundSceneDSP.swift \

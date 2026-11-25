@@ -3,20 +3,23 @@ import SrtFlowCore
 import SrtFlowMCPKit
 @testable import SrtFlow
 
-// A voice change's files belong to its own cloud job (2026-11-26, CXD3 on PR #554; docs/bugfixes/2026-11-24-download-lost-connection-
-// no-retry.md), with real App objects and the fake Sky Studio (VoiceChangeHTTP):
-// - two running changes of the same clip and voice never choose the same names (VoiceChangeOutputName.claim), and a name is free again
-//   once its change is done with it;
+// A voice change's files belong to its own cloud job (2026-11-26, CXD3 / CXD4 on PR #554; docs/bugfixes/2026-11-24-download-lost-
+// connection-no-retry.md), with real App objects and the fake Sky Studio (VoiceChangeHTTP):
+// - each file takes its name on disk only when it is whole, never replacing anything (VoiceChangeOutputName.places → CloudResultPlace):
+//   the background's stem never matches the voice's, not even in case only, and a voice called like the background lands as its own
+//   file beside it (they once became one file on a case-insensitive drive);
 // - a new Chinese change downloading while the held English one's Download again lands: cancelling the Chinese one leaves the English
 //   files, on the timeline, as they were (both once chose the same two paths, and the cancel deleted them);
-// - a stop during the background's download says both GETs (it once said 1 of the 2 the server saw), keeps the voice it wrote while a
-//   timeline uses it and a file someone else put at its background's name, and deletes the voice it wrote when nothing uses it.
+// - another process's file at the voice's name (SkyCut Beta's landed voice) is never replaced, and a cancel never deletes it;
+// - a stop during the background's download says both GETs (it once said 1 of the 2 the server saw), keeps the voice it placed while a
+//   timeline uses it, never deletes a file that replaced its voice meanwhile, and deletes the voice it placed when nothing uses it.
 
 @MainActor
 func runVoiceChangeOwnFilesChecks(_ root: URL) async throws {
-    try claimChecks(root)
+    try placesChecks(root)
     try await cancelKeepsOtherJobsFiles(root)
     try await stopDuringBackground(root)
+    try await namesNeverShared(root)
 }
 
 @MainActor
@@ -25,22 +28,17 @@ private func changeArgs(_ fixture: VoiceChangeFixture, _ clipID: UUID, language:
 }
 
 @MainActor
-private func claimChecks(_ root: URL) throws {
-    let folder = root.appendingPathComponent("change-claims", isDirectory: true)
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    let original = folder.appendingPathComponent("talk.wav")
-    func claim() -> (voice: URL, background: URL) {
-        VoiceChangeOutputName.claim(original: original, voiceName: "Sky", backgroundLabel: "background", voiceExtension: "wav",
-                                    backgroundExtension: "wav", fallbacks: [])
+private func placesChecks(_ root: URL) throws {
+    let original = root.appendingPathComponent("change-places/talk.wav")
+    func places(_ voice: String) -> (voice: CloudResultPlace, background: CloudResultPlace) {
+        VoiceChangeOutputName.places(original: original, voiceName: voice, backgroundLabel: "background", voiceExtension: "wav",
+                                     backgroundExtension: "wav", fallbacks: [], isWritable: { _ in true })
     }
-    let first = claim(), second = claim()
-    require(Set([first.voice, first.background, second.voice, second.background]).count == 4,
-            "two running changes of the same clip and voice choose four different paths: \(first), \(second)")
-    VoiceChangeOutputName.release(first)
-    VoiceChangeOutputName.release(second)
-    let again = claim()
-    require(again.voice == first.voice && again.background == first.background, "a released name is free again: \(again)")
-    VoiceChangeOutputName.release(again)
+    let plain = places("Sky"), cased = places("Background")
+    require(plain.voice.stem == "talk - Sky" && plain.background.stem == "talk - background" && plain.background.number == 1
+            && plain.voice.folder == original.deletingLastPathComponent(),
+            "the two files' stems, next to the original: \(plain.voice.stem), \(plain.background.stem)")
+    require(cased.background.number == 2, "a voice whose name matches the background's in case only: the background numbers from 2")
 }
 
 /// The held English change's Download again lands while a new Chinese change of the same clip and voice is downloading; cancelling
@@ -83,8 +81,8 @@ private func cancelKeepsOtherJobsFiles(_ root: URL) async throws {
             "cancelling the Chinese change leaves the English files whole and on the timeline: \(englishFiles.map(\.lastPathComponent))")
 }
 
-/// Stopped while its background downloads: both GETs said; the voice it wrote stays while a timeline uses it, and a file someone else
-/// put at its background's name stays; with nothing using its voice, the voice goes.
+/// Stopped while its background downloads: both GETs said; the voice it placed stays while a timeline uses it, a file someone else put
+/// at its background's name stays, a file that replaced its voice stays; with nothing using its voice, the voice goes.
 @MainActor
 private func stopDuringBackground(_ root: URL) async throws {
     let fixture = try VoiceChangeFixture(folder: root.appendingPathComponent("change-stop-background"))
@@ -129,6 +127,58 @@ private func stopDuringBackground(_ root: URL) async throws {
     require(next["code"] == "download_stopped" && second != nil && !FileManager.default.fileExists(atPath: second?.path ?? "/"),
             "a voice nothing uses is deleted at the stop: \(second?.lastPathComponent ?? "none")")
     require(Set((try? FileManager.default.contentsOfDirectory(atPath: media.path)) ?? []) == before, "nothing of it is left in the folder")
+
+    // Its voice replaced by another file while the background downloads: that file is never deleted (only the file it placed, while it
+    // is still that file: it once deleted the replacement, CXD4).
+    let replacement = Data("a file that replaced the voice".utf8)
+    var placedVoice: URL?
+    let third = try await stopped {
+        let now = Set((try? FileManager.default.contentsOfDirectory(atPath: media.path)) ?? [])
+        placedVoice = now.subtracting(before).first.map { media.appendingPathComponent($0) }
+        if let placedVoice { try? replacement.write(to: placedVoice, options: .atomic) }
+    }
+    require(third["code"] == "download_stopped" && placedVoice.flatMap { try? Data(contentsOf: $0) } == replacement,
+            "a file that replaced its voice meanwhile is left as it is: \(placedVoice?.lastPathComponent ?? "none")")
+    if let placedVoice { try? FileManager.default.removeItem(at: placedVoice) }
+}
+
+/// Names are taken on disk: another process's file at the voice's name (SkyCut Beta's voice on its timeline) is never replaced, and a
+/// cancel never deletes it; a voice called like the background (in case only) lands as its own file.
+@MainActor
+private func namesNeverShared(_ root: URL) async throws {
+    let fixture = try VoiceChangeFixture(folder: root.appendingPathComponent("change-names-on-disk"))
+    let clipID = fixture.placeClip(try fixture.stereoSource())
+    let media = fixture.folder.appendingPathComponent("media")
+    let others = media.appendingPathComponent("talk - Sky.wav")
+    let theirs = Data("SkyCut Beta's voice on its own timeline".utf8)
+    try theirs.write(to: others)
+
+    let landed = try await fixture.wait(try await fixture.change(changeArgs(fixture, clipID, language: "en")))
+    let voice = landed["voice_file"]?.stringValue.map { AIWorkspace.shared.resolve($0) }
+    require(landed["status"] == "done" && voice != nil && voice != others && voice.flatMap { try? Data(contentsOf: $0) } == VoiceChangeHTTP.wave(seconds: 4.02)
+            && (try? Data(contentsOf: others)) == theirs,
+            "another process's file at the voice's name is never replaced; the voice takes the next name: \(voice?.lastPathComponent ?? "nil")")
+    fixture.project.effectiveUndoManager?.undo()
+
+    VoiceChangeHTTP.lock.withLock { VoiceChangeHTTP.holdNext["background.wav"] = 1 }
+    let started = try await fixture.change(changeArgs(fixture, clipID, language: "en"))
+    guard let id = started.payload["job_id"]?.stringValue, let job = AIJobs.shared.job(id) else { return require(false, "the change starts") }
+    await ownFilesEventually("the background's GET") { VoiceChangeHTTP.lock.withLock { VoiceChangeHTTP.holdNext["background.wav"] } == 0 }
+    AIJobs.shared.cancel(job)
+    await ownFilesEventually("the change to stop") { job.status != .running }
+    require((try? Data(contentsOf: others)) == theirs, "a cancel never deletes another process's file at the voice's name")
+
+    // A voice called like the background, in case only: two files, each its own.
+    let id2 = "voice_ca5ed" + String(repeating: "0", count: 27)
+    let named = L10n("background (file name)").uppercased()
+    VoiceChangeHTTP.lock.withLock { VoiceChangeHTTP.voices[id2] = VoiceChangeHTTP.voice(id2, name: named, languages: ["zh", "en"]) }
+    var args = changeArgs(fixture, clipID, language: "en").objectValue ?? [:]
+    args["voice"] = .string(id2)
+    let cased = try await fixture.wait(try await fixture.change(.object(args)))
+    let files = ["voice_file", "background_file"].compactMap { cased[$0]?.stringValue.map { AIWorkspace.shared.resolve($0) } }
+    require(cased["status"] == "done" && files.count == 2 && files[0] != files[1]
+            && (try? Data(contentsOf: files[0])) == VoiceChangeHTTP.wave(seconds: 4.02) && (try? Data(contentsOf: files[1])) == VoiceChangeHTTP.wave(seconds: 4),
+            "a voice called \(named) and the background are two files: \(files.map(\.lastPathComponent))")
 }
 
 @MainActor

@@ -83,6 +83,19 @@ retries in #549; downloads did not.
    - Why the checks stayed green: the gzip fixture never decoded to its own total, no check had two voice changes downloading at once
      or a file in the way of an output folder, the ledger fixture had no bill under review, and the official re-ask and the changed
      key were checked through the registry, not the tool entries.
+7. **Round 4 (`56c25600`) fixed those repros, but the same two classes went one layer deeper** (Codex's re-check CXD4):
+   - Names claimed in memory: SkyCut and SkyCut Beta changing the same clip chose the same voice path; the new job overwrote the old
+     job's voice on the timeline and its cancel deleted it. A voice called "Background" and the "background" file became one file on a
+     case-insensitive drive (the task said done, only the background was left). A cancel deleted a file that had replaced its own
+     voice during the background's download (deleting by path, not by the file it wrote).
+   - Placing still removed what was at the name when the result was "checked": generate_media recursively removed a non-empty folder
+     `test.png/` that appeared after its name was picked, and said done (on main the same).
+   - An upscale whose first download succeeded while its bill was under review booked and reported the quote (75) as the charge, and
+     get_job never read the original job again, so it stayed 75 after Sky Studio settled at 72.
+   - The image's format check ran after the result had "arrived": a length-less 200 holding only an 8-byte PNG header failed it with
+     the Download again entry already released, and the original key then only returned `started`, no second GET.
+   - Why the checks stayed green: the not-saved check built its error by hand (mapping the real write error back to a network one
+     stayed green), and the film wording was checked by calling the wording function, not through the film flow.
 
 ## Fix
 
@@ -191,7 +204,25 @@ so this PR keeps only what concerns the download of a job that was already paid 
 - **Key and words:** the identity holds the key as SkyCut reads it (trimmed); a film's next step says a film call with another key is
   charged again and one without a key is refused (`SkyStudioGenerationRun.downloadRetry` / `otherCall`, shared with the SRT's line).
 
-Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift` (`download`), `CloudMedia/CloudResultDownload.swift`, `SkyStudioDownloadRetry.swift`,
+**Round 5 (2026-11-26), after CXD4:**
+
+- **Every paid result takes its name through the repo's exclusive placement** (`CloudResultPlace` → `ExclusivePlacement.placeOwned`,
+  the exports' placement from #508: exclusive rename → hard link → `O_EXCL` copy): `stem.ext` or the next free number at that moment,
+  never replacing, moving over or removing anything at the name (a file, a folder, a case-only variant, another process's file);
+  `SkyStudioAPI.download(_:into:renew:check:onProgress:)` returns the placed file by device and inode. A flow that gives one up uses
+  `ExclusivePlacement.discard` (only while it is still that file). The WebM editing copy and the upscale's final save go the same way;
+  the in-memory name claims (generation, voice change) are gone.
+- **A flow's own check before the name**: the image check (`SkyStudioImageResult.downloadCheck`) runs on the private file inside the
+  download loop; a failure is an incomplete answer (fetched again, three end `download_incomplete`), so the result stays held until
+  a checked image is placed (generation and the official recovery).
+- **Final bills only, refreshed by get_job**: `SkyStudioJobStatus.finalCharge` (the bill's net, else the top-level, nil while the bill
+  is not final); an upscale or a voice change whose bill is not final keeps its reservation, says `billing_pending` with
+  `credits_reserved`, and get_job reads the original job again until it is final (`UpscaleJob.refreshBill`, `VoiceChangeJob.refreshBill`).
+- Real-path tests: the real write errors (a read-only folder before the GET and once the result is whole) and an official film
+  generation through `SkyStudioGenerationRun` with a production plan and authority.
+
+Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift` (`download`), `CloudMedia/CloudResultDownload.swift`, `CloudMedia/CloudResultPlace.swift`,
+`Sources/SrtFlowCore/ExclusivePlacement.swift` (`placeOwned`), `SkyStudioDownloadRetry.swift`,
 `SkyStudioDownloadFailure.swift`, `SkyStudioDownloadWords.swift`, `SkyStudioHeldDownloads.swift`, `SkyStudioGenerationRequests.swift`,
 `SkyStudioGenerationRun.swift`, `SkyStudioGenerationDelivery.swift`, `SkyStudioGenerateTool.swift`, `SkyStudioOfficialGenerateTool.swift`,
 `SkyStudioOfficialRecoveryRun.swift`, `SkyStudioMediaStatus.swift`, `SkyStudioVoiceCloudBatches.swift`, `SkyStudioVoiceoverRun.swift`,
@@ -335,6 +366,30 @@ Narrowed round (the local server now also answers a gzip 206 and an empty 200; t
     other key and 9:16 red; (3) both chosen paths deleted, timeline test kept: someone else's file red. check-upscale with the old
     charge rule: five FAILs. The five new wiring pins, all undone at once: each its own ✗.
 
+- Round 5 (2026-11-26):
+  - `scripts/check-sky-studio.sh`: `DownloadEdgeChecks` (a folder at the name with a file in it and a case-only name left whole, the
+    result at the next number; a whole gzip 200 beside the 2,000-byte file; a read-only folder before the GET and once the result is
+    whole: `download_not_saved` after one GET); `ImageResultChecks` (the image's check names the extension; a PNG header is fetched
+    again; three end `download_incomplete`, nothing placed).
+  - `swift run SrtFlowCoreChecks` (`ExclusivePlacementChecks`, rename / link / O_EXCL copy / exFAT): `placeOwned` leaves a folder at
+    the name whole; `discard` never removes a file that replaced the placed one.
+  - `scripts/check-upscale.sh`: a file already at the upscale's name next to the original is kept, the upscale takes the next number.
+  - `scripts/check-voice-recovery.sh`: `VoiceChangeOwnFilesChecks` (another process's file at the voice's name is never replaced nor
+    deleted; a voice named like the background lands as its own file; a file that replaced its voice is left; an unused voice is
+    deleted), `GenerationDownloadChecks` (PNG headers held, then saved by the key path; a folder at the name), `PaidToolEntryChecks`
+    (a read-only output folder: `download_not_saved`, then saved by the key; an upscale saved while its bill is under review: 75
+    reserved and `billing_pending`, get_job settles at 72), `VoiceChangeDownloadChecks` (the same for a voice change: 9 kept, 7.5
+    once final), `OfficialFilmRunChecks` (an official film generation's next step through the flow); Main checks that the paid jobs
+    of the download checks give their job slots back (3 before, 3 after: the three are LibraryRestartChecks' jobs parked as if
+    SkyCut had quit, which raise the limit by three; verifying the account against the fake `/me` now keeps that arrangement instead
+    of re-adopting 3, which had left the official film run waiting for a slot).
+  - Reverse-verified (each FAIL seen, the files restored): check-sky-studio with the placement replacing what is at the name, the
+    real write errors mapped back to network errors and the flow's check skipped (14 FAILs, each mutation its own); the core checks
+    with `placeOwned` removing what is at the name and `discard` by path; check-voice-recovery in two runs: (1) the placement replacing,
+    the quote booked and reported as the upscale's charge, the film flow using the ordinary words, the write error as a network one;
+    (2) a voice change deleting by path, a voice change settling a bill under review, the image check skipped, get_job never refreshing
+    an upscale's bill, a held generation keeping a job slot, the background's stem allowed to match the voice's in case.
+
 ## Lessons
 
 - A download after payment is the most expensive step to lose: retry what a second try can fix, resume when the system kept the
@@ -354,7 +409,14 @@ Narrowed round (the local server now also answers a gzip 206 and an empty 200; t
   already there. Treat an empty body as no result.
 - A job deletes only what it wrote: two jobs that choose names before either writes can choose the same ones, so claim the names
   while running, and on a failure delete only your own files that nothing uses.
-- A charge under review is not a charge: keep the reservation until the bill is final.
+- A charge under review is not a charge: keep the reservation until the bill is final, and keep asking (get_job) until it is.
+- Place, never replace: a result takes its name through the one exclusive placement, so nothing at the name (a file, a folder, a
+  case-only variant, another process's file) can be overwritten or removed, and a flow gives up only the file it placed, by identity.
+  Names claimed in memory only protect one process.
+- A check that guards a paid result belongs before the result counts as arrived: run it on the private file, and treat a failure as
+  a failed download (held), never as an arrived result.
+- Test the error and the words through the real path: a constructed error or a direct call of a wording function stays green when
+  the real path is mapped back.
 - A fake server that only resumes the happy way proves little: give it the edges the real network gives (a short 206, a stalled
   error body, a redirect) before trusting the retry logic.
 - The long-term rules are in [Sky Studio jobs](../architecture/sky-studio-jobs.md), "Downloads that the network interrupts".

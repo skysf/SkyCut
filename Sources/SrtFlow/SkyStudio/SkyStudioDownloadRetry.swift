@@ -9,7 +9,7 @@ import Foundation
 // - which HTTP answers mean the result's address may have expired or been withdrawn, so Sky Studio is asked once for a fresh one
 //   (the original job's `GET /jobs/{id}`; nothing is ever submitted again);
 // - what one try ended as (`Try`), for CloudResultDownload only, and when what arrived is the whole result (`wholeness`): checked against
-//   its length, whole but not checkable (only where no file is in the way), or not the whole result.
+//   its length, whole but not checkable (then only the flow's own check vouches for it), or not the whole result.
 // What it does not cover: sending anything (CloudResultDownload owns the loop), the error when it gives up
 // (SkyStudioDownloadFailure), the words the user reads (SkyStudioDownloadWords).
 // Rules: docs/architecture/sky-studio-jobs.md, "Downloads that the network interrupts".
@@ -41,9 +41,9 @@ struct SkyStudioDownloadRetry: Sendable {
 
     /// What one GET ended as.
     enum Try {
-        /// The whole result is in the partial file beside the destination; `unchecked`: why its length could not be checked (`wholeness`),
-        /// nil when it was. Only a checked result replaces a file already at the destination.
-        case done(unchecked: String?)
+        /// The whole result is in the private file next to where it goes (checked against its length, or whole but unchecked:
+        /// `wholeness`); the flow's own check, if any, comes next.
+        case done
         /// The network broke it (SkyStudioUploadRetry.isTransient); `resumeData` when the system kept what had arrived (never for an
         /// encoded answer: a range of it could not be checked).
         case broken(detail: String, resumeData: Data?)
@@ -70,8 +70,8 @@ struct SkyStudioDownloadRetry: Sendable {
         /// The whole result, its length checked: a 206 to the last byte with the whole length on disk, or a 200 holding its declared
         /// length, with the bytes as they are (no Content-Encoding).
         case checked
-        /// A whole answer whose length cannot be checked (a 200 without a length, or one the system decoded), with why: taken only where
-        /// no file is in the way.
+        /// A whole answer whose length cannot be checked (a 200 without a length, or one the system decoded), with why: taken as the
+        /// result when the flow's own check (an image that decodes) passes; it never replaces anything (nothing does).
         case unchecked(String)
         /// Not the whole result, with why: thrown away, and the next GET starts it from nothing.
         case incomplete(String)

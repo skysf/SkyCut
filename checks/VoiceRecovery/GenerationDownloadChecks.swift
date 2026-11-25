@@ -25,6 +25,8 @@ final class GenerationHTTP: URLProtocol {
     static var requests: [(method: String, path: String, body: JSONValue)] = []
     static var drops = 0
     static var emptyFiles = 0
+    /// How many of the next image GETs answer only its first 8 bytes (a PNG header, its whole declared length).
+    static var headerFiles = 0
     static var captionDrops = 0
     static var holdFiles = false
     static var withCaption = false
@@ -64,7 +66,10 @@ final class GenerationHTTP: URLProtocol {
     ]]]
 
     static func reset() {
-        lock.withLock { requests = []; drops = 0; emptyFiles = 0; captionDrops = 0; holdFiles = false; withCaption = false; jobs = 0; jobReadFailures = 0 }
+        lock.withLock {
+            requests = []; drops = 0; emptyFiles = 0; headerFiles = 0; captionDrops = 0; holdFiles = false; withCaption = false; jobs = 0
+            jobReadFailures = 0
+        }
     }
 
     static func count(_ method: String, _ prefix: String) -> Int { lock.withLock { requests.filter { $0.method == method && $0.path.hasPrefix(prefix) }.count } }
@@ -89,6 +94,7 @@ final class GenerationHTTP: URLProtocol {
         if path.hasSuffix("/files/image.png") {
             if Self.drops > 0 { Self.drops -= 1 }
             else if Self.emptyFiles > 0 { Self.emptyFiles -= 1; answer = (200, Data(), "image/png") }
+            else if Self.headerFiles > 0 { Self.headerFiles -= 1; answer = (200, Self.image.prefix(8), "image/png") }
             else { answer = (200, Self.image, "image/png") }
         } else if path.hasSuffix("/files/caption.srt") {
             if Self.captionDrops > 0 { Self.captionDrops -= 1 } else { answer = (200, Self.caption, "application/x-subrip") }
@@ -166,6 +172,7 @@ func runGenerationDownloadChecks(_ root: URL) async throws {
         await heldAndDownloadedAgain(folder)
         await stopped(folder)
         await emptyAnswers(folder)
+        await folderAtTheName(folder)
         await missingCaption(folder)
     }
 }
@@ -266,6 +273,36 @@ private func emptyAnswers(_ folder: URL) async {
     row?.retryDownload?()
     let done = await finishedJob(job)
     require(done["status"] == "done", "Download again then saves the whole result: \(done)")
+
+    // Only a PNG header, its whole declared length: not an image that decodes, so never the result; held until the image is saved
+    // (its Download again was once released before the check, and the key then only returned `started`, CXD4).
+    GenerationHTTP.lock.withLock { GenerationHTTP.headerFiles = 3 }
+    let header = makeRun(folder, stem: "header").start()
+    let failed = await finishedJob(header)
+    let headerRow = SkyStudioGenerationActivity.shared.runs.first { $0.aiJobID == header.id }
+    require(failed["status"] == "failed" && failed["code"] == "download_incomplete" && headerRow?.retryDownload != nil
+            && SkyStudioHeldDownloads.isHeld(header.id) && !FileManager.default.fileExists(atPath: folder.appendingPathComponent("header.png").path),
+            "three PNG headers are never the result: held with Download again, nothing placed: \(failed)")
+    require(SkyStudioHeldDownloads.retry(header.id), "the job's own key path downloads it again")
+    let saved = await finishedJob(header)
+    let file = saved["file"]?.stringValue.map { AIWorkspace.shared.resolve($0) }
+    require(saved["status"] == "done" && file.flatMap { try? Data(contentsOf: $0) } == GenerationHTTP.image && !SkyStudioHeldDownloads.isHeld(header.id),
+            "then the whole image is saved, and nothing is held: \(saved)")
+}
+
+/// A folder that took the result's name (and what is in it) is never touched: the result takes the next free number (generate_media
+/// once removed such a folder and said done, CXD4).
+@MainActor
+private func folderAtTheName(_ folder: URL) async {
+    let blocking = folder.appendingPathComponent("named.png", isDirectory: true)
+    try? FileManager.default.createDirectory(at: blocking, withIntermediateDirectories: true)
+    try? Data("inside".utf8).write(to: blocking.appendingPathComponent("keep.txt"))
+    let job = makeRun(folder, stem: "named").start()
+    let done = await finishedJob(job)
+    let file = done["file"]?.stringValue.map { AIWorkspace.shared.resolve($0) }
+    require(done["status"] == "done" && file?.lastPathComponent == "named 2.png" && file.flatMap { try? Data(contentsOf: $0) } == GenerationHTTP.image
+            && (try? Data(contentsOf: blocking.appendingPathComponent("keep.txt"))) == Data("inside".utf8),
+            "a folder at the name is left whole; the image takes the next number: \(done)")
 }
 
 @MainActor

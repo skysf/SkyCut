@@ -53,6 +53,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 \
   checks/VoiceRecovery/VoiceChangeOwnFilesChecks.swift \
   checks/VoiceRecovery/GenerationDownloadChecks.swift checks/VoiceRecovery/VoiceoverDownloadChecks.swift \
   checks/VoiceRecovery/UpscaleJobDownloadChecks.swift checks/VoiceRecovery/OfficialRecoveryDownloadChecks.swift \
+  checks/VoiceRecovery/OfficialFilmRunChecks.swift \
   checks/VoiceRecovery/PaidToolEntryChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" \
   -o "${APP}/Contents/MacOS/VoiceRecoveryCheck"

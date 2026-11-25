@@ -51,12 +51,19 @@ func runUpscaleDownloadChecks(_ request: UpscaleRequest, base: String, bucket: S
     checkEqual((try? FileManager.default.contentsOfDirectory(atPath: work.path)) ?? [], [], "nothing half-written is left")
     guard let held else { return }
 
-    // Download again: only the delivery (GETs), saved as the first try would have.
+    // Download again: only the delivery (GETs), saved as the first try would have; a file already at its name next to the original
+    // is never replaced (the upscale takes the next number: the save used to move it over a name picked earlier).
     do {
         let outcome = try await UpscalePipeline.deliver(request, held.delivery, api: api, key: "sk-test", ffmpeg: ffmpeg, workFolder: work) { _ in }
         check(FileManager.default.fileExists(atPath: outcome.file.path) && outcome.creditsCharged == 72 && outcome.jobID == "job-up",
               "Download again saves the same result: \(outcome.file.lastPathComponent)")
+        let earlier = Data("an earlier file at the upscale's name".utf8)
+        try? earlier.write(to: outcome.file)
+        let again = try await UpscalePipeline.deliver(request, held.delivery, api: api, key: "sk-test", ffmpeg: ffmpeg, workFolder: work) { _ in }
+        check(again.file != outcome.file && (try? Data(contentsOf: outcome.file)) == earlier && FileManager.default.fileExists(atPath: again.file.path),
+              "a file already at the upscale's name is never replaced; the upscale takes the next number: \(again.file.lastPathComponent)")
         try? FileManager.default.removeItem(at: outcome.file)
+        try? FileManager.default.removeItem(at: again.file)
     } catch {
         check(false, "Download again saves the result, got \(error)")
     }

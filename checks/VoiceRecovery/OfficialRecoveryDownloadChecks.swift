@@ -23,7 +23,7 @@ func runOfficialRecoveryDownloadChecks(_ root: URL) async throws {
     let project = OpenProjects.shared.primary
     project.documentURL = folder.appendingPathComponent("Official.skycut")
     try await withGenerationHTTP {
-        await SkyStudioAccount.shared.refresh()
+        await verifyAccountKeepingSlots()
         guard let account = SkyStudioAccount.shared.stored?.me.account.id else { return require(false, "the account is verified (/me)") }
         let key = "official-\(UUID().uuidString.prefix(8))"
         let args: JSONValue = ["kind": "image", "prompt": "a cabin in snow", "film": [:], "idempotency_key": .string(key)]
@@ -81,4 +81,15 @@ func runOfficialRecoveryDownloadChecks(_ root: URL) async throws {
     let ordinary = SkyStudioGenerationRun.downloadRetry(key: "k", film: false)
     require(ordinary.contains("A call without that idempotency_key, or with another one, is a new generation and is charged again"),
             "an ordinary generation's next step says a key-less call is charged again: \(ordinary)")
+}
+
+/// The account verified against the fake /me, keeping the shared job slots the earlier checks arranged. LibraryRestartChecks leaves
+/// three voice library jobs parked mid-follow as if SkyCut had quit (their slots would go with the process) and opens three more
+/// slots for them; adopting /me's 3 again would leave every later job waiting for a slot. No production job keeps a slot once its
+/// Sky Studio job has ended (Main checks that the download checks give theirs back).
+@MainActor
+func verifyAccountKeepingSlots() async {
+    let limits = SkyStudioJobSlots.shared.snapshot.limits
+    await SkyStudioAccount.shared.refresh()
+    SkyStudioJobSlots.shared.adopt(limits)
 }

@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import SrtFlowCore
 import SrtFlowMCPKit
 
 // MARK: - 一次变声的任务：传 → 交 → 等 → 下两个文件 → 一步落地
@@ -41,6 +42,8 @@ final class VoiceChangeJob {
     private let fallbackFolders: [URL]
     private weak var project: VideoEditProject?
     private var held: SkyStudioHeldCredits
+    /// Sky Studio's bill was not final when the job finished: the reservation stays until get_job reads a final one (refreshBill).
+    private var billPending = false
     private let status: SkyStudioMediaStatus
     private var serverID: String?
     private var task: Task<Void, Never>?
@@ -74,6 +77,7 @@ final class VoiceChangeJob {
         let job = AIJobs.shared.start(.voiceChange, progress: { nil }, liveDetail: { [weak self] in self?.live() ?? [:] },
                                       cancel: { [weak self] in self?.task?.cancel() })
         self.job = job
+        job.refresh = { [self] in await refreshBill() }   // strong, as a generation's: the job outlives its task while get_job asks
         status.aiJobID = job.id
         status.onCancel = { [weak self] in self?.task?.cancel() }
         SkyStudioGenerationActivity.shared.add(status)
@@ -109,7 +113,8 @@ final class VoiceChangeJob {
                 ? "The voice change was stopped before Sky Studio accepted it; nothing was charged."
                 : SkyStudioVoiceLibraryErrors.uncharged(error))
         }
-        if let charged = done.billing?.netCharged ?? done.creditsCharged { held.settle(charged: charged) }
+        // The final charge only (a bill under review keeps the reservation until get_job reads a final one).
+        if let charged = done.finalCharge { held.settle(charged: charged) } else { billPending = true }
         guard case .conversion(let result)? = done.voiceResult else {
             return finish(.failed, "Sky Studio finished but returned no voice and background files; do not start the same change again "
                 + "before checking this job with Sky Studio.", detail: charges(done))
@@ -241,19 +246,20 @@ final class VoiceChangeJob {
 
     /// 下载两个文件到原素材旁边，量出各自多长。下到一半断了不留半个文件（SkyStudioAPI.download）；只下成一个就把它也删掉。
     /// A direct change downloads the voice alone (no background was made; one sent anyway is not what was asked for).
-    /// SkyStudioAPI.download resumes or tries a broken GET again and renews an expired address from the original job (`jobID`).
-    /// The names are this job's own (VoiceChangeOutputName.claim); a failure or a stop deletes only the files this download wrote, and
-    /// only while no timeline uses them, and counts every GET it sent (CXD3 on PR #554: a stop once said 1 of the 2 the server saw).
+    /// SkyStudioAPI.download resumes or tries a broken GET again and renews an expired address from the original job (`jobID`). Each file
+    /// takes its name on disk only when it is whole, never replacing anything (VoiceChangeOutputName.places). A failure or a stop deletes
+    /// only the files this download placed, only while each is still that file (by device and inode) and no timeline uses it, and
+    /// counts every GET it sent (CXD3 / CXD4 on PR #554: a stop once said 1 of 2 GETs; a cancel deleted another job's file, and a file
+    /// that had replaced its own).
     private func download(_ result: SkyStudioVoiceConversion, jobID: String) async throws -> VoiceChangeLanding.Files {
         let background = direct ? nil : result.backgroundURL
-        let places = VoiceChangeOutputName.claim(
+        let places = VoiceChangeOutputName.places(
             original: origin.sourceURL, voiceName: target.name, backgroundLabel: L10n("background (file name)"),
             voiceExtension: VoiceChangeOutputName.pathExtension(contentType: result.contentType, url: result.voiceURL),
             backgroundExtension: VoiceChangeOutputName.pathExtension(contentType: result.backgroundContentType ?? result.contentType,
                                                                      url: background ?? result.voiceURL),
             fallbacks: fallbackFolders
         )
-        defer { VoiceChangeOutputName.release(places) }
         let typical = quote.typicalSeconds
         let last = CloudPhaseBox()
         let report: @Sendable (Double) -> Void = { [weak self] fraction in
@@ -264,24 +270,25 @@ final class VoiceChangeJob {
         status.advance(to: .downloading(fraction: nil), typicalSeconds: typical)
         let voiceShare = background == nil ? 1.0 : 0.5
         var gets = 0
-        var wrote: [URL] = []
+        var placed: [ExclusivePlacement.Claim] = []
         do {
-            gets += try await services.api.download(result.voiceURL, to: places.voice, renew: renewal(jobID) { $0.voiceURL }) {
+            let voice = try await services.api.download(result.voiceURL, into: places.voice, renew: renewal(jobID) { $0.voiceURL }) {
                 report($0 * voiceShare)
             }
-            wrote.append(places.voice)
+            (gets, placed) = (gets + voice.gets, placed + [voice.file])
+            var separated: CloudResultFile?
             if let background {
-                gets += try await services.api.download(background, to: places.background, renew: renewal(jobID) { $0.backgroundURL }) {
+                let file = try await services.api.download(background, into: places.background, renew: renewal(jobID) { $0.backgroundURL }) {
                     report(0.5 + $0 / 2)
                 }
-                wrote.append(places.background)
+                (gets, placed, separated) = (gets + file.gets, placed + [file.file], file)
             }
             status.advance(to: .finishing, typicalSeconds: typical)
-            var files = VoiceChangeLanding.Files(voice: places.voice, voiceSeconds: try await Self.seconds(of: places.voice))
-            if background != nil { files.background = .init(file: places.background, seconds: try await Self.seconds(of: places.background)) }
+            var files = VoiceChangeLanding.Files(voice: voice.url, voiceSeconds: try await Self.seconds(of: voice.url))
+            if let separated { files.background = .init(file: separated.url, seconds: try await Self.seconds(of: separated.url)) }
             return files
         } catch {
-            for file in wrote where !Self.onAnyTimeline(file) { try? FileManager.default.removeItem(at: file) }
+            for file in placed where !Self.onAnyTimeline(file.url) { ExclusivePlacement.discard(file) }
             // A download that gave up or was stopped: with the GETs the files before it took.
             if let failure = SkyStudioDownloadFailure.from(error) { throw failure.after(gets) }
             // Stopped after the files came down, before they were measured: a stop with the GETs that brought them.
@@ -409,13 +416,27 @@ final class VoiceChangeJob {
     // MARK: 结果
 
     private func charges(_ server: SkyStudioJobStatus) -> [String: JSONValue] {
-        var value: [String: JSONValue] = ["skystudio_job_id": .string(server.jobID)]
-        if let charged = server.billing?.netCharged ?? server.creditsCharged {
+        var value: [String: JSONValue] = ["skystudio_job_id": .string(server.jobID), "billing_pending": .bool(server.finalCharge == nil)]
+        if let charged = server.finalCharge {
             value["credits_charged"] = .number(SkyStudioCredits.number(charged))
+        } else {
+            value["credits_reserved"] = .number(SkyStudioCredits.number(quote.credits))
+            value["billing_note"] = .string("Sky Studio has not finalized this bill (it may be under review): the credits reserved stay on "
+                + "today's books until it is. get_job reads the original job again and reports the final charge.")
         }
         if let billing = server.billing { value["billing"] = billing.json }
         value["spent_today_credits"] = .number(SkyStudioCredits.number(SkyStudioSpendStore.shared.spentToday()))
         return value
+    }
+
+    /// get_job: a finished job whose bill was not final reads the original job again (only a GET); once its bill is final the day's
+    /// books and the receipt take that charge.
+    private func refreshBill() async {
+        guard billPending, let job, job.status != .running, let id = serverID,
+              let server = try? await services.api.job(id, key: key), let charged = server.finalCharge, billPending else { return }
+        held.settle(charged: charged)
+        billPending = false
+        AIJobs.shared.updateDetail(job, charges(server))
     }
 
     private func live() -> [String: JSONValue] {

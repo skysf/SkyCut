@@ -396,11 +396,12 @@ grep -qF 'SkyStudioImageOperation.names' "${CONTROLS}" || fail "图片操作枚�
 grep -qF 'try SkyStudioImageOperation.validateRoute(args)' "${GEN_TOOL}" || fail "图片操作未在官方分派前拒绝 film"
 grep -qF 'if let operation { body["operation"] = .string(operation) }' Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \
   || fail "图片操作没有进入报价和提交，也无法绑定确认码"
-# Since 2026-11-24 the delivery (download and the steps after it) is its own type, which Download again runs again.
+# Since 2026-11-24 the delivery (download and the steps after it) is its own type, which Download again runs again. Since 2026-11-26 the
+# image's bytes are checked, and name its extension, on the download's private file before it takes a name (CXD4 on PR #554).
 GEN_DELIVERY="Sources/SrtFlow/SkyStudio/SkyStudioGenerationDelivery.swift"
-grep -qF 'SkyStudioImageResult.format(at: downloaded)' "${GEN_DELIVERY}" \
-  && grep -qF 'SkyStudioImageResult.finalize(downloaded, format: format)' "${GEN_DELIVERY}" \
-  || fail "生产下载之后未按真实图片字节确定扩展名"
+grep -qF 'check: image.map(SkyStudioImageResult.downloadCheck)' "${GEN_DELIVERY}" \
+  && grep -qF 'let read = await MediaReadQueue.run(on: MediaReadQueue.analysis) { Result { try format(at: partial) } }' Sources/SrtFlow/SkyStudio/SkyStudioImageResult.swift \
+  || fail "生产下载之后未按真实图片字节确定扩展名（图片在落名之前按字节校验）"
 grep -qF 'operation != "generate"' "${REFERENCE_FILES}" || fail "特殊图片操作没有把 image 接到 image_url"
 
 # 9c. 官方路线必须接到同一个生产运行器：显式准备、精确报价、先落回执、恢复只查原单。

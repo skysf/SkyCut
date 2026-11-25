@@ -6,8 +6,11 @@ import Foundation
 // - a gzip 206 for the second half (`bytes 29-57/58`, 1,000 bytes decoded): never the result, and a file already at the destination
 //   stays as it was; followed by the whole answer it is the whole result;
 // - a gzip 206 `bytes 29-52/53` decoding to exactly 53 bytes (CXD3: it once overwrote a whole 2,000-byte file on the first GET): never
-//   the result, every GET after it starts without a Range; a whole gzip 200 (its length cannot be checked) never replaces a file already
-//   there, and is taken where nothing is in the way; a gzip 200 the network broke starts again without a Range;
+//   the result, every GET after it starts without a Range; a whole gzip 200 is taken beside a file already at its name, never over it;
+//   a gzip 200 the network broke starts again without a Range;
+// - a result takes its name without touching what is there: a folder at the name (and its contents) and a name that differs only in
+//   case stay, the result takes the next number; a folder SkyCut may not write, before or after the GET, ends download_not_saved
+//   (CXD4: the real write error had only been checked with a constructed error);
 // - an empty 200: never the result; three of them end `download_incomplete` (a download failure the flows hold for Download again);
 // - an answer whose status the system held back (a stalled 403 or 500): at most one GET at the job's current address, never the same
 //   address again;
@@ -59,8 +62,9 @@ private func runShortAnswerChecks(_ server: UploadServer, folder: URL, result: D
     } catch {
         check(false, "a gzip 206 then the whole answer: the download works, got \(error)")
     }
-    check((try? Data(contentsOf: kept)) == result && resultGets(server).count == 2,
-          "a gzip 206 then the whole answer: the whole result after two GETs")
+    check((try? Data(contentsOf: kept)) == earlier && (try? Data(contentsOf: folder.appendingPathComponent("kept 2.mp4"))) == result
+            && resultGets(server).count == 2,
+          "a gzip 206 then the whole answer: the whole result after two GETs, beside the file already there (never over it)")
 
     // An empty 200 is never a result: three of them are a download failure (which the flows hold for Download again).
     server.configureDownload(gets: [.empty], result: result)
@@ -88,31 +92,21 @@ private func runEncodedAnswerChecks(_ server: UploadServer, folder: URL, result:
 
     // A gzip 206 whose decoded body is exactly its Content-Range total: never the result, and never resumed.
     server.configureDownload(gets: [.gzipRange(decoded: 53, range: "bytes 29-52/53")], result: result)
-    var failure = await downloadFailureOf { try await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), to: kept) }
+    let failure = await downloadFailureOf { try await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), to: kept) }
     check(failure?.kind == .incomplete && failure?.attempts == 3 && (try? Data(contentsOf: kept)) == earlier && leftovers(folder).isEmpty,
           "three gzip 206s decoding to their whole total: download_incomplete, the 2,000-byte file untouched: \(String(describing: failure))")
     check(resultGets(server).allSatisfy { $0.headers["range"] == nil }, "every GET after an encoded answer starts without a Range")
 
-    // A whole gzip 200: taken nowhere a file already is (three of them end download_incomplete), taken where nothing is in the way.
+    // A whole gzip 200 (unchecked): taken, beside the file already at the name, never over it.
     server.configureDownload(gets: [.gzipWhole], result: result)
-    failure = await downloadFailureOf { try await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), to: kept) }
-    check(failure?.kind == .incomplete && failure?.attempts == 3 && (try? Data(contentsOf: kept)) == earlier && leftovers(folder).isEmpty,
-          "a gzip 200 never replaces the file already at the destination: \(String(describing: failure))")
-    server.configureDownload(gets: [.gzipWhole, .file], result: result)
     do {
         try await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), to: kept)
     } catch {
-        check(false, "a gzip 200 then the whole answer: the checked result replaces the file, got \(error)")
+        check(false, "a whole gzip 200: taken, got \(error)")
     }
-    check((try? Data(contentsOf: kept)) == result && resultGets(server).count == 2, "a gzip 200, then the whole result checked against its length")
-    let fresh = folder.appendingPathComponent("fresh-encoded.mp4")
-    server.configureDownload(gets: [.gzipWhole], result: result)
-    do {
-        try await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), to: fresh)
-    } catch {
-        check(false, "a gzip 200 where nothing is in the way: taken, got \(error)")
-    }
-    check((try? Data(contentsOf: fresh)) == result && resultGets(server).count == 1, "a gzip 200 where nothing is in the way is taken")
+    check((try? Data(contentsOf: kept)) == earlier && (try? Data(contentsOf: folder.appendingPathComponent("kept-encoded 2.mp4"))) == result
+            && resultGets(server).count == 1,
+          "a whole gzip 200 takes the next free name; the 2,000-byte file at the name is untouched")
 
     // A gzip 200 the network broke: the next GET starts again from nothing, without a Range.
     server.configureDownload(gets: [.gzipCut, .file], result: result)
@@ -125,6 +119,51 @@ private func runEncodedAnswerChecks(_ server: UploadServer, folder: URL, result:
     let gets = resultGets(server)
     check((try? Data(contentsOf: broken)) == result && gets.count == 2 && gets[1].headers["range"] == nil,
           "a broken gzip 200 is never resumed: \(gets.map { $0.headers["range"] ?? "-" })")
+    await runPlacementChecks(server, folder: folder, result: result, api: api)
+}
+
+/// Where a whole result goes: a name taken by a folder or by a name that differs only in case is never touched (the next free number);
+/// a folder that cannot be written ends `download_not_saved`, held by the flows (CXD4 on PR #554: generate_media once removed a folder
+/// that had taken its name; a voice "Background" and the "background" became one file; the real write error was never checked).
+private func runPlacementChecks(_ server: UploadServer, folder: URL, result: Data, api: (UploadEvents, TimeInterval) -> SkyStudioAPI) async {
+    let blocking = folder.appendingPathComponent("shot.mp4", isDirectory: true)
+    try? FileManager.default.createDirectory(at: blocking, withIntermediateDirectories: true)
+    try? Data("inside".utf8).write(to: blocking.appendingPathComponent("keep.txt"))
+    server.configureDownload(gets: [.file], result: result)
+    let beside = try? await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), into: CloudResultPlace(folder: folder, stem: "shot",
+                                                                                                                pathExtension: "mp4"))
+    check(beside?.url.lastPathComponent == "shot 2.mp4" && beside.flatMap { try? Data(contentsOf: $0.url) } == result
+          && (try? Data(contentsOf: blocking.appendingPathComponent("keep.txt"))) == Data("inside".utf8),
+          "a folder at the name is left whole; the result takes the next number: \(beside?.url.lastPathComponent ?? "nil")")
+
+    let upper = folder.appendingPathComponent("Case.mp4")
+    try? Data("upper".utf8).write(to: upper)
+    server.configureDownload(gets: [.file], result: result)
+    let lower = try? await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), into: CloudResultPlace(folder: folder, stem: "case",
+                                                                                                               pathExtension: "mp4"))
+    check(lower.flatMap { try? Data(contentsOf: $0.url) } == result && (try? Data(contentsOf: upper)) == Data("upper".utf8),
+          "a name that differs only in case is never replaced (a case-insensitive drive: the next number): \(lower?.url.lastPathComponent ?? "nil")")
+
+    // The real write errors: the system's download cannot be moved into a folder SkyCut may not write; the whole result cannot take its
+    // name once the folder became read-only. Both download_not_saved after the one GET, held by the flows (never a network failure).
+    let locked = folder.appendingPathComponent("locked", isDirectory: true)
+    try? FileManager.default.createDirectory(at: locked, withIntermediateDirectories: true)
+    chmod(locked.path, 0o555)
+    server.configureDownload(gets: [.file], result: result)
+    var failure = await downloadFailureOf {
+        try await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), to: locked.appendingPathComponent("a.mp4"))
+    }
+    check(failure?.kind == .notSaved && failure?.code == "download_not_saved" && failure?.attempts == 1,
+          "a folder SkyCut may not write: download_not_saved after its one GET: \(String(describing: failure))")
+    chmod(locked.path, 0o755)
+    server.configureDownload(gets: [.file], result: result)
+    let place = CloudResultPlace(folder: locked, stem: "late", pathExtension: "mp4")
+    failure = await downloadFailureOf {
+        _ = try await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), into: place, check: { _ in chmod(locked.path, 0o555); return nil })
+    }
+    chmod(locked.path, 0o755)
+    check(failure?.kind == .notSaved && failure?.attempts == 1 && !FileManager.default.fileExists(atPath: locked.appendingPathComponent("late.mp4").path),
+          "a whole result that cannot take its name: download_not_saved, nothing placed: \(String(describing: failure))")
 }
 
 private func runHeldBackChecks(_ server: UploadServer, folder: URL, result: Data, api: (UploadEvents, TimeInterval) -> SkyStudioAPI) async {

@@ -12,7 +12,9 @@ import SrtFlowMCPKit
 //   is a deliberate new version); the held change keeps its own row's Download again;
 // - that row's Download again lands the byte-identical files under the same job id (the job read first), as one undo step;
 // - a stop during Download again keeps the button (download_stopped, with the GET it sent), and the next press lands it;
-// - an expired address (403): one GET of the original job for a fresh address; the change lands with no new job.
+// - an expired address (403): one GET of the original job for a fresh address; the change lands with no new job;
+// - a bill under review when it lands: the reservation stays and the receipt says the bill is pending (not its amount as the charge);
+//   get_job reads the original job again, and once the bill is final the books and the receipt take it (the reviews of PR #554).
 // Main checks that every keep-awake lease came back.
 
 @MainActor
@@ -20,6 +22,26 @@ func runVoiceChangeDownloadChecks(_ root: URL) async throws {
     try await repeatChecks(root)
     try await stopChecks(root)
     try await expiredChecks(root)
+    try await billChecks(root)
+}
+
+@MainActor
+private func billChecks(_ root: URL) async throws {
+    let fixture = try VoiceChangeFixture(folder: root.appendingPathComponent("change-bill"))
+    let clipID = fixture.placeClip(try fixture.stereoSource())
+    VoiceChangeHTTP.lock.withLock { VoiceChangeHTTP.billUnderReview = true }
+    let spent = SkyStudioSpendStore.shared.spentToday()
+    @MainActor func books() -> Double { SkyStudioSpendStore.shared.spentToday() - spent }
+    let started = try await fixture.change(args(fixture, clipID))
+    let landed = try await fixture.wait(started)
+    require(landed["status"] == "done" && landed["billing_pending"] == true && landed["credits_charged"] == nil && landed["credits_reserved"] == 9
+            && abs(books() - 9) < 0.001,
+            "landed while the bill is under review: the 9 reserved stay, the bill said pending: \(landed), \(books())")
+    guard let id = started.payload["job_id"]?.stringValue else { return require(false, "the change's job id") }
+    VoiceChangeHTTP.lock.withLock { VoiceChangeHTTP.billUnderReview = false }
+    let final = try await AIExportTools.job(AIToolArguments(["job_id": .string(id)])).payload
+    require(final["billing_pending"] == false && final["credits_charged"] == 7.5 && abs(books() - 7.5) < 0.001,
+            "once the bill is final, get_job settles it: the books and the receipt say 7.5: \(final), \(books())")
 }
 
 @MainActor

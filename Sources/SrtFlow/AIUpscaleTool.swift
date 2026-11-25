@@ -198,7 +198,6 @@ enum AIUpscaleTool {
             "duration": AIFormat.seconds(outcome.info.duration),
             "tier": .string(finished.request.tier.id),
             "skystudio_job_id": .string(outcome.jobID),
-            "credits_charged": .number(SkyStudioCredits.number(outcome.creditsCharged)),
             "spent_today_credits": .number(SkyStudioCredits.number(SkyStudioSpendStore.shared.spentToday())),
             "elapsed_seconds": .number(outcome.elapsed.rounded()),
             "next_step": .string(done.isEmpty
@@ -209,8 +208,33 @@ enum AIUpscaleTool {
         if !outcome.audioRestored {
             detail["note"] = "The original sound could not be put back (ffmpeg is missing); the upscaled file has no sound."
         }
+        detail.merge(billFields(outcome.creditsCharged, reserved: finished.request.credits)) { _, bill in bill }
+        if outcome.creditsCharged == nil {
+            // Not final yet: get_job reads the original job again until it is, then the books and this receipt take the final charge.
+            aiJob.refresh = { [finished] in
+                guard let charged = await finished.refreshBill() else { return }
+                AIJobs.shared.updateDetail(aiJob, Self.billFields(charged, reserved: finished.request.credits))
+            }
+        }
         let saved = await AIProjectTools.saveIfNeverSaved(project, after: .ok(.object(detail), changed: !done.isEmpty))
         AIJobs.shared.finish(aiJob, .done, message: done.isEmpty ? "Upscaled; nothing replaced." : "Upscaled and replaced \(done.count) clip(s).", detail: saved.payload)
+    }
+
+    /// What the receipt says about the charge: the final one, or (nil) that Sky Studio's bill is not final yet and the reservation stays.
+    private static func billFields(_ charged: Double?, reserved: Double) -> [String: JSONValue] {
+        var fields: [String: JSONValue] = ["spent_today_credits": .number(SkyStudioCredits.number(SkyStudioSpendStore.shared.spentToday())),
+                                           "billing_pending": .bool(charged == nil)]
+        if let charged {
+            fields["credits_charged"] = .number(SkyStudioCredits.number(charged))
+            fields["billing_note"] = "Sky Studio's bill for this upscale is final."
+        } else {
+            fields["credits_charged"] = .null
+            fields["credits_reserved"] = .number(SkyStudioCredits.number(reserved))
+            fields["billing_note"] = .string("Sky Studio has not finalized this upscale's bill (it may be under review): the "
+                + "\(SkyStudioCredits.text(reserved)) credits reserved stay on today's books until it is. get_job reads the original job "
+                + "again and reports the final charge; do not upscale again for it.")
+        }
+        return fields
     }
 
     /// 没做成 / 停下来了：把结局记给 AI 的任务（done 在 land 里记）。

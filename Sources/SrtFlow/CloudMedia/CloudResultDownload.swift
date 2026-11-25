@@ -2,15 +2,16 @@ import Foundation
 
 // MARK: - A paid result's download: the GETs behind SkyStudioAPI.download
 //
-// What it covers (2026-11-24, backlog B40 and the reviews of PR #554): one result downloaded into a partial file beside its destination
-// and moved over only when it is whole.
+// What it covers (2026-11-24, backlog B40 and the reviews of PR #554): one result downloaded into a private file next to where it goes
+// (CloudResultPlace) and placed only when it is whole, and usable by the flow's own check.
 // - Every GET asks for the bytes as they are (`Accept-Encoding: identity`). A GET the network broke is resumed from the system's own
 //   resume data (never an encoded answer's), or started again; three GETs in all, redirects included (the system never follows one by
 //   itself here, so every GET is counted).
 // - What arrived must be the whole result (SkyStudioDownloadRetry.wholeness: never empty, a 206 to the last byte with the whole length
-//   on disk and never encoded, a 200 holding its length); anything else is thrown away and the result started again from nothing. A
-//   file already at the destination is replaced only by a result checked against its length (an encoded or length-less 200 is not).
-// - This Mac could not keep it (moving it into place, the disk): `notSaved`, not tried again.
+//   on disk and never encoded, a 200 holding its length) and pass the flow's `check` (an image that decodes: a length-less answer
+//   holding 8 bytes of a PNG once passed); anything else is thrown away and the result started again from nothing.
+// - It takes its name without replacing or removing anything (CloudResultPlace.place: the next free number of its series when the name
+//   is taken); this Mac could not keep it (moving the download in, placing it, the disk): `notSaved`, not tried again.
 // - A 403 / 404 / 410 asks the original job once for its current address (`renew`, only a read). An answer that began but whose
 //   status the system held back counts as an answer too: at most that one GET at the job's current address, never the same address
 //   again. Any other answer, a cancel and a connection that does not work end it.
@@ -23,14 +24,14 @@ struct CloudResultDownload {
     let session: URLSession
     let retry: SkyStudioDownloadRetry
 
-    /// Downloads `url` into `destination`; returns the GETs it sent.
-    @discardableResult
+    /// Downloads `url` into `place`; returns the file it became and the GETs it sent. `check`: the flow's own check of the whole
+    /// result in its private file, before it takes a name (it may correct the extension: an image's bytes say what it is).
     func run(
-        _ url: URL, to destination: URL, renew: (@Sendable () async throws -> URL?)?, onProgress: @escaping @Sendable (Double) -> Void
-    ) async throws -> Int {
-        let partial = destination.deletingLastPathComponent()
-            .appendingPathComponent(".\(destination.lastPathComponent).part-\(UUID().uuidString.prefix(8))")
-        defer { try? FileManager.default.removeItem(at: partial) }
+        _ url: URL, into place: CloudResultPlace, check: (@Sendable (URL) async throws -> String?)?, renew: (@Sendable () async throws -> URL?)?,
+        onProgress: @escaping @Sendable (Double) -> Void
+    ) async throws -> CloudResultFile {
+        let partial = place.partial()
+        defer { try? FileManager.default.removeItem(at: partial) }   // its private name: nobody else's
         var address = url
         var resumeData: Data?
         var asked = false
@@ -64,24 +65,32 @@ struct CloudResultDownload {
                 try Task.checkCancellation()   // a GET is counted only once it is really sent
                 gets += 1
                 switch try await fetch(address, resuming: resumeData, into: partial, onProgress: onProgress) {
-                case .done(let unchecked):
-                    // Never over a file already there with a result not checked whole: thrown away, the next GET starts it again.
-                    if let unchecked, FileManager.default.fileExists(atPath: destination.path) {
-                        (lastError, lastKind) = ("\(unchecked), would have replaced the file already at the destination", .incomplete)
-                        resumeData = nil
-                        onProgress(0)
-                        pausesFirst = true
-                        continue
+                case .done:
+                    var corrected: String?
+                    if let check {
+                        do {
+                            corrected = try await check(partial)
+                        } catch is CancellationError {
+                            throw CancellationError()
+                        } catch {
+                            // Not usable by the flow's own check: thrown away, the next GET starts it again.
+                            let reason = (error as? CloudResultUnusable)?.reason ?? error.localizedDescription
+                            (lastError, lastKind) = ("what came down is not a usable result: \(reason)", .incomplete)
+                            resumeData = nil
+                            onProgress(0)
+                            pausesFirst = true
+                            continue
+                        }
                     }
+                    let file: CloudResultFile
                     do {
-                        if unchecked == nil { try? FileManager.default.removeItem(at: destination) }
-                        try FileManager.default.moveItem(at: partial, to: destination)
+                        file = CloudResultFile(file: try await place.place(partial, pathExtension: corrected), gets: gets)
                     } catch {
                         lastError = error.localizedDescription
                         throw failed(.notSaved)
                     }
                     onProgress(1)
-                    return gets
+                    return file
                 case .broken(let detail, let kept):
                     (lastError, lastKind) = (detail, .interrupted)
                     resumeData = kept
@@ -166,8 +175,7 @@ struct CloudResultDownload {
         switch SkyStudioDownloadRetry.wholeness(status: status, contentRange: answer?.value(forHTTPHeaderField: "Content-Range"),
                                                 expectedLength: answer?.expectedContentLength ?? -1, size: size,
                                                 encoding: answer?.value(forHTTPHeaderField: "Content-Encoding")) {
-        case .checked: return .done(unchecked: nil)
-        case .unchecked(let why): return .done(unchecked: why)
+        case .checked, .unchecked: return .done   // the flow's own check, if any, comes next
         case .incomplete(let problem): return .incomplete(detail: problem)   // thrown away: the next try starts the result from nothing
         }
     }
