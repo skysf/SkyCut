@@ -49,6 +49,10 @@
 固定自签名证书没有 Team ID，512 格式钥匙串的分区名单仍按 cdhash 记。每个新构建首次
 读取可能需要授权，这一点继续保留。只用 `kSecUseAuthenticationUIFail` 会漏掉分区密码框；
 探针已证明进程交互关闭可以拦住，详见[钥匙串阻塞案例](../bugfixes/2026-11-07-keychain-prompt-blocks-ai-calls.md)。
+Since 2026-11-26 builds carry the Team ID 26TVX3S9FR ([code signing](code-signing-and-permissions.md)): after one more
+Allow… / Always Allow on the first Developer ID build, the partition list should hold `teamid:26TVX3S9FR` and later builds
+should not ask (to be confirmed on the second install). The silent reads, the banner and the per-build prompt stay as
+they are: they cost nothing when the keychain does not ask.
 
 - `KeychainSecret` 的原生调用只在 `KeychainSecretExecutor` 的串行 `OperationQueue` 上执行。
   静默读先保存 / 关闭交互，原生调用返回后恢复。交互读和所有写入 / 删除使用同一个执行器，
