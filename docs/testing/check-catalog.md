@@ -628,6 +628,8 @@
     都要能从 AGENTS.md 的链接找到。只读 AGENTS.md 的代理打不开索引外的文档，所以漏一行等于那份文档不存在。漏索引、死链、算上限用同一份清单：
     `docs/` 下名字只有字母、数字、`.` `_` `-` 的普通 `.md` 文件（叫 `xxx.md` 的文件夹不算文档；符号链接、`.MD`、名字带空格或括号的红）；
     `docs/bugfixes/` 下只放 `YYYY-MM-DD-<slug>.md`、`TEMPLATE.md`、`INDEX.md`。
+    No doc on that list and no `.md` file at the root is empty (only whitespace counts): an emptied doc still opens, so its index
+    line and the dead-link check stayed green when a script emptied one (PR #555, 2026-11-25; `[empty_doc]`, three self-test cases).
   - 两份都没有死链（大小写也要一字不差）；`INDEX.md` 里的链接按它所在的文件夹解析（同文件夹写 `xxx.md`，别的文件夹写 `../architecture/xxx.md`）。
     AGENTS.md 的「Bug 修复案例索引」一节只留指路的话（每行 ≤ 400 字节、≤ 5 行，只许普通的一行或 `- ` 开头的一行）；这一节和 AGENTS.md 的索引小节里，
     任何指向 `docs/bugfixes/` 下案例的链接都红（`INDEX.md`、`TEMPLATE.md` 除外），不管前面是什么记号（开工早的会话还会照旧规矩往那里补一行）。
