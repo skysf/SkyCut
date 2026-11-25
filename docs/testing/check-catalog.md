@@ -394,14 +394,15 @@
     - `LimitTokenChecks` (2026-11-26): a raise's token void after the limit went to 2,000 and back to 1,000; a used or unknown
       token replayed with `theme=classic` writes nothing and says to repeat without it; with a mode change it asks.
     - `SettleChecks` (2026-11-26): a settlement in Tokyo on the booking's day key; a keyless refund or settlement only into a day the
-      ledger proves (Shanghai midnight: none; noon: that day); a settlement writes the ledger once.
+      ledger proves (Shanghai midnight: none; noon: that day); a settlement writes the ledger once. Each case runs on three clocks,
+      passed to the settlement too: the fixed sample, today, and 120 days ago. The 40-day clean-up never deletes the sample (CXM4).
     - `ReferenceTotalChecks`: the actual totals.
   - `scripts/check-voice-recovery.sh`:
     - `VoiceChangeBalanceChecks`: change_voice into a plain 402 and into one with pending billing, with real App objects; get_job then
       GETs the original job and settles by its billing;
     - `VoiceChangeSettleChecks` (2026-11-26): a polled 402 queries the original job; a 402 GET with a final bill of 6.5 settles at
       6.5; no final bill keeps the 9 and reports no charge (done, or get_job on the original job); a result without its background
-      keeps the 9 until get_job reads the bill;
+      keeps the 9 until get_job reads the bill; after a 402 GET with a bill, get_job's `spent_today_credits` is read after settling;
     - the voiceover's budget stop: its options, the numbers read at the refusal, its own resume;
     - the mid-voiceover fee over the limit, with both ways (`FallbackFeeChecks`).
   - `checks/sky-studio-wiring/daily-limit.sh` pins:
