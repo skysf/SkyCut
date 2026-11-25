@@ -19,10 +19,21 @@ if [ ! -d "${SRC}" ]; then
   echo "✗ 没找到 ${SRC}：先跑 scripts/build-app.sh" >&2
   exit 1
 fi
-# The Beta is notarized like the release: a notary profile notarytool cannot use stops it before anything is copied.
+# The Beta is signed and notarized like the release: whatever stops a release build (notarize.sh --check) stops it here,
+# before anything is copied. A run that fails after that deletes the half-made Beta (FBS1 6).
 scripts/signing/notarize.sh --check
+WROTE_BETA=0
+discard_unfinished() {
+  if [ "$1" -ne 0 ] && [ "${WROTE_BETA}" = 1 ]; then
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u "$PWD/${BETA}" \
+      >/dev/null 2>&1 || true
+    rm -rf "${BETA}"
+  fi
+}
+trap 'discard_unfinished $?' EXIT
 
 echo "==> 复制成 ${BETA}"
+WROTE_BETA=1
 rm -rf "${BETA}"
 ditto "${SRC}" "${BETA}"
 

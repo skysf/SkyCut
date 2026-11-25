@@ -70,11 +70,24 @@ signing_mode_from() {
   echo ad-hoc
 }
 
+# How this run signs: signing_mode_from on this Mac's listings, plus two rules (FBS1 review, 2026-11-26). A `security`
+# that fails is an error, never «no identity». Ad-hoc only with SKYCUT_ALLOW_ADHOC=1 (someone building SkyCut for
+# themselves): otherwise a Mac with no Developer ID of the team builds nothing, so an ad-hoc build can't pass for a release.
 signing_mode() {
-  local valid all
-  valid="$(security find-identity -v -p codesigning 2>/dev/null || true)"
-  all="$(security find-identity -p codesigning 2>/dev/null || true)"
-  signing_mode_from "${valid}" "${all}"
+  local valid all mode
+  if ! valid="$(security find-identity -v -p codesigning 2>&1)" || ! all="$(security find-identity -p codesigning 2>&1)"; then
+    echo "✗ security cannot list this Mac's code-signing identities (is the login keychain reachable from this shell?):" >&2
+    echo "  ${valid:-}${all:-}" >&2
+    return 1
+  fi
+  mode="$(signing_mode_from "${valid}" "${all}")" || return 1
+  if [ "${mode}" = ad-hoc ] && [ "${SKYCUT_ALLOW_ADHOC:-}" != 1 ]; then
+    echo "✗ No Developer ID of team ${SIGNING_TEAM_ID} on this Mac, so this is not a build for users or a release." >&2
+    echo "  Building SkyCut for yourself from source? SKYCUT_ALLOW_ADHOC=1 signs it ad-hoc and skips notarization" >&2
+    echo "  (macOS then treats every build as another app; never hand it to anyone)." >&2
+    return 1
+  fi
+  echo "${mode}"
 }
 
 # The signature on $1 is the pinned Developer ID's: our team, the pinned leaf certificate and a secure timestamp

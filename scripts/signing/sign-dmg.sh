@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Signs a built SkyCut DMG with the pinned Developer ID (build-app.sh, before notarize.sh submits it): Gatekeeper checks a
-# downloaded disk image's own signature and ticket before it mounts it. On a Mac with no Developer ID of our team the
-# DMG stays unsigned, like the ad-hoc app inside it (never handed to a user). docs/architecture/code-signing-and-permissions.md.
+# downloaded disk image's own signature and ticket before it mounts it. signing_mode's refusal stops it (status kept);
+# only with SKYCUT_ALLOW_ADHOC=1 does the DMG of an ad-hoc build stay unsigned. docs/architecture/code-signing-and-permissions.md.
 #
 # Usage: scripts/signing/sign-dmg.sh <SkyCut-x.y.z-arm64.dmg>
 set -euo pipefail
@@ -13,8 +13,9 @@ DMG="$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")"
 cd "$(dirname "$0")/../.."
 source scripts/signing/common.sh
 
-if [ "$(signing_mode)" != developer-id ]; then
-  echo "⚠️  No Developer ID on this Mac: the DMG stays unsigned. Never hand it to a user or release it."
+MODE="$(signing_mode)"
+if [ "${MODE}" != developer-id ]; then
+  echo "⚠️  SKYCUT_ALLOW_ADHOC=1: the DMG stays unsigned. Never hand it to anyone or release it."
   exit 0
 fi
 codesign --force --sign "$(signing_pinned_sha1)" --timestamp "${DMG}"

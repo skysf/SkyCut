@@ -8,8 +8,9 @@
 #   Apple Events to Finder); the helpers need none. Which feature needs which entitlement, and the proof:
 #   docs/architecture/code-signing-and-permissions.md.
 # - Identity (scripts/signing/common.sh): the pinned Developer ID with a secure timestamp; afterwards every piece is
-#   checked for our team, the pinned certificate, the timestamp and the runtime flag. A Mac with no Developer ID of our
-#   team (CI, a build from source) signs ad-hoc with a warning: such a build never goes to a user or a release.
+#   checked for our team, the pinned certificate, the timestamp and the runtime flag. signing_mode refuses (status kept)
+#   an expired or unknown certificate and a Mac with no Developer ID of our team; only SKYCUT_ALLOW_ADHOC=1 (a build for
+#   oneself, the guard's fixture) signs ad-hoc, with a warning: such a build never goes to anyone.
 # - A notarization ticket stapled to an earlier signature (build-beta-app.sh copies the notarized release) belongs to the
 #   old code and is removed; notarize.sh staples the new one.
 #
@@ -46,7 +47,7 @@ if [ "${MODE}" = developer-id ]; then
   echo "   Identity: Developer ID Application of team ${SIGNING_TEAM_ID} (SHA-1 $(signing_pinned_sha1))"
 else
   IDENTITY=(--sign - --timestamp=none)
-  echo "⚠️  No Developer ID on this Mac: signing ad-hoc. Never hand this build to a user or release it: macOS treats every"
+  echo "⚠️  SKYCUT_ALLOW_ADHOC=1: signing ad-hoc. Never hand this build to anyone or release it: macOS treats every"
   echo "    ad-hoc build as another app (screen recording, microphone, Downloads and keychain permissions are asked again,"
   echo "    and the screen recording switch cannot bring them back), and Gatekeeper blocks it on every other Mac."
 fi
