@@ -63,6 +63,12 @@ struct VoiceChangePanel: View {
             }
             directOption
             offer
+            if model.heldDownload != nil {
+                Text("This change is already made on Sky Studio but did not download. Download it again: nothing more is charged.")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let problem = model.problem {
                 Text(verbatim: problem)
                     .font(.caption)
@@ -79,11 +85,17 @@ struct VoiceChangePanel: View {
                 // 两个按钮不许被压缩（带价的那个最长）：左边那一句让它折行。
                 Button("Cancel") { dismiss() }
                     .fixedSize()
-                Button(VoiceChangeText.button(model.quote), action: start)
-                .keyboardShortcut(.defaultAction)
-                .disabled(model.quote == nil || overLimit)
-                .fixedSize()
-                .accessibilityIdentifier("voice-change-start")
+                if model.heldDownload != nil {
+                    Button("Download again") { if model.downloadAgain() { dismiss() } }
+                        .keyboardShortcut(.defaultAction)
+                        .fixedSize()
+                } else {
+                    Button(VoiceChangeText.button(model.quote), action: start)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(model.quote == nil || overLimit)
+                    .fixedSize()
+                    .accessibilityIdentifier("voice-change-start")
+                }
             }
         }
         .padding(20)

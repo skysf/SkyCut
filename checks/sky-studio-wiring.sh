@@ -396,8 +396,10 @@ grep -qF 'SkyStudioImageOperation.names' "${CONTROLS}" || fail "图片操作枚�
 grep -qF 'try SkyStudioImageOperation.validateRoute(args)' "${GEN_TOOL}" || fail "图片操作未在官方分派前拒绝 film"
 grep -qF 'if let operation { body["operation"] = .string(operation) }' Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \
   || fail "图片操作没有进入报价和提交，也无法绑定确认码"
-grep -qF 'SkyStudioImageResult.format(at: downloaded)' "${GEN_RUN}" \
-  && grep -qF 'SkyStudioImageResult.finalize(downloaded, format: format)' "${GEN_RUN}" \
+# Since 2026-11-24 the delivery (download and the steps after it) is its own type, which Download again runs again.
+GEN_DELIVERY="Sources/SrtFlow/SkyStudio/SkyStudioGenerationDelivery.swift"
+grep -qF 'SkyStudioImageResult.format(at: downloaded)' "${GEN_DELIVERY}" \
+  && grep -qF 'SkyStudioImageResult.finalize(downloaded, format: format)' "${GEN_DELIVERY}" \
   || fail "生产下载之后未按真实图片字节确定扩展名"
 grep -qF 'operation != "generate"' "${REFERENCE_FILES}" || fail "特殊图片操作没有把 image 接到 image_url"
 
@@ -415,7 +417,7 @@ grep -qF 'SkyStudioGenerationRequests.completeStarted(operationKey, result: resp
   || fail "官方新提交不可无条件缓存；唯一未筛选 response 是显式准备任务"
 grep -qF 'official?.request ?? generation.job(' "${GEN_RUN}" || fail "生产运行器丢掉已审查的官方精确请求"
 grep -qF 'official.recovery.received(status)' "${GEN_RUN}" || fail "生产运行器没保存已知原单回执"
-grep -qF 'official?.recovery.delivered(' "${GEN_RUN}" || fail "生成结果没保存可恢复身份"
+grep -qF 'official?.recovery.delivered(' "${GEN_DELIVERY}" || fail "生成结果没保存可恢复身份"
 grep -qF 'await runner.resume(serverID)' "${RECOVERY}" || fail "重启恢复没有只查原单"
 if grep -qE 'runner\.run\(|api\.submit\(' "${RECOVERY}"; then fail "重启恢复不许重新 POST 收费"; fi
 grep -qF '"prepare_references"' Sources/SrtFlow/AIProjectBinding.swift || fail "官方准备没绑定会话拥有的工程"

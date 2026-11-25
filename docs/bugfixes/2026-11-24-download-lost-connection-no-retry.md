@@ -24,6 +24,26 @@ retries in #549; downloads did not.
    get_job's `remote_result`, and no tool, button or recovery downloaded it again (only voiceover's recovery file and the official
    receipt could, by design).
 3. **An expired address was a dead end.** A 403 / 404 from the storage ended the download; nothing asked the job for a fresh address.
+4. **The first fix (PR #554 at `19e1112f`) looked done and was not** (Codex's review, reproduced on loopback):
+   - **A short 206 became the result.** It trusted any 2xx with a non-empty file. A resumed answer `bytes 100000-249999/1000000` was
+     moved into place as a 250,000-byte result at 100%: URLSession completes such an answer as if it were whole.
+   - **The HTTP answer was not always read first.** An error answer whose body stalls times out with its status held back
+     (`task.response` nil; a probe showed the task's metrics carry no status either, only that an answer began), so a stalled 403 was
+     counted as broken and the old address was fetched again instead of the job's current one.
+   - **Redirects multiplied the GETs.** The system followed them inside one task: three tries sent six GETs.
+   - **Download again was not the same paid job on every path.** Upscale and voice change downloaded the address held from the first
+     try (an expired one stayed expired); a stop during a voice change's Download again was reported as a save failure, and upscale's
+     Cancel removed the job with its button. generate_media bound the idempotency_key into the request's identity, so the key SkyCut
+     returned for a keyless first call was refused as "different inputs" and a keyless re-ask minted a new key, a new paid job; a
+     dismissed row took the held run with it; official generation and recovery answered from their cached answer and never downloaded
+     again. Voiceover's failed row had no button, and the upscale / voice change panels let Start pay again for the same input (B47).
+   - **The day's books kept the reservation.** An upscale settled Sky Studio's charge only after a saved file: 75 reserved, 72
+     charged, and a failed download left 75 on the books.
+   - **The words promised what did not work.** Same-key advice for official requests, "also at the fresh address" when the address
+     had not changed, "charged" while billing could still be pending, and an SRT failure pointing at get_job, which never fetches it.
+   - Why the checks stayed green: the fake server always completed a 206 to the end of the file, had no stalled error answer and no
+     redirect, the order of the HTTP checks was pinned only by a source scan, and Download again was exercised only through one flow's
+     button (voice change).
 
 ## Fix
 
@@ -52,16 +72,53 @@ retries in #549; downloads did not.
   - Every flow passes `renew:`. The task rows show **Download again** (`SkyStudioMediaStatus.retryDownload`,
     `UpscaleJob.canRetryDownload`).
 - **For the post-merge smoke test against the real Sky Studio: `SRTFLOW_TEST_DOWNLOAD_DROPS=N`, debug builds only**
-  (`CloudMedia/CloudDownloadFault.swift`, the whole file inside `#if DEBUG`, reached only from `SkyStudioAPI.fetch` inside `#if DEBUG`).
+  (`CloudMedia/CloudDownloadFault.swift`, the whole file inside `#if DEBUG`, reached only from `CloudResultDownload.fetch` inside `#if DEBUG`).
   The first N GETs are cancelled with the system's resume data once a quarter of the body (at most 256 KB) arrived and end as -1005.
   `scripts/debug-hook-probe.sh` now refuses a binary naming this hook too, and `scripts/check-sky-studio.sh` requires its refusal of the
   debug build to name both hooks.
 
-Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift` (`download`, `fetch`), `SkyStudioDownloadRetry.swift`,
-`SkyStudioDownloadFailure.swift`, `SkyStudioDownloadWords.swift`, `SkyStudioGenerationRun.swift`, `SkyStudioGenerateTool.swift`,
-`SkyStudioOfficialRecoveryRun.swift`, `SkyStudioVoiceCloudBatches.swift`, `SkyStudioVoiceoverRun.swift`, `Upscale/UpscalePipeline.swift`,
-`Upscale/UpscaleJob.swift`, `AIUpscaleTool.swift`, `VoiceChange/VoiceChangeJob.swift`, `CloudMedia/CloudTransfer.swift`
-(`didResumeAtOffset`), `CloudMedia/CloudTaskRows.swift`, `AIJobs.swift` (`reopen`), `CloudMedia/CloudDownloadFault.swift`.
+**Second round, after the review of #554:**
+
+- **The GETs moved into `CloudMedia/CloudResultDownload.swift`** (`SkyStudioAPI.download` hands every paid result to it; the API file
+  went from 507 to 416 lines):
+  - whole before it is moved: `SkyStudioDownloadRetry.incompleteness` (a 206 must reach the last byte with `total` bytes on disk, a 200
+    with a length must hold it, sizes not compared under a Content-Encoding); anything else is thrown away and the result started
+    again. Progress counts against the whole length (the Content-Range total), so a short 206 never reads 100%;
+  - an answer that began but whose status was held back (`CloudTransferDelegate.answerStarted`) asks the job for its current address
+    first and goes there when it differs; otherwise it is tried again after a pause;
+  - `followsRedirects: false`: a 3xx with a Location is followed by the next GET, which counts (`redirectTarget`, http(s) only);
+  - the refusal says "also at the fresh address" only when a GET went to one (`triedFreshAddress`).
+- **Every Download again reads the original job's current result first**, then downloads with `renew:`: generation, the official
+  recovery (it GETs the job first, as before), upscale, voice change; voiceover's recovery GETs its original jobs.
+- **Held whatever kept it from landing.** A stop while downloading is `download_stopped` (`SkyStudioDownloadFailure.stopped`) and keeps
+  the result held in every flow, as does a local step after the download (an upscale's sound or save, a voice change's files).
+  Upscale: Cancel during a paid download stops it and keeps the job listed (`UpscaleJob.downloadsPaidResult`).
+- **The same paid job on every way back:**
+  - generate_media: the key is no longer part of a request's identity (`SkyStudioGenerationRequests.identity`); `heldAnswer` sends the
+    same request, with the key SkyCut returned or with none, to Download again under the same job id; held runs are registered by job
+    id (`SkyStudioHeldDownloads`), so the re-ask works after the row was dismissed; official generation and recovery find theirs from
+    the cached answer (`heldAnswer(for:)`). The delivery (download, image format, WebM copy, SRT, official receipt, music) moved into
+    `SkyStudioGenerationDelivery` (the run was at 577 of 600 lines), which Download again runs again; a missing SRT is held on its
+    own, and the re-ask fetches only it;
+  - upscale and voice change (B47): upscale_clip and change_voice asked for the same input, and both panels, offer Download again (the
+    paid button gives way to it, with an orange line) instead of a new paid job; a dismissed held upscale stays findable for them, and
+    the upscale inspector shows Download again too;
+  - voiceover: the failed row's Download again runs the same local recovery as `add_voiceover resume=recovery_file`
+    (`generate_missing` off).
+- **The day's books take Sky Studio's charge when the result is made** (`UpscalePipeline.run`'s `onMade`, `UpscaleJob.settleMade`),
+  before any download.
+- **Words**: the message and next step no longer assert a charge (billing may be pending; the job's billing fields say it), the
+  official next step names its film arguments and key, and an SRT failure says that the same request fetches only the SRT.
+
+Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift` (`download`), `CloudMedia/CloudResultDownload.swift`, `SkyStudioDownloadRetry.swift`,
+`SkyStudioDownloadFailure.swift`, `SkyStudioDownloadWords.swift`, `SkyStudioHeldDownloads.swift`, `SkyStudioGenerationRequests.swift`,
+`SkyStudioGenerationRun.swift`, `SkyStudioGenerationDelivery.swift`, `SkyStudioGenerateTool.swift`, `SkyStudioOfficialGenerateTool.swift`,
+`SkyStudioOfficialRecoveryRun.swift`, `SkyStudioMediaStatus.swift`, `SkyStudioVoiceCloudBatches.swift`, `SkyStudioVoiceoverRun.swift`,
+`Upscale/UpscalePipeline.swift`, `Upscale/UpscaleJob.swift` (and `UpscaleActivity`), `Upscale/UpscalePanel.swift`,
+`Upscale/UpscaleJobStatusView.swift`, `AIUpscaleTool.swift`, `VoiceChange/VoiceChangeJob.swift`, `VoiceChange/VoiceChangeActivity.swift`,
+`VoiceChange/VoiceChangeTool.swift`, `VoiceChange/VoiceChangePanel.swift` / `VoiceChangePanelModel.swift`, `CloudMedia/CloudTransfer.swift`
+(`didResumeAtOffset`, the whole length, `answerStarted`), `CloudMedia/CloudTaskRows.swift`, `AIJobs.swift` (`reopen`),
+`CloudMedia/CloudDownloadFault.swift`.
 
 ## Verification
 
@@ -88,6 +145,42 @@ Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift` (`download`, `fetch`),
 - `checks/sky-studio-wiring/download-retry.sh`, `checks/ai-keep-awake.sh` (reopen's lease) and the upload section's probe pin.
 - Reverse-verified: each mutation applied alone, its check seen red, the file restored (see the report for the list).
 
+Second round (the local server now also answers a short 206, a stalled error answer and a redirect: `UploadServer.swift`):
+
+- `DownloadRetryChecks`: the short 206 (`bytes 100000-249999/1000000` after a cut) is thrown away, never reads 100%, and the next GET
+  fetches the whole file byte-identical (three GETs: cut, short, whole); a 403 whose body stalls goes to the job's fresh address at
+  once (old then fresh, no pause), and to the same address again after a pause when the job has no other; a redirect, a cut, then the
+  rest is three GETs with the target resumed; a redirect then drops is three GETs, not six; the same address from the job is never
+  called a fresh one; the wholeness rule, Content-Range and redirect targets as pure checks.
+- `HeldDownloadChecks`: the key and confirm token are not part of a request's identity; the returned key and no key each start the held
+  Download again once (a second re-ask while it runs starts nothing); another request, key or scope does not; an official cached answer
+  finds its held job.
+- `scripts/check-voice-recovery.sh` (real App objects):
+  - `GenerationDownloadChecks`, the real `SkyStudioGenerationRun` on a loopback fixture: three drops hold it (both ways back named);
+    the row dismissed, the re-ask saves the byte-identical file under the same job id, reading the job first; a stop keeps it
+    (`download_stopped`) and the next press saves it; a missing SRT is fetched alone; one `/jobs` each;
+  - `VoiceChangeDownloadChecks`: change_voice asked for the same change downloads it again under the same job id (no quote, upload or
+    `/jobs`; the job read first; one undo); a stop during Download again keeps the button; the panel offers Download again for the
+    same clip and voice only;
+  - `UpscaleJobDownloadChecks`, the real `UpscaleJob` and `UpscaleActivity`: three drops hold it with the books at 72 of the 75 reserved;
+    Cancel while it downloads again keeps it listed and stopped; dismissed, it is still found for the panel and upscale_clip (the same
+    size only), and their Download again lists it again, reads the job first and saves it, one upload and one `/jobs` in all;
+  - `VoiceoverDownloadChecks`: a batch whose download gave up fails with `download_network`; the row's Download again runs the recovery,
+    which lands the voiceover with no new batch.
+- `scripts/check-upscale.sh` → `DownloadChecks`: the charge (72) handed over before any download; three drops held with the job, the
+  charge and the offset; Download again saves it with no new upload or job; a stop held.
+- Reverse-verified (each mutation's own FAIL line seen, the files restored; independent mutations batched per run, dependent ones in
+  runs of their own), 21 behaviour mutations: a short 206 accepted; a held-back answer treated as broken; the system following
+  redirects; "fresh address" said without a fresh GET; the key back in the identity; the keyless re-ask not matched; an official
+  cached answer not held (check-sky-studio); the charge handed over only after the download; a stop dropping the result
+  (check-upscale); the held row not registered for the re-ask; a generation stop not held; the missing SRT not held; the generation's
+  Download again not reading the job; the upscale's charge not settled when made; Cancel removing a downloading paid upscale; a
+  dismissed held upscale forgotten; the upscale's Download again not reading the job; the voiceover row without Download again; a
+  voice change stop read as a save failure; change_voice paying again; the panel not seeing the held change; the voice change's
+  Download again not reading the job (check-voice-recovery). And 12 wiring mutations in `download-retry.sh` (wholeness, redirects,
+  the held-back answer, the re-ask order, the official answer, voiceover's button, the change_voice interlock, settling when made, a
+  generation stop, Cancel / Dismiss / relisting of a held upscale).
+
 ## Lessons
 
 - A download after payment is the most expensive step to lose: retry what a second try can fix, resume when the system kept the
@@ -95,4 +188,9 @@ Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift` (`download`, `fetch`),
 - "Query the original job" is not a recovery if nothing downloads its result: every flow that holds a paid result needs a way to
   fetch the same result again, and the next step must name it.
 - Two retry loops multiply: when the transport retries, remove the callers' own loops.
+- "Completed" is not "whole": check a resumed answer's range and the bytes on disk against the total before it becomes the result.
+- A held paid result must be reachable from every way the user or the AI asks again (the row, the same request with or without its
+  key, the panel, a stop in between), and survive the row being dismissed; a way back that misses one path is a second charge.
+- A fake server that only resumes the happy way proves little: give it the edges the real network gives (a short 206, a stalled
+  error body, a redirect) before trusting the retry logic.
 - The long-term rules are in [Sky Studio jobs](../architecture/sky-studio-jobs.md), "Downloads that the network interrupts".

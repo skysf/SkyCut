@@ -155,6 +155,7 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioImageOperation.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioImageResult.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGenerationRequests.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioHeldDownloads.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGenerationFrame.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioSpend.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioApproval.swift \
@@ -202,6 +203,7 @@ xcrun swiftc \
   Sources/SrtFlow/CloudMedia/CloudTransfer.swift \
   Sources/SrtFlow/CloudMedia/CloudUploadFault.swift \
   Sources/SrtFlow/CloudMedia/CloudDownloadFault.swift \
+  Sources/SrtFlow/CloudMedia/CloudResultDownload.swift \
   Sources/SrtFlow/CloudMedia/CloudJobPhase.swift \
   checks/Shared/ScratchDefaults.swift \
   checks/SkyStudio/main.swift \
@@ -225,6 +227,7 @@ xcrun swiftc \
   checks/SkyStudio/UploadRetryChecks.swift \
   checks/SkyStudio/UploadAnswerChecks.swift \
   checks/SkyStudio/DownloadRetryChecks.swift \
+  checks/SkyStudio/HeldDownloadChecks.swift \
   checks/SkyStudio/FilmChecks.swift \
   checks/SkyStudio/OfficialQuoteChecks.swift \
   checks/SkyStudio/OfficialReceiptChecks.swift \
@@ -292,6 +295,7 @@ xcrun swiftc \
   Sources/SrtFlow/CloudMedia/CloudTransfer.swift \
   Sources/SrtFlow/CloudMedia/CloudUploadFault.swift \
   Sources/SrtFlow/CloudMedia/CloudDownloadFault.swift \
+  Sources/SrtFlow/CloudMedia/CloudResultDownload.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioUploadRetry.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioUploadFailure.swift \

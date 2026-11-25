@@ -31,6 +31,9 @@ import SrtFlowMCPKit
             try await runVoiceChangeChecks(root)
             try await runVoiceChangeDirectChecks(root)
             try await runVoiceChangeDownloadChecks(root)
+            try await runGenerationDownloadChecks(root)
+            try await runVoiceoverDownloadChecks(root)
+            try await runUpscaleJobDownloadChecks(root)
         } catch {
             VoiceCheckLog.failures += 1
             print("FAIL: production voice recovery checks: \(error)")
@@ -61,7 +64,12 @@ import SrtFlowMCPKit
             + "direct quote refused before paying, a default result without its background not landed, separation_failed failing with "
             + "nothing landed and only the separation charged, the panel's localized line and its direct retry"
             + "; a voice change whose download gave up: download_network after three GETs, Download again lands the byte-identical files "
-            + "under the same job id with no new upload or job, an expired address renewed once from the original job")
+            + "under the same job id with no new upload or job, an expired address renewed once from the original job"
+            + "; Download again everywhere: change_voice and the panel asked for the same change download it again, a stop keeps the "
+            + "button; a generation held after three drops is downloaded again by the AI's re-ask after its row was dismissed, a stop "
+            + "keeps it, a missing SRT is fetched alone, one /jobs each; a voiceover row's Download again runs its recovery with no new "
+            + "batch; an upscale held after three drops (the charge settled when made), Cancel while downloading again keeps it, "
+            + "dismissed it is still found, and Download again saves it with one /jobs")
         exit(0)
     }
 

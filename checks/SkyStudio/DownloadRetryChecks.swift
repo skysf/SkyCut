@@ -17,12 +17,15 @@ func runDownloadRetryChecks(_ server: UploadServer) async {
     await runResumeChecks(server, folder: folder, result: result)
     await runDownloadAnswerChecks(server, folder: folder, result: result)
     await runDownloadStopChecks(server, folder: folder, result: result)
+    await runDownloadEdgeChecks(server, folder: folder, result: result) { events, timeout in downloadAPI(server, events: events, getTimeout: timeout) }
 }
 
 /// Waits between tries are recorded, not slept (unless `sleep` is given).
-private func downloadAPI(_ server: UploadServer, events: UploadEvents, sleep: (@Sendable (TimeInterval) async throws -> Void)? = nil) -> SkyStudioAPI {
+private func downloadAPI(_ server: UploadServer, events: UploadEvents, sleep: (@Sendable (TimeInterval) async throws -> Void)? = nil,
+                         getTimeout: TimeInterval = 600) -> SkyStudioAPI {
     var retry = SkyStudioDownloadRetry()
     retry.sleep = sleep ?? { seconds in events.add(.pause(seconds)) }
+    retry.getTimeout = getTimeout
     return SkyStudioAPI(session: uploadSession, base: URL(string: "http://127.0.0.1:\(server.port)/api/skycut/v1")!, version: "0.18.50",
                         machine: String(repeating: "a", count: 64), downloadRetry: retry)
 }
@@ -63,9 +66,7 @@ private final class Renewals: @unchecked Sendable {
     var count: Int { lock.lock(); defer { lock.unlock() }; return asked }
     var renew: @Sendable () async throws -> URL? {
         { [self] in
-            lock.lock()
-            asked += 1
-            lock.unlock()
+            lock.withLock { asked += 1 }
             return answer
         }
     }
@@ -77,7 +78,8 @@ private func runResumeChecks(_ server: UploadServer, folder: URL, result: Data) 
     var events = UploadEvents()
     let resumed = folder.appendingPathComponent("resumed.mp4")
     do {
-        try await downloadAPI(server, events: events).download(server.resultURL("a.mp4"), to: resumed) { events.add(.progress($0)) }
+        let sink = events
+        try await downloadAPI(server, events: sink).download(server.resultURL("a.mp4"), to: resumed, onProgress: { sink.add(.progress($0)) })
     } catch {
         check(false, "one drop on a resumable result: the download works, got \(error)")
     }
@@ -100,7 +102,8 @@ private func runResumeChecks(_ server: UploadServer, folder: URL, result: Data) 
     events = UploadEvents()
     let restarted = folder.appendingPathComponent("restarted.mp4")
     do {
-        try await downloadAPI(server, events: events).download(server.resultURL("a.mp4"), to: restarted) { events.add(.progress($0)) }
+        let sink = events
+        try await downloadAPI(server, events: sink).download(server.resultURL("a.mp4"), to: restarted, onProgress: { sink.add(.progress($0)) })
     } catch {
         check(false, "one drop without validators: the download works, got \(error)")
     }
@@ -182,8 +185,9 @@ private func runDownloadAnswerChecks(_ server: UploadServer, folder: URL, result
         try await downloadAPI(server, events: UploadEvents()).download(server.resultURL("old.mp4"), to: folder.appendingPathComponent("same.mp4"),
                                                                        renew: renewals.renew)
     }
-    check(failure?.kind == .refused(status: 403) && failure?.renewed == true && failure?.attempts == 1,
-          "the same address again: refused (renewed, one GET): \(String(describing: failure))")
+    check(failure?.kind == .refused(status: 403) && failure?.triedFreshAddress == false && failure?.attempts == 1
+            && failure?.message.contains("fresh address") == false,
+          "the same address again: refused after one GET, never said to be a fresh address: \(String(describing: failure))")
     checkEqual(renewals.count, 1, "asked once")
     checkEqual(resultGets(server).count, 1, "the same address is not tried again")
 
@@ -194,7 +198,8 @@ private func runDownloadAnswerChecks(_ server: UploadServer, folder: URL, result
         try await downloadAPI(server, events: UploadEvents()).download(server.resultURL("old.mp4"), to: folder.appendingPathComponent("twice.mp4"),
                                                                        renew: renewals.renew)
     }
-    check(failure?.kind == .refused(status: 410) && failure?.attempts == 2 && failure?.renewed == true,
+    check(failure?.kind == .refused(status: 410) && failure?.attempts == 2 && failure?.triedFreshAddress == true
+            && failure?.message.contains("also at the fresh address") == true,
           "the fresh address refused too: refused after two GETs: \(String(describing: failure))")
     checkEqual(renewals.count, 1, "never a second fresh address")
 
@@ -278,18 +283,22 @@ private func runDownloadFailureWordsChecks() {
     let unreachable = SkyStudioDownloadFailure(kind: .unreachable, attempts: 1, lastError: "NSURLErrorDomain -1200")
     check(unreachable.message.contains("could not connect (NSURLErrorDomain -1200)") && unreachable.code == "download_network",
           "a connection that does not work: plain words, download_network")
-    let refused = SkyStudioDownloadFailure(kind: .refused(status: 403), attempts: 2, lastError: "HTTP 403", renewed: true)
-    check(refused.message.contains("refused the download (HTTP 403), also at a fresh address") && refused.code == "download_refused",
+    let refused = SkyStudioDownloadFailure(kind: .refused(status: 403), attempts: 2, lastError: "HTTP 403", triedFreshAddress: true)
+    check(refused.message.contains("refused the download (HTTP 403), also at the fresh address") && refused.code == "download_refused",
           "a refusal after a fresh address: plain words, download_refused")
     checkEqual(refused.localizedDescription, refused.message, "a caught error reads as the message")
-    for failure in [interrupted, unreachable, refused] {
+    let stopped = SkyStudioDownloadFailure.stopped
+    check(stopped.code == "download_stopped" && stopped.message.contains("was stopped"), "a stopped download: its own code and words")
+    for failure in [interrupted, unreachable, refused, stopped] {
+        // Billing is not asserted (it may be pending): the words say it was made and that nothing more was charged.
+        check(!failure.message.contains("charged for it"), "\(failure.kind): the message never asserts the charge: \(failure.message)")
         check(failure.fields() == ["code": .string(failure.code), "download_attempts": .number(Double(failure.attempts)),
                                    "download_error": .string(failure.lastError)],
               "\(failure.kind): without a retry, only the code, the GET count and the last error (a flow keeps its own next step)")
         let next = failure.fields(retry: "call generate_media again with the same idempotency_key.")["next_step"]?.stringValue ?? ""
-        check(next.hasPrefix("Sky Studio made this result and charged for it; only its download to this Mac failed, and nothing more was charged.")
+        check(next.hasPrefix("Sky Studio made this result; only its download to this Mac did not finish, and nothing more was charged for it.")
               && next.hasSuffix("call generate_media again with the same idempotency_key."),
-              "\(failure.kind): the next step says it was made and charged once and how to download it again: \(next)")
+              "\(failure.kind): the next step says it was made, nothing more charged, and how to download it again: \(next)")
         check(!(failure.message + next).lowercased().contains("proxy"), "\(failure.kind): the words name the network, never a proxy")
     }
     checkEqual(SkyStudioDownloadFailure.from(refused), refused, "read back from the error")
@@ -297,4 +306,123 @@ private func runDownloadFailureWordsChecks() {
     let standard = SkyStudioDownloadRetry.standard
     check(standard.attempts == 3 && standard.pauses == [1, 2], "three GETs in all, a short pause before each new one")
     checkEqual(SkyStudioDownloadRetry.renewableStatuses, [403, 404, 410], "only an expired or withdrawn address is renewed")
+    runWholenessChecks()
+}
+
+/// The pure rule that a result is whole before it is moved into place (the review of PR #554: a resumed 206 `bytes
+/// 100000-249999/1000000` once became a 250,000-byte result).
+private func runWholenessChecks() {
+    let short = SkyStudioDownloadRetry.incompleteness(status: 206, contentRange: "bytes 100000-249999/1000000", expectedLength: 150_000, size: 250_000)
+    check(short != nil, "a resumed answer short of the last byte is not the result")
+    check(SkyStudioDownloadRetry.incompleteness(status: 206, contentRange: "bytes 100000-999999/1000000", expectedLength: 900_000, size: 1_000_000) == nil,
+          "a resumed answer to the last byte, with the whole length on disk, is the result")
+    check(SkyStudioDownloadRetry.incompleteness(status: 206, contentRange: "bytes 100000-999999/1000000", expectedLength: 900_000, size: 900_000) != nil,
+          "the length on disk must be the whole result's")
+    check(SkyStudioDownloadRetry.incompleteness(status: 206, contentRange: "bytes 0-99/*", expectedLength: 100, size: 100) != nil,
+          "a resumed answer whose total is unknown cannot be checked: it is not taken")
+    check(SkyStudioDownloadRetry.incompleteness(status: 206, contentRange: nil, expectedLength: 100, size: 100) != nil,
+          "a resumed answer without a Content-Range is not taken")
+    check(SkyStudioDownloadRetry.incompleteness(status: 200, contentRange: nil, expectedLength: 1_000, size: 999) != nil,
+          "a whole answer must hold its declared length")
+    check(SkyStudioDownloadRetry.incompleteness(status: 200, contentRange: nil, expectedLength: -1, size: 999) == nil,
+          "a whole answer without a length is taken as it is")
+    check(SkyStudioDownloadRetry.incompleteness(status: 200, contentRange: nil, expectedLength: 400, size: 999, encoded: true) == nil,
+          "an encoded answer's decoded bytes are not compared with its length")
+    check(SkyStudioDownloadRetry.parseContentRange("bytes 5-9/10").map { [$0.first, $0.last, $0.total ?? -1] } == [5, 9, 10]
+            && SkyStudioDownloadRetry.parseContentRange("bytes 9-5/10") == nil && SkyStudioDownloadRetry.parseContentRange("items 0-1/2") == nil,
+          "Content-Range is read strictly")
+    let base = URL(string: "https://cdn.example/files/a.mp4")!
+    checkEqual(SkyStudioDownloadRetry.redirectTarget(status: 302, location: "/files/b.mp4", from: base)?.absoluteString,
+               "https://cdn.example/files/b.mp4", "a relative Location resolves against the address it came from")
+    check(SkyStudioDownloadRetry.redirectTarget(status: 302, location: "ftp://x/y", from: base) == nil
+            && SkyStudioDownloadRetry.redirectTarget(status: 200, location: "/b", from: base) == nil,
+          "only an http(s) Location of a 3xx is followed")
+}
+
+/// What the network and the server can do to a resumed or redirected GET, against the local server.
+func runDownloadEdgeChecks(_ server: UploadServer, folder: URL, result: Data, api: (UploadEvents, TimeInterval) -> SkyStudioAPI) async {
+    // A resumed GET answered with a 206 that stops short of the end: thrown away, and the next GET fetches the whole result.
+    server.configureDownload(gets: [.cut(400_000), .shortRange(150_000), .file], result: result)
+    var events = UploadEvents()
+    let whole = folder.appendingPathComponent("whole.mp4")
+    do {
+        let sink = events
+        try await api(sink, 600).download(server.resultURL("a.mp4"), to: whole, onProgress: { sink.add(.progress($0)) })
+    } catch {
+        check(false, "a short 206: the next GET fetches the whole result, got \(error)")
+    }
+    checkEqual(try? Data(contentsOf: whole), result, "a short 206 never stands as the result: the file is byte-identical")
+    var gets = server.log.filter { $0.method == "GET" }
+    check(gets.count == 3 && gets[1].headers["range"] != nil && gets[2].headers["range"] == nil,
+          "cut, resumed (short), then the whole result from the start: \(gets.map { $0.headers["range"] ?? "-" })")
+    let shortEvents = events.all
+    let lastPause = shortEvents.lastIndex { if case .pause = $0 { return true } else { return false } } ?? 0
+    check(lastPause > 0 && shortEvents[lastPause - 1] == .progress(0)
+            && !shortEvents[..<lastPause].contains(.progress(1)),
+          "the short answer never reads 100%, and progress goes back to 0 before the GET that starts again: \(shortEvents)")
+
+    // An error answer whose status the system held back while its body stalled: the job's current address is asked for, and used.
+    server.configureDownload(gets: [.statusStall(403), .file], result: result)
+    var renewals = Renewals(server.resultURL("fresh.mp4"))
+    events = UploadEvents()
+    let stalled = folder.appendingPathComponent("stalled403.mp4")
+    do {
+        try await api(events, 1.5).download(server.resultURL("old.mp4"), to: stalled, renew: renewals.renew)
+    } catch {
+        check(false, "a stalled 403 then the job's fresh address: the download works, got \(error)")
+    }
+    checkEqual(try? Data(contentsOf: stalled), result, "the fresh address gives the byte-identical file")
+    gets = server.log.filter { $0.method == "GET" }
+    check(renewals.count == 1 && gets.map(\.path) == ["/files/old.mp4", "/files/fresh.mp4"] && events.pauses.isEmpty,
+          "a stalled answer goes to the fresh-address path, never the old address again: \(gets.map(\.path)), renewed \(renewals.count)")
+
+    // The same, but the job gives the same address: the same address is tried again after the pause (it may have been a slow 200).
+    server.configureDownload(gets: [.statusStall(403), .file], result: result)
+    let old = server.resultURL("old.mp4")
+    renewals = Renewals(old)
+    events = UploadEvents()
+    let same = folder.appendingPathComponent("stalledSame.mp4")
+    do {
+        try await api(events, 1.5).download(old, to: same, renew: renewals.renew)
+    } catch {
+        check(false, "a stalled answer with the same address: tried again, got \(error)")
+    }
+    checkEqual(try? Data(contentsOf: same), result, "tried again at the same address: byte-identical")
+    check(renewals.count == 1 && server.log.filter { $0.method == "GET" }.count == 2 && events.pauses == [1],
+          "asked once, then the same address after a pause: \(renewals.count), \(events.pauses)")
+
+    // A redirect is a GET of its own: followed by the next GET, three in all however the server redirects.
+    server.configureDownload(gets: [.redirect("a.mp4"), .cut(300_000), .file], result: result)
+    let redirected = folder.appendingPathComponent("redirected.mp4")
+    do {
+        try await api(UploadEvents(), 600).download(server.resultURL("r.mp4"), to: redirected)
+    } catch {
+        check(false, "a redirect, a cut, then the rest: the download works, got \(error)")
+    }
+    checkEqual(try? Data(contentsOf: redirected), result, "after a redirect and a cut the file is byte-identical")
+    gets = server.log.filter { $0.method == "GET" }
+    check(gets.map(\.path) == ["/files/r.mp4", "/files/a.mp4", "/files/a.mp4"] && gets[2].headers["range"] != nil,
+          "the redirect, the target, then the target resumed (never the redirect again): \(gets.map(\.path))")
+    server.configureDownload(gets: [.redirect("a.mp4"), .cut(300_000)], result: result)
+    let failure = await downloadFailureOf {
+        try await api(UploadEvents(), 600).download(server.resultURL("r.mp4"), to: folder.appendingPathComponent("redirect-drops.mp4"))
+    }
+    check(failure?.kind == .interrupted && failure?.attempts == 3 && server.log.filter { $0.method == "GET" }.count == 3,
+          "a redirect then drops: three GETs in all, never six: \(String(describing: failure)), \(server.log.filter { $0.method == "GET" }.count)")
+}
+
+/// The download failure a body ended with, or nil (anything else is recorded).
+func downloadFailureOf(_ body: () async throws -> Void) async -> SkyStudioDownloadFailure? {
+    checks += 1
+    do {
+        try await body()
+        failures += 1
+        print("FAIL a download expected to fail did not")
+    } catch let failure as SkyStudioDownloadFailure {
+        return failure
+    } catch {
+        failures += 1
+        print("FAIL expected a SkyStudioDownloadFailure, got \(error)")
+    }
+    return nil
 }

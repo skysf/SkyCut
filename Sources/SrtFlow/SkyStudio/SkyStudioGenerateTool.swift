@@ -32,12 +32,13 @@ enum SkyStudioGenerateTool {
         let prompt = try args.string("prompt") ?? ""
         if try args.string("model") == "ideogram-remove-background", !args.has("operation") { ask.operation = "remove_background" }
         if kind != .image, ask.operation != "generate" { throw AIToolError("operation=\(ask.operation) requires kind=image; upscale_clip is video-only.") }
-        let idempotencyKey = try args.string("idempotency_key")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? UUID().uuidString.lowercased()
-        var arguments = args.raw.objectValue ?? [:]
-        arguments["confirm_token"] = nil
-        let requestIdentity: JSONValue = ["arguments": .object(arguments), "project": .string(String(describing: ObjectIdentifier(project))),
-            "generation": .number(Double(project.documentGeneration)), "account": .string(SkyStudioAccount.shared.stored?.me.account.id ?? "")]
-        if let cached = try SkyStudioGenerationRequests.begin(idempotencyKey, identity: requestIdentity) { return downloadAgain(cached) ?? cached }
+        let givenKey = try args.string("idempotency_key")?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let idempotencyKey = givenKey ?? UUID().uuidString.lowercased()
+        let requestIdentity = SkyStudioGenerationRequests.identity(arguments: args.raw, project: String(describing: ObjectIdentifier(project)),
+            generation: project.documentGeneration, account: SkyStudioAccount.shared.stored?.me.account.id ?? "")
+        // A re-ask of a paid result waiting for Download again (this key, or this request without a key): the same result, never a new job.
+        if let again = SkyStudioGenerationRequests.heldAnswer(key: givenKey, identity: requestIdentity) { return again }
+        if let cached = try SkyStudioGenerationRequests.begin(idempotencyKey, identity: requestIdentity) { return cached }
         defer { SkyStudioGenerationRequests.abandonPreparation(idempotencyKey) }
         let picked = try SkyStudioReferenceFiles.picks(args, kind: kind)
         if let approval = try AIWorkspace.shared.confirmReading(picked.files.map(\.file), verb: "send to Sky Studio", args: args, project: project) { return approval }
@@ -188,17 +189,6 @@ enum SkyStudioGenerateTool {
         let response = AIToolResult.ok(.object(result))
         SkyStudioGenerationRequests.complete(idempotencyKey, result: response)
         return response
-    }
-
-    /// generate_media called again with the same idempotency_key after its paid result's download gave up: the same result is downloaded
-    /// again under the same job id (nothing quoted, uploaded or submitted; SkyStudioGenerationRun.retryDownload). nil when that job has
-    /// nothing waiting to be downloaded (its first answer stands, as before).
-    private static func downloadAgain(_ cached: AIToolResult) -> AIToolResult? {
-        guard let id = cached.payload["job_id"]?.stringValue,
-              let retry = SkyStudioGenerationActivity.shared.runs.first(where: { $0.aiJobID == id })?.retryDownload else { return nil }
-        retry()
-        return .ok(["status": "downloading_again", "job_id": .string(id), "submitted_again": false,
-                    "next_step": "Sky Studio made this result earlier and charged for it once; SkyCut is downloading the same result again, at no charge. Wait with get_job."])
     }
 
     /// 给 get_status 的一段：存了 Sky Studio 的 Key 才有。AI 看了就知道生成和 upscale 花的是积分、今天还剩多少。

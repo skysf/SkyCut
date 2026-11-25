@@ -216,12 +216,22 @@ final class SkyStudioVoiceoverRun {
         if let blocked = error as? SkyStudioVoiceBudgetProblem {
             extra.merge(SkyStudioJobGate.budgetBlocked(credits: blocked.credits, store: .shared).payload.objectValue ?? [:]) { _, new in new }
         }
-        // A batch Sky Studio made whose download gave up: the code and the GET count (resume=recovery_file downloads it again, at no
-        // charge); the task row reads the localized line.
+        // A batch Sky Studio made whose download gave up: the code and the GET count; the row reads the localized line and its
+        // Download again runs the same local recovery as resume=recovery_file (only GETs the original jobs; nothing is generated).
         let download = SkyStudioDownloadFailure.from((error as? SkyStudioVoiceProcessingError)?.underlying ?? error)
         if let download { extra.merge(download.fields()) { _, new in new } }
         finish(cancelled ? .cancelled : .failed, text)
-        if let download, !cancelled { status.issue = SkyStudioDownloadWords.shown(download) }
+        if let download, !cancelled, recovery != nil { status.holdDownload(download) { [self] in recoverDownload() } }
+    }
+
+    /// Download again: a new recovery job for this recovery file (add_voiceover resume=recovery_file, generate_missing off), and this
+    /// row gives way to it.
+    private func recoverDownload() {
+        guard let recovery, let project, let input = try? recovery.input(for: project) else { return }
+        if let id = status.aiJobID { SkyStudioHeldDownloads.release(id) }
+        status.retryDownload = nil
+        SkyStudioGenerationActivity.shared.dismiss(status)
+        _ = SkyStudioVoiceoverRun(input: input, project: project, recovery: recovery, generateMissing: false, services: services).start()
     }
 
     /// 回任务号时说好要先装本机转写模型的：交第一批之前装（状态行「准备本机转写」，get_job 的 local_step）。装不上就当这台 Mac

@@ -382,6 +382,10 @@ Task {
             check(false, "被拒抛的是 \(error)")
         }
         checkEqual(Set((try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []), Set(before), "被拒不落文件")
+
+        // Downloads that the network interrupts (2026-11-24): held, Download again, a stop (DownloadChecks.swift).
+        await runUpscaleDownloadChecks(request, base: base, bucket: bucket, uploaded: uploaded, resultURL: resultURL, fakeBytes: fakeBytes,
+                                       ffmpeg: ffmpeg, work: work)
     } catch {
         check(false, "素材造不出来：\(error)")
     }

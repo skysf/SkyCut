@@ -48,13 +48,24 @@ struct UpscaleJobStatusView: View {
             case .failed(let message):
                 Text(String(format: L10n("Upscale failed: %@"), message)).font(.caption).foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Dismiss") { activity.remove(job) }.controlSize(.small)
+                endedButtons
             case .cancelled(let stop):
-                Text(stop.localizedNote ?? L10n("Upscale cancelled.")).font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Dismiss") { activity.remove(job) }.controlSize(.small)
+                Text(job.downloadFailure.map(SkyStudioDownloadWords.shown) ?? stop.localizedNote ?? L10n("Upscale cancelled."))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                endedButtons
             }
         }
+    }
+}
+
+extension UpscaleJobStatusView {
+    /// A failed or stopped job: Download again when it holds a paid result (2026-11-24; nothing more is charged), then Dismiss.
+    @ViewBuilder fileprivate var endedButtons: some View {
+        if job.canRetryDownload {
+            Button("Download again") { activity.downloadAgain(job) }.controlSize(.small)
+                .instantHelp("Download the finished result again; nothing more is charged")
+        }
+        Button("Dismiss") { activity.remove(job) }.controlSize(.small)
     }
 }
 

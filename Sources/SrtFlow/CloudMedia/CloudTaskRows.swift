@@ -74,15 +74,14 @@ struct CloudUpscaleTaskRow: View {
                         .instantHelp("Compare the original and upscaled video")
                     dismissButton
                 }
-            case .failed:
+            case .failed, .cancelled:
                 HStack {
                     if job.canRetryDownload {
-                        Button("Download again") { job.retryDownload() }
+                        Button("Download again") { UpscaleActivity.shared.downloadAgain(job) }
                             .instantHelp("Download the finished result again; nothing more is charged")
                     }
                     dismissButton
                 }
-            case .cancelled: dismissButton
             }
         }
     }
@@ -94,7 +93,7 @@ struct CloudUpscaleTaskRow: View {
     private var issue: String? {
         switch job.state {
         case .failed(let message): return message
-        case .cancelled(let stop): return stop.localizedNote
+        case .cancelled(let stop): return job.downloadFailure.map(SkyStudioDownloadWords.shown) ?? stop.localizedNote
         case .running, .done: return nil
         }
     }

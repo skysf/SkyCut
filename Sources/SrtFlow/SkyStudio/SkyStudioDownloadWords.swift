@@ -21,6 +21,8 @@ enum SkyStudioDownloadWords {
         case .refused(let status):
             return String(format: L10n("The result is ready on Sky Studio, but its storage refused the download (HTTP %d). Nothing more was charged."),
                           status)
+        case .stopped:
+            return L10n("The result is ready on Sky Studio, but its download was stopped. Nothing more was charged; trying again downloads the same result.")
         }
     }
 }

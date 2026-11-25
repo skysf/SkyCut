@@ -48,6 +48,7 @@ xcrun swiftc \
   Sources/SrtFlow/CloudMedia/CloudTransfer.swift \
   Sources/SrtFlow/CloudMedia/CloudUploadFault.swift \
   Sources/SrtFlow/CloudMedia/CloudDownloadFault.swift \
+  Sources/SrtFlow/CloudMedia/CloudResultDownload.swift \
   Sources/SrtFlow/CloudMedia/CloudJobPhase.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioUploadRetry.swift \
@@ -84,6 +85,7 @@ xcrun swiftc \
   Sources/SrtFlow/Upscale/UpscaleAudioMux.swift \
   Sources/SrtFlow/Upscale/UpscaleSourceTrimmer.swift \
   Sources/SrtFlow/Upscale/UpscalePipeline.swift \
+  checks/Upscale/DownloadChecks.swift \
   checks/Upscale/main.swift \
   checks/OptimizedMedia/RampVideo.swift \
   checks/SkyStudio/Stub.swift \

@@ -57,8 +57,12 @@ final class SkyStudioOfficialRecoveryRun {
                 status.advance(to: .downloading(fraction: nil), typicalSeconds: nil)
                 let key = key
                 let renew: @Sendable () async throws -> URL? = { try await SkyStudioAPI().job(serverID, key: key).result?.url }
-                try await SkyStudioAPI().download(result.url, to: original, renew: renew) { [weak self] fraction in
-                    Task { @MainActor in self?.status.advance(to: .downloading(fraction: CloudJobPhase.quantized(fraction)), typicalSeconds: nil) }
+                do {
+                    try await SkyStudioAPI().download(result.url, to: original, renew: renew) { [weak self] fraction in
+                        Task { @MainActor in self?.status.advance(to: .downloading(fraction: CloudJobPhase.quantized(fraction)), typicalSeconds: nil) }
+                    }
+                } catch is CancellationError {
+                    throw SkyStudioDownloadFailure.stopped   // the paid output stays held for Download again
                 }
             }
             var file = original
@@ -72,14 +76,16 @@ final class SkyStudioOfficialRecoveryRun {
         } catch {
             let message = (error as? AIToolError)?.message ?? (error as? SkyStudioJobError)?.message
                 ?? (error as? SkyStudioFailure).map { SkyStudioJobError.request($0).message } ?? error.localizedDescription
-            finish(job, error is CancellationError ? .cancelled : .failed, message: message, download: SkyStudioDownloadFailure.from(error))
+            let download = SkyStudioDownloadFailure.from(error)
+            let stopped = error is CancellationError || download?.kind == .stopped
+            finish(job, stopped ? .cancelled : .failed, message: message, download: download)
         }
     }
 
-    /// Download again: this recovery runs once more under the same job id (it only reads the original job and its output).
+    /// Download again: this recovery runs once more under the same job id (it reads the original job first, so an expired address
+    /// is replaced, and only downloads its output).
     private func retryDownload(_ job: AIJobs.Job) {
-        status.retryDownload = nil
-        status.issue = nil
+        status.beginDownloadAgain()
         AIJobs.shared.reopen(job)
         task = Task { @MainActor in await self.execute(job) }
     }
@@ -98,13 +104,11 @@ final class SkyStudioOfficialRecoveryRun {
         if let file { detail["file"] = .string(file.path); AIReadGrants.shared.remember([file]) }
         if let original = value.savedOriginal { detail["original_file"] = .string(original.path); AIReadGrants.shared.remember([original]) }
         if let download {
-            detail.merge(download.fields(retry: "call generate_media again with the same arguments and idempotency_key (that only reads "
-                + "the original job and downloads its output), or " + SkyStudioDownloadFailure.taskListRetry)) { _, new in new }
+            detail.merge(download.fields(retry: "call generate_media again with the same film arguments and idempotency_key (that only "
+                + "reads the original job and downloads its output under this job id), or " + SkyStudioDownloadFailure.taskListRetry)) { _, new in new }
         }
         AIJobs.shared.finish(job, result, message: message, detail: .object(detail))
-        if let download {
-            status.issue = SkyStudioDownloadWords.shown(download)
-            status.retryDownload = { [self] in retryDownload(job) }
-        }
+        // Strong: the row's button and the AI's re-ask keep this recovery until Download again starts.
+        if let download { status.holdDownload(download) { [self] in retryDownload(job) } }
     }
 }

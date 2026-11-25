@@ -54,6 +54,13 @@ enum AIUpscaleTool {
             throw AIToolError(message(error))
         }
         let tier = try pick(tierName, from: tiers, target: target)
+        // This very upscale was made and paid but not saved here: its Download again (only GETs), never a second charge.
+        if let held = UpscaleActivity.shared.heldDownload(original: model.originalURL, range: model.range(for: choice, tier: tier), tier: tier.id,
+                                                          target: target) {
+            UpscaleActivity.shared.downloadAgain(held)
+            return held.aiJobID.map { SkyStudioHeldDownloads.answer(jobID: $0) } ?? .ok(["status": "downloading_again", "submitted_again": false,
+                "next_step": "This upscale was made earlier (started from SkyCut's panel) and only its download did not finish; SkyCut is downloading the same result again with no new charge. It shows in the cloud task list and opens the comparison when done."])
+        }
         let row = model.rows(tiers: [tier], choice: choice, target: target)[0]
         if let refusal = row.refusal {
             throw AIToolError("\(tier.id) cannot take this: \(refusal.message)")
@@ -224,18 +231,34 @@ enum AIUpscaleTool {
                 AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: " + failure.message,
                                      detail: .object(failure.fields(retry: "call upscale_clip again.")))
             } else if let failure = ended.downloadFailure {
-                // Made and charged, only its download gave up: the user's Download again gets it at no charge, never a new upscale.
-                var fields = failure.fields(retry: SkyStudioDownloadFailure.taskListRetry + " Never call upscale_clip again for it.")
-                if let id = ended.skyStudioJobID { fields["skystudio_job_id"] = .string(id) }
-                AIJobs.shared.finish(aiJob, .failed, message: failure.message, detail: .object(fields))
+                // Made, only its download gave up: Download again gets it at no charge, never a new upscale.
+                AIJobs.shared.finish(aiJob, .failed, message: failure.message, detail: .object(heldFields(ended, failure.fields(retry: retry))))
+            } else if ended.canRetryDownload {
+                AIJobs.shared.finish(aiJob, .failed, message: "Sky Studio made this upscale, but SkyCut could not save it: \(message)",
+                                     detail: .object(heldFields(ended, ["next_step": .string("Nothing more was charged. To download the same result again at no charge, " + retry)])))
             } else {
                 AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: \(message)", detail: detail)
             }
         case .cancelled(let stop):
-            AIJobs.shared.finish(aiJob, .cancelled, message: "The upscale was stopped. " + SkyStudioJobError.stopped(stop).message, detail: detail)
+            if let failure = ended.downloadFailure {
+                AIJobs.shared.finish(aiJob, .cancelled, message: failure.message, detail: .object(heldFields(ended, failure.fields(retry: retry))))
+            } else {
+                AIJobs.shared.finish(aiJob, .cancelled, message: "The upscale was stopped. " + SkyStudioJobError.stopped(stop).message, detail: detail)
+            }
         case .running, .done:
             break
         }
+    }
+
+    /// How a held upscale is downloaded again: the row's button, or upscale_clip asked for the same upscale (same clip, range, tier and
+    /// target), which downloads it under this job id.
+    private static let retry = SkyStudioDownloadFailure.taskListRetry.dropLast().description + ", or call upscale_clip again with the same "
+        + "clip, range, tier and target: that only downloads this result again under this job id. Never start another upscale for it."
+
+    private static func heldFields(_ job: UpscaleJob, _ fields: [String: JSONValue]) -> [String: JSONValue] {
+        var value = fields
+        if let id = job.skyStudioJobID { value["skystudio_job_id"] = .string(id) }
+        return value
     }
 
     private static func sizeLabel(_ size: CGSize) -> String { "\(Int(size.width.rounded()))×\(Int(size.height.rounded()))" }

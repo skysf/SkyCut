@@ -407,8 +407,9 @@
 9. **文件**（`VoiceChangeOutputName`）：`<原名> - <声音名>.wav`、`<原名> - 背景.wav`（「背景」照界面语言写），放原素材的文件夹，写不进去退到工程的家、
    再退到下载；撞名加编号、不覆盖；扩展名照服务器报的类型（背景不是 WAV 时它另报）。Since 2026-11-24 the download is
    SkyStudioAPI.download's (resumed or retried, three GETs in all, an expired address renewed from the job; the job no longer loops
-   on its own), and one that still gives up keeps the result for Download again in the task row ([Sky Studio jobs](sky-studio-jobs.md),
-   "Downloads that the network interrupts"; the result stays on Sky Studio for 60 days).
+   on its own). Whatever keeps the files from landing (the download gave up or was stopped, a file could not be saved) keeps the
+   result for Download again: the task row, change_voice or the panel asked for the same change (no new charge; [Sky Studio
+   jobs](sky-studio-jobs.md), "Downloads that the network interrupts"; the result stays on Sky Studio for 60 days).
 10. **界面**（方案 5.5）：时间线上的块右键「换成我的声音…」**只往 `VoiceChangeActivity` 写一个目标**（块不读工程、不做 IO）；面板由挂在检查器底下的
     `VoiceChangePresenter` 摆（`Equatable` + `.equatable()`，同 `UpscalePresenter`；只在那一段所在的工程窗口里摆）。面板用共用的声音选择器
     （`VoicePickerView`：我的声音、设计的声音、预设排最后——预设的样音只有几秒，当变声目标没验证过）。默认选谁（`defaultSelection`）：我的声音只有一个

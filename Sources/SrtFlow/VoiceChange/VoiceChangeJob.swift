@@ -121,39 +121,51 @@ final class VoiceChangeJob {
         await deliver(result, server: done)
     }
 
-    /// Downloads the result and lands it. A download that gave up is held for Download again (`hold`).
+    /// Downloads the result and lands it. Whatever keeps it from landing here (the download gave up or was stopped, a file could not be
+    /// saved) holds the paid result for Download again (`hold`).
     private func deliver(_ result: SkyStudioVoiceConversion, server done: SkyStudioJobStatus) async {
         let files: VoiceChangeLanding.Files
         do {
             files = try await download(result, jobID: done.jobID)
         } catch let failure as SkyStudioDownloadFailure {
             return hold(failure, result: result, server: done)
+        } catch where error is CancellationError || Task.isCancelled {
+            return hold(.stopped, result: result, server: done)
         } catch {
-            return finish(.failed, "Sky Studio changed the voice (the credits were spent), but SkyCut could not save "
-                + (direct ? "the voice file" : "the two files") + ": "
-                + "\(SkyStudioVoiceLibraryErrors.message(error)) The result stays on Sky Studio for 60 days.", detail: charges(done))
+            return hold(nil, result: result, server: done, message: "Sky Studio changed the voice, but SkyCut could not save "
+                + (direct ? "the voice file" : "the two files") + ": \(SkyStudioVoiceLibraryErrors.message(error))")
         }
         await land(files, result: result, server: done)
     }
 
-    /// The download gave up after SkyStudioAPI.download's own tries: failed with the code and the localized line, the result kept for
-    /// Download again. Nothing more was charged.
-    private func hold(_ failure: SkyStudioDownloadFailure, result: SkyStudioVoiceConversion, server: SkyStudioJobStatus) {
+    /// How a held change is downloaded again: the row's button, or change_voice asked for the same change again.
+    private static let retry = SkyStudioDownloadFailure.taskListRetry.dropLast().description + ", or call change_voice again for the same "
+        + "clip with the same voice and skip_separation: that only downloads this result again under this job id. The result is kept on "
+        + "Sky Studio for 60 days. Never start another voice change for it."
+
+    /// The paid result did not land: its download gave up (failed, the localized line), was stopped (stopped), or a file could not be
+    /// saved (`message`). It is kept for Download again (the row, the panel and change_voice for the same change). Nothing more was
+    /// charged.
+    private func hold(_ failure: SkyStudioDownloadFailure?, result: SkyStudioVoiceConversion, server: SkyStudioJobStatus, message: String = "") {
         undelivered = (result, server)
         var detail = charges(server)
-        detail.merge(failure.fields(retry: SkyStudioDownloadFailure.taskListRetry + " The result is kept on Sky Studio for 60 days. "
-            + "Never call change_voice again for it.")) { _, new in new }
-        finish(.failed, failure.message, detail: detail, shown: SkyStudioDownloadWords.shown(failure))
-        // Strong: the row's button keeps this job until it is pressed or the row is dismissed.
-        status.retryDownload = { [self] in retryDownload() }
+        if let failure { detail.merge(failure.fields(retry: Self.retry)) { _, new in new } }
+        else { detail["next_step"] = .string("Nothing more was charged. To download the same result again at no charge, " + Self.retry) }
+        finish(failure?.kind == .stopped ? .cancelled : .failed, failure?.message ?? message, detail: detail,
+               shown: failure.map(SkyStudioDownloadWords.shown))
+        // Strong: the row's button, the panel and change_voice keep this job until Download again starts.
+        let retry: () -> Void = { [self] in retryDownload() }
+        VoiceChangeActivity.shared.hold(origin.clipID, .init(voice: target.id, direct: direct, jobID: job?.id, retry: retry))
+        if let failure { status.holdDownload(failure, retry: retry) } else { status.retryDownload = retry }
     }
 
-    /// Download again: the same files (only GETs; nothing uploaded or submitted), landed as one undo step as the first try would have.
+    /// Download again: the same files (only GETs; nothing uploaded or submitted), read from the job first so expired addresses are
+    /// replaced, landed as one undo step as the first try would have.
     func retryDownload() {
         guard let pending = undelivered, let job else { return }
         undelivered = nil
-        status.retryDownload = nil
-        status.issue = nil
+        VoiceChangeActivity.shared.release(origin.clipID)
+        status.beginDownloadAgain()
         AIJobs.shared.reopen(job)
         VoiceChangeActivity.shared.began(origin.clipID)
         task = Task { @MainActor in
@@ -161,7 +173,9 @@ final class VoiceChangeJob {
                 SkyStudioGenerationActivity.shared.remove(status)
                 VoiceChangeActivity.shared.ended(origin.clipID)
             }
-            await deliver(pending.result, server: pending.server)
+            var result = pending.result
+            if case .conversion(let current)? = try? await services.api.job(pending.server.jobID, key: key).voiceResult { result = current }
+            await deliver(result, server: pending.server)
         }
     }
 

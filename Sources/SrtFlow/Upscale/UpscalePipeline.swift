@@ -67,8 +67,8 @@ struct UpscaleDelivery: Sendable {
     var started: Date
 }
 
-/// The paid upscale's download gave up (SkyStudioDownloadFailure, after SkyStudioAPI.download's own tries): `delivery` is kept for
-/// Download again.
+/// The paid upscale's download gave up (SkyStudioDownloadFailure, after SkyStudioAPI.download's own tries) or was stopped
+/// (`.stopped`): `delivery` is kept for Download again.
 struct UpscaleUndelivered: Error {
     let failure: SkyStudioDownloadFailure
     let delivery: UpscaleDelivery
@@ -110,10 +110,13 @@ enum UpscalePipeline {
     }
 
     /// `onSubmitted`：任务交上了（从这一刻起积分扣了，没做成服务器退）；UpscaleJob 用它分清「没交上」和「交上之后断了」。
+    /// `onMade`: Sky Studio finished it, before anything is downloaded (UpscaleJob settles the charge it reported there and keeps what
+    /// Download again needs).
     static func run(
         _ request: UpscaleRequest, api: SkyStudioAPI, key: String, ffmpeg: URL?, workFolder: URL,
         sleep: (@Sendable (Double) async throws -> Void)? = nil,
         onSubmitted: @escaping @Sendable (String) -> Void = { _ in },
+        onMade: @escaping @Sendable (UpscaleDelivery) -> Void = { _ in },
         phase report: @escaping @Sendable (CloudJobPhase) -> Void
     ) async throws -> UpscaleOutcome {
         let started = Date()
@@ -175,6 +178,7 @@ enum UpscalePipeline {
         }
         guard let result = done.result else { throw SkyStudioJobError.badAnswer("a finished job without a result") }
         let delivery = UpscaleDelivery(jobID: done.jobID, result: result, creditsCharged: done.creditsCharged, offset: offset, started: started)
+        onMade(delivery)
         return try await deliver(request, delivery, api: api, key: key, ffmpeg: ffmpeg, workFolder: workFolder, phase: phase)
     }
 
@@ -205,6 +209,8 @@ enum UpscalePipeline {
             }
         } catch let failure as SkyStudioDownloadFailure {
             throw UpscaleUndelivered(failure: failure, delivery: delivery)
+        } catch is CancellationError {
+            throw UpscaleUndelivered(failure: .stopped, delivery: delivery)   // stopped while downloading: still held for Download again
         }
         try Task.checkCancellation()
 

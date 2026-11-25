@@ -58,6 +58,8 @@ final class VoiceRecoveryHTTP: URLProtocol {
     /// eleven-v4 的 `words` 用不了：null，或者报的字对不回原文（字母全换成 x）。
     enum BrokenWords { case null, wrongLetters }
     static var brokenWords: BrokenWords?
+    /// How many of the next result downloads (/files/) lose their connection (VoiceoverDownloadChecks: a paid batch not downloaded).
+    static var fileDrops = 0
     /// 这一场自己答的请求（方法、路径 → 状态码、JSON；nil 照常）：StopChecks 用它答取消和停下之后的原单。调用时已经拿着锁。
     static var override: ((String, String) -> (Int, JSONValue)?)?
     static let catalog: JSONValue = {
@@ -79,7 +81,7 @@ final class VoiceRecoveryHTTP: URLProtocol {
         rechoose = false; quoteFailure = nil; quoteWarnings = []; quoteOneTime = []; fallbackAt = nil
         oneTimeAt = nil; enrolls = []; enrollPriceChange = nil; standingActive = false; offerFallback = false; deferred = false; holdUntil = [:]; promptIndex = [:]
         open = []; peakOpen = 0; finished = []; jobBodies = []; ruleOf = []
-        lowRate = []; brokenWords = nil; override = nil
+        lowRate = []; brokenWords = nil; override = nil; fileDrops = 0
         let samples = (0..<264_600).map { Int16(sin(Double($0) * 0.08) * 4_000) }
         wave = VoiceReferenceSample.wavData(samples: samples, sampleRate: 44_100)
         // 同一个音（约 562 Hz）、同样 6 秒，24 kHz。
@@ -167,6 +169,10 @@ final class VoiceRecoveryHTTP: URLProtocol {
                 Self.open.remove(index)
                 if !Self.finished.contains(rule) { Self.finished.append(rule) }
             }
+        } else if path.hasPrefix("/files/"), Self.fileDrops > 0 {
+            Self.fileDrops -= 1
+            Self.lock.unlock()
+            return client!.urlProtocol(self, didFailWithError: URLError(.networkConnectionLost))
         } else if path.hasPrefix("/files/") {
             let index = Int(path.components(separatedBy: "voice-").last?.replacingOccurrences(of: ".wav", with: "") ?? "")
             let low = index.map { $0 < Self.ruleOf.count && Self.lowRate.contains(Self.ruleOf[$0]) } ?? false

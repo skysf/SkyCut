@@ -30,8 +30,10 @@ final class UploadServer: @unchecked Sendable {
     /// What a `GET /files/…` gets. `slow`: the whole result in 32 KB pieces every 10 ms (a client that cuts early is seen mid-body).
     /// `cut` / `cutReset`: the head (the whole length declared) and that many body bytes from where the Range starts, then the
     /// connection closed (FIN) or reset. `stall`: the head and 1 KB, then nothing until the client goes away. `statusCut`: an HTTP error
-    /// whose head declares 64 KB, then 1 KB of it and the connection closed.
-    enum GetReply: Sendable { case file, slow, cut(Int), cutReset(Int), status(Int), statusCut(Int), stall }
+    /// whose head declares 64 KB, then 1 KB of it and the connection closed; `statusStall`: only its head, then nothing.
+    /// `shortRange`: a resumed GET answered 206 with only that many bytes from where the Range starts (`bytes a-b/total`, b short of the
+    /// end), the answer itself whole. `redirect`: a 302 to another result on this server.
+    enum GetReply: Sendable { case file, slow, cut(Int), cutReset(Int), status(Int), statusCut(Int), statusStall(Int), stall, shortRange(Int), redirect(String) }
     static let etag = "\"skycut-check-1\""
 
     struct Seen: Sendable {
@@ -264,19 +266,29 @@ final class UploadServer: @unchecked Sendable {
             close(client)
             return
         }
+        if case .statusStall(let code) = reply {
+            begin(client, status: "\(code) Error", declaredLength: 65_536, bodyBytes: 0)
+            return hold(client)
+        }
+        if case .redirect(let name) = reply {
+            return respond(client, status: "302 Found", body: "", extra: ["Location: /files/\(name)"])
+        }
         var start = 0
         if validators, let range = headers["range"], range.hasPrefix("bytes="), headers["if-range"].map({ $0 == Self.etag }) ?? true,
            let offset = Int(range.dropFirst(6).prefix { $0 != "-" }), offset < body.count {
             start = offset
         }
-        var head = [start > 0 ? "HTTP/1.1 206 Partial Content" : "HTTP/1.1 200 OK", "Content-Length: \(body.count - start)",
+        // A short 206 ends `bytes` past where the Range starts, short of the result's end.
+        var end = body.count
+        if case .shortRange(let bytes) = reply, start > 0 { end = min(body.count - 1, start + bytes) }
+        var head = [start > 0 ? "HTTP/1.1 206 Partial Content" : "HTTP/1.1 200 OK", "Content-Length: \(end - start)",
                     "Content-Type: video/mp4", "Connection: close"]
         if validators { head += ["ETag: \(Self.etag)", "Accept-Ranges: bytes", "Last-Modified: Mon, 23 Nov 2026 07:00:00 GMT"] }
-        if start > 0 { head.append("Content-Range: bytes \(start)-\(body.count - 1)/\(body.count)") }
+        if start > 0 { head.append("Content-Range: bytes \(start)-\(end - 1)/\(body.count)") }
         write(client, Data((head.joined(separator: "\r\n") + "\r\n\r\n").utf8))
         switch reply {
-        case .file:
-            write(client, body.subdata(in: start..<body.count))
+        case .file, .shortRange:
+            write(client, body.subdata(in: start..<end))
             shutdown(client, SHUT_WR)
             close(client)
         case .slow:
@@ -296,7 +308,7 @@ final class UploadServer: @unchecked Sendable {
         case .stall:
             write(client, body.subdata(in: start..<min(body.count, start + 1_024)))
             hold(client)
-        case .status, .statusCut:
+        case .status, .statusCut, .statusStall, .redirect:
             break
         }
     }
