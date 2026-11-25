@@ -97,6 +97,21 @@ The first pass found one gap: an expired pin is also refused by the «another ce
 removing the expired-pin branch went unnoticed (its «renew it» advice was lost). Each refusal case now names the words its
 message must say.
 
+**After the first review (FBS1, 2026-11-26).** The review found three gaps, now closed:
+- A Mac without the Developer ID, or a shell whose `security` failed, still produced an ad-hoc, release-named build with
+  exit 0. `signing_mode` now treats a failing `security` as an error and refuses ad-hoc unless `SKYCUT_ALLOW_ADHOC=1`.
+- `notarize.sh` and `sign-dmg.sh` lost the refusal's status (`[ "$(signing_mode)" != … ]`), so an expired certificate
+  reached the compile. They now take `MODE="$(signing_mode)"` first, as `sign-app.sh` does.
+- The guard matched substrings, so 21 of the review's 37 mutations stayed green, a commented-out notarization step among
+  them. It now matches steps as whole lines, checks that each failure branch ends the run, reads backslash-continued
+  `notarytool` commands whole, and runs the real scripts with stub `security`, `xcrun` and `codesign`.
+
+Re-run: 48 sabotages, all red. That is the review's 21 green ones (commented-out or conditional steps, missing `exit 1`s, a
+password on the command's second line, `signing_mode` short-circuited, `notary_profile_ready` returning at once, the leaf
+comparison removed), seven for the new rules (opt-out, a failing `security`, the failed-build cleanup, the staple retry,
+the kept refusals), and the first round's 20 on the new lines. Also new: a failed build deletes what it wrote in `dist/`,
+and the staple is tried three times.
+
 ## 5. Waiting for the user: screen recording and the microphone
 
 Both need the user's own grant for a Developer-ID-signed bundle (System Settings, a relaunch, the microphone's Allow), so

@@ -107,7 +107,8 @@ swift run SrtFlowCoreChecks
 Create a release app and DMG:
 
 ```bash
-scripts/build-app.sh
+scripts/build-app.sh                        # with SkyCut's Developer ID
+SKYCUT_ALLOW_ADHOC=1 scripts/build-app.sh   # anyone else: an ad-hoc build for yourself
 ```
 
 Build products are written to `dist/` and are intentionally excluded from
@@ -115,8 +116,9 @@ version control.
 
 Official builds are signed with SkyCut's Developer ID and notarised by Apple, so
 they open directly, and the permissions macOS grants (screen recording,
-microphone, the Downloads folder, the keychain) carry over to the next version.
-Without that Developer ID the script falls back to ad-hoc signing, skips
+microphone, the Downloads folder, the keychain) are expected to carry over to the
+next version. Without that Developer ID the build stops; to build for yourself,
+run `SKYCUT_ALLOW_ADHOC=1 scripts/build-app.sh`, which signs ad-hoc, skips
 notarisation and warns: each such build looks like a different app to macOS, so
 those permissions have to be granted again
 (`docs/architecture/code-signing-and-permissions.md`).
@@ -257,14 +259,16 @@ SkyCut 是一款轻量、原生的 macOS 字幕与视频工具。
 scripts/vendor-ffmpeg.sh   # 获取随包分发的 arm64 ffmpeg（只需一次）
 swift build
 swift run SrtFlowCoreChecks
-scripts/build-app.sh
+scripts/build-app.sh                        # 有 SkyCut 的 Developer ID 时
+SKYCUT_ALLOW_ADHOC=1 scripts/build-app.sh   # 其他人：自己用的 ad-hoc 构建
 ```
 
 构建产物位于 `dist/`，不会提交到版本库。
 
 正式的构建用 SkyCut 的 Developer ID 签名并经 Apple 公证，下载下来可以直接打开，macOS 给过的权限（录屏、麦克风、
-下载文件夹、钥匙串）升级之后还在。没有这个 Developer ID 时脚本退回 ad-hoc 签名、不做公证并提醒：这样的每个构建
-在 macOS 眼里都是另一个 App，这些权限要重新给（`docs/architecture/code-signing-and-permissions.md`）。
+下载文件夹、钥匙串）预计升级之后还在。没有这个 Developer ID 时打包会停下；自己编着用就运行
+`SKYCUT_ALLOW_ADHOC=1 scripts/build-app.sh`：ad-hoc 签名、不做公证并提醒，这样的每个构建在 macOS 眼里都是另一个
+App，这些权限要重新给（`docs/architecture/code-signing-and-permissions.md`）。
 
 ### 分享给别人时
 

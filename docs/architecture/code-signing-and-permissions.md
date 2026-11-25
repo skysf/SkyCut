@@ -23,7 +23,7 @@ ad-hoc 签名（`codesign --sign -`）的 designated requirement 就是 `cdhash 
 | --- | --- | --- |
 | 录屏（ScreenCapture，系统的 TCC.db） | 系统设置里拨开关 | 开关照样显示开着，App 照样被拒。**关掉再打开只改开关、不换钉着的签名**（用户刚拨过的记录 `last_modified` 是新的，`csreq` 还是老构建的 cdhash），怎么拨都没用。只有删掉这条记录（`tccutil reset`，或在列表里选中按「−」）让系统重新问 |
 | 下载文件夹（用户的 TCC.db） | 系统弹框点「允许」 | 下一次访问重新弹框；点了允许，`csreq` 换成新构建的 |
-| 钥匙串（Sky Studio 的 Key，原 fal 的 Key，[fal.ai 生成](fal-generation.md) 第六节） | 弹框输登录密码、点「始终允许」 | 每个新构建第一次读弹一次。**换成固定证书之后也照样弹**，见历史一节的 2026-11-07 更正 |
+| 钥匙串（Sky Studio 的 Key，原 fal 的 Key，[fal.ai 生成](fal-generation.md) 第六节） | 弹框输登录密码、点「始终允许」 | 每个新构建第一次读弹一次。**换成固定证书之后也照样弹**，见历史一节的 2026-11-07 更正 (that was the self-signed certificate; with the Developer ID, expected to ask once more and then no more: section 2) |
 
 ## 2. The Developer ID (since 2026-11-26)
 
@@ -70,8 +70,13 @@ The user, 2026-11-25, after renewing the Apple Developer Program (an individual 
   - `build-app.sh` and `build-beta-app.sh` start with `notarize.sh --check`: a profile notarytool cannot use stops the
     build before the compile and says how to create it.
   - How long it takes, measured: [the report](../reports/2026-11-26-developer-id-signing.md).
-- **A Mac without a Developer ID of the team** (CI, someone building from source): ad-hoc, with the same runtime and
-  entitlements, not notarized, with a ⚠️ warning. Such a build never goes to a user or a release.
+- **A Mac without a Developer ID of the team, or a `security` that cannot list identities**: the build stops (since the
+  FBS1 review, 2026-11-26; before that it signed ad-hoc and exited 0 with only a warning). Someone building SkyCut for
+  themselves sets `SKYCUT_ALLOW_ADHOC=1`: ad-hoc, with the same runtime and entitlements, not notarized, with a ⚠️
+  warning. Nothing in `scripts/` sets it, and such a build never goes to anyone. CI runs none of the build scripts.
+- **A failed build** deletes the app and DMG it had begun writing in `dist/` (the Beta likewise), so nothing unsigned or
+  un-notarized stays there under a release's name. `notarize.sh` tries the staple three times, 20 s apart, because a
+  ticket can take a moment to become downloadable after «Accepted».
 - **The self-signed identity** of 2026-10-03 («SrtFlow Signing» in `~/.config/srtflow/signing/`) stays untouched as a
   backup; no script uses it. `create-identity.sh`, which made it, was removed (git history has it).
 
@@ -82,7 +87,8 @@ The user, 2026-11-25, after renewing the Apple Developer Program (an individual 
 2. **Only the pinned Developer ID signs user and release builds.** `sign-app.sh` refuses a pin that is no longer valid and
    another certificate of the team (renewed: update the pin, the team keeps every permission). Never sign SkyCut with
    another team's certificate.
-3. **A build signed ad-hoc («⚠️ No Developer ID on this Mac») or not notarized never goes to a user or a release.**
+3. **A build signed ad-hoc (only with `SKYCUT_ALLOW_ADHOC=1`, «⚠️ SKYCUT_ALLOW_ADHOC=1: signing ad-hoc») or not notarized
+   never goes to a user or a release.** No script sets the opt-out.
 4. **Every code file in the bundle is named in `sign-app.sh`**, which refuses any other Mach-O: new code is signed on
    purpose, with only the entitlements it needs. A new protected resource (camera, location, contacts…) needs its usage
    description and its entitlement together, and a proof like the probe in the report; a runtime exception needs proof
@@ -110,7 +116,7 @@ The user, 2026-11-25, after renewing the Apple Developer Program (an individual 
 
 | Check | Pins |
 | --- | --- |
-| `checks/release-signing.sh` (scan guard, `checks/release-signing/`) | rules 1–6: the build scripts' order (profile checked before the compile; the app signed and notarized before the DMG is built; the DMG signed, then notarized; the Beta signed, then notarized); one signing command with the runtime, inside out, entitlements only on the app, the timestamped identity only when `signing_mode` says so; the pin, the team and the profile name; `signing_mode_from` fed listings (pinned → Developer ID, expired pin or another certificate of the team → refused, no Developer ID of the team → ad-hoc); entitlements against Info.plist's usage descriptions, no runtime exception; notarytool only with the keychain profile; it also signs a fixture app ad-hoc (runtime on all four pieces, stray code refused); the screen recording repair and wording |
+| `checks/release-signing.sh` (scan guard, `checks/release-signing/`) | rules 1–6, steps matched as whole lines (a step commented out or made conditional is red) and every failure branch checked to end the run: the build scripts' order (profile checked before the compile; the app signed and notarized before the DMG is built; the DMG signed, then notarized; the Beta signed, then notarized); one signing command with the runtime, inside out, entitlements only on the app, the timestamped identity only when `signing_mode` says so; the pin, the team and the profile name; `signing_mode_from` fed listings (pinned → Developer ID, expired pin or another certificate of the team → refused, no Developer ID of the team → ad-hoc); entitlements against Info.plist's usage descriptions, no runtime exception; notarytool only with the keychain profile; it also signs a fixture app ad-hoc with the opt-out (runtime on all four pieces, stray code refused); with stub `security`, `xcrun` and `codesign`, the real scripts refuse a failing `security`, an expired pin, no Developer ID without the opt-out, an unusable notary profile and another leaf certificate; the screen recording repair and wording |
 | `scripts/check-mcp.sh` (`checks/MCP/packaging-wiring.sh`), `checks/web-motion-wiring.sh` | the helpers are copied in before signing and signed before the app |
 | `sign-app.sh` itself | after signing: our team, the pinned leaf certificate, a timestamp, the runtime and the entitlements on every piece, the team requirement; unnamed code refused |
 | `notarize.sh` itself | Accepted, stapled, `stapler validate`, Gatekeeper's «Notarized Developer ID» |

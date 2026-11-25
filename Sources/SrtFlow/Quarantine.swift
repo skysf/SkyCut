@@ -2,6 +2,9 @@ import Foundation
 
 /// 处理下载来源的隔离标记（`com.apple.quarantine`）。
 ///
+/// Since 2026-11-26 release builds are signed with the Developer ID and notarized, which Gatekeeper accepts. What follows
+/// was written for the ad-hoc builds before that, and still holds for an ad-hoc build made from source.
+///
 /// 背景：SrtFlow 只做 ad-hoc 签名，没有 Developer ID 公证。DMG 经网页下载或
 /// AirDrop 传到别人机器上后，整个 `.app` 会被打上隔离标记。用户在「右键 → 打开」
 /// 里同意之后，App 本身能正常启动 —— **但包里嵌的可执行文件仍然会被系统直接

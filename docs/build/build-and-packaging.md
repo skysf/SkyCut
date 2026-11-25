@@ -168,8 +168,10 @@ runtime is on and Apple notarizes them, so a download opens directly. The rules,
   (it asks for an app-specific password from appleid.apple.com). Scripts never ask for, read or print the password; a
   build without a usable profile stops before the compile and prints this command.
 - `build-app.sh` notarizes twice: the app (zipped), stapled before the DMG is made, then the signed DMG, stapled too.
-- A Mac with no Developer ID of the team (CI, someone building from source) signs ad-hoc, skips notarization and prints
-  ⚠️ warnings: **such a build never goes to a user or a release**.
+- A Mac with no Developer ID of the team, or a shell whose `security` cannot reach the keychain, stops the build before
+  the compile. Someone building SkyCut for themselves from source runs `SKYCUT_ALLOW_ADHOC=1 scripts/build-app.sh`: ad-hoc,
+  not notarized, with ⚠️ warnings, and **such a build never goes to a user or a release**.
+- A build that fails after it began writing `dist/` deletes the app and DMG it wrote (`build-beta-app.sh` its Beta).
 
 ## 测试版（SkyCut Beta）
 
