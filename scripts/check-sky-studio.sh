@@ -47,10 +47,13 @@
 #      The debug-only hook SRTFLOW_TEST_UPLOAD_DROPS (CloudUploadFault): scripts/debug-hook-probe.sh passes this build without DEBUG
 #      and refuses the debug build (the control); the hook's own checks (checks/UploadFault/main.swift) run in a second binary built
 #      with -D DEBUG.
-#      Downloads of paid results (2026-11-24; DownloadRetryChecks, the same server): a GET cut mid-body is resumed (Range) or started
-#      again, three GETs in all, then `download_network`; a 403 / 404 / 410 asks once for a fresh address, never the same GET again;
-#      another answer, a TLS failure and a cancel end it. The debug-only hook SRTFLOW_TEST_DOWNLOAD_DROPS (CloudDownloadFault) is
-#      refused by the same probe; its checks (checks/UploadFault/DownloadFaultChecks.swift) run in the -D DEBUG binary.
+#      Downloads of paid results (2026-11-24; DownloadRetryChecks and DownloadEdgeChecks, the same server): every GET asks for
+#      identity bytes; a GET cut mid-body is resumed (Range) or started again, three GETs in all, then `download_network`; only the
+#      whole result is kept (a short or gzip 206, an empty 200: `download_incomplete`); a 403 / 404 / 410, or an answer whose status
+#      was held back, asks once for a fresh address, never the same GET again; another answer and a TLS failure end it; a stop says
+#      the GETs it sent. HeldDownloadChecks: a request's key is part of what it is bound to, and only its own job is downloaded again.
+#      The debug-only hook SRTFLOW_TEST_DOWNLOAD_DROPS (CloudDownloadFault) is refused by the same probe; its checks
+#      (checks/UploadFault/DownloadFaultChecks.swift) run in the -D DEBUG binary.
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写只有一份 KeychainSecret，真钥匙串在 scripts/check-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -227,6 +230,7 @@ xcrun swiftc \
   checks/SkyStudio/UploadRetryChecks.swift \
   checks/SkyStudio/UploadAnswerChecks.swift \
   checks/SkyStudio/DownloadRetryChecks.swift \
+  checks/SkyStudio/DownloadEdgeChecks.swift \
   checks/SkyStudio/HeldDownloadChecks.swift \
   checks/SkyStudio/FilmChecks.swift \
   checks/SkyStudio/OfficialQuoteChecks.swift \

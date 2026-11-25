@@ -3,20 +3,23 @@ import SrtFlowMCPKit
 
 // MARK: - 同一操作在 MCP 层只起一个本机任务
 // 管什么：把调用方稳定的 idempotency_key 绑定完整参数 / 工程，在报价或上传 await 期间也占位。
-// A re-ask of a request whose paid result waits for Download again (the same key, or the same request without a key) downloads
-// that result again and never starts a paid job (`heldAnswer`; 2026-11-24). The key itself is not part of what it is bound to, so the
-// key SkyCut returned works on the next call (`identity`).
+// The key is part of what it is bound to (`identity`); when the caller gave none, the key SkyCut made is filled in, so the key it
+// returned names that same request on the next call. That key's job holding a paid result that did not come down answers Download
+// again (`heldAnswer(for:)`, by the job id in the key's own cached answer). A call without the key, or with another one, is a new
+// request and a new paid job (user, 2026-11-25: an identical paid request sent again is a deliberate new version): nothing here maps
+// a new request to an old job by its parameters.
 // 不管什么：HTTP 重试、服务端的钱包幂等、磁盘恢复；没有任务号的未知提交保留 key，绝不自动重放。
 @MainActor
 enum SkyStudioGenerationRequests {
     struct Entry { let identity: JSONValue; var result: AIToolResult? }
     private static var entries: [String: Entry] = [:]
 
-    /// What a key is bound to: the arguments without `confirm_token` and `idempotency_key`, the project and the account.
-    static func identity(arguments: JSONValue, project: String, generation: Int, account: String) -> JSONValue {
+    /// What `key` is bound to: the arguments without `confirm_token` (with the key itself: the one SkyCut made when the caller gave
+    /// none), the project and the account.
+    static func identity(arguments: JSONValue, key: String, project: String, generation: Int, account: String) -> JSONValue {
         var fields = arguments.objectValue ?? [:]
         fields["confirm_token"] = nil
-        fields["idempotency_key"] = nil
+        if fields["idempotency_key"]?.stringValue == nil { fields["idempotency_key"] = .string(key) }
         return ["arguments": .object(fields), "project": .string(project), "generation": .number(Double(generation)), "account": .string(account)]
     }
 
@@ -32,19 +35,8 @@ enum SkyStudioGenerationRequests {
         return nil
     }
 
-    /// A re-ask whose paid result waits for Download again: that result is downloaded again under its job id (nothing quoted,
-    /// uploaded or submitted). With `key`, the request bound to it; without one, any request of this identity (a re-ask that dropped
-    /// the key must not mint a new key and pay again). nil when nothing of it is held.
-    static func heldAnswer(key: String?, identity: JSONValue, scope: String = "") -> AIToolResult? {
-        let candidates = key.map { entries[scope + ":" + $0].map { [$0] } ?? [] }
-            ?? entries.filter { $0.key.hasPrefix(scope + ":") }.map(\.value)
-        for entry in candidates where entry.identity == identity {
-            if let answer = entry.result.flatMap(heldAnswer(for:)) { return answer }
-        }
-        return nil
-    }
-
-    /// The answer a key already has (its job id) when that job holds a paid result: Download again starts, and the answer says so.
+    /// A key's own cached answer (its job id) when that job holds a paid result that did not come down: Download again of that very
+    /// result (only GETs; nothing quoted, uploaded or submitted), and the answer says so. nil when its job holds nothing.
     static func heldAnswer(for cached: AIToolResult) -> AIToolResult? {
         guard let id = cached.payload["job_id"]?.stringValue, SkyStudioHeldDownloads.retry(id) else { return nil }
         return SkyStudioHeldDownloads.answer(jobID: id)

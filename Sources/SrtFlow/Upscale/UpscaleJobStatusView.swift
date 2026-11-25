@@ -6,6 +6,8 @@ import SwiftUI
 // 处理了多久、这一档通常几分钟）和状态行同一份（CloudPhaseText）。
 // 检查器里「Upscale」那一节本身在 VideoEditInspector+Upscale.swift（是检查器的一段 body，不是单独的视图：
 // 预览性能 ratchet 数的是 body 次数，选一段多一个视图就是多一次）。
+// A paid result held after its download stopped reads the download's own line here (it names the way back: Download again on the
+// job's own row in the task list); the inspector finds jobs by their original file, so it offers no Download again itself (2026-11-25).
 // 不管什么：面板和对比窗口怎么摆（UpscalePresenter）、换源（VideoEditProject+Upscale）。
 
 /// 一个正在做 / 做完还没处理的任务在检查器里的样子（只订阅这一个任务）。
@@ -48,24 +50,13 @@ struct UpscaleJobStatusView: View {
             case .failed(let message):
                 Text(String(format: L10n("Upscale failed: %@"), message)).font(.caption).foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
-                endedButtons
+                Button("Dismiss") { activity.remove(job) }.controlSize(.small)
             case .cancelled(let stop):
                 Text(job.downloadFailure.map(SkyStudioDownloadWords.shown) ?? stop.localizedNote ?? L10n("Upscale cancelled."))
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                endedButtons
+                Button("Dismiss") { activity.remove(job) }.controlSize(.small)
             }
         }
-    }
-}
-
-extension UpscaleJobStatusView {
-    /// A failed or stopped job: Download again when it holds a paid result (2026-11-24; nothing more is charged), then Dismiss.
-    @ViewBuilder fileprivate var endedButtons: some View {
-        if job.canRetryDownload {
-            Button("Download again") { activity.downloadAgain(job) }.controlSize(.small)
-                .instantHelp("Download the finished result again; nothing more is charged")
-        }
-        Button("Dismiss") { activity.remove(job) }.controlSize(.small)
     }
 }
 

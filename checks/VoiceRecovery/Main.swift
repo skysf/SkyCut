@@ -34,6 +34,8 @@ import SrtFlowMCPKit
             try await runGenerationDownloadChecks(root)
             try await runVoiceoverDownloadChecks(root)
             try await runUpscaleJobDownloadChecks(root)
+            try await runOfficialRecoveryDownloadChecks(root)
+            try await runPaidToolEntryChecks(root)   // last: it marks a key on the account
         } catch {
             VoiceCheckLog.failures += 1
             print("FAIL: production voice recovery checks: \(error)")
@@ -42,6 +44,10 @@ import SrtFlowMCPKit
         require(AIKeepAwake.shared.holders == 0, "every AI job in these checks gave its keep-awake lease back (\(AIKeepAwake.shared.holders) left)")
         ProjectTeardown.stopPreview(OpenProjects.shared.primary)
         UserDefaults.standard.removePersistentDomain(forName: domain)
+        // This run's own Application Support folder (official receipts, the provider marker): the script removes it too.
+        if let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            try? FileManager.default.removeItem(at: support.appendingPathComponent(domain, isDirectory: true))
+        }
         if VoiceCheckLog.failures > 0 { print("FAIL: \(VoiceCheckLog.failures) production voice recovery checks"); exit(1) }
         print("PASS: production voice: whole-segment quote before job_id, one selection per segment, budget / refusal / local fallback before paying, "
             + "batches read together within the audio slots and landed in order, mid-script fallback for later batches, fallback_needs_one_time "
@@ -63,13 +69,15 @@ import SrtFlowMCPKit
             + "; direct change: skip_separation in the quote and the job, the voice alone on one new track as one undo step, an unconfirmed "
             + "direct quote refused before paying, a default result without its background not landed, separation_failed failing with "
             + "nothing landed and only the separation charged, the panel's localized line and its direct retry"
-            + "; a voice change whose download gave up: download_network after three GETs, Download again lands the byte-identical files "
-            + "under the same job id with no new upload or job, an expired address renewed once from the original job"
-            + "; Download again everywhere: change_voice and the panel asked for the same change download it again, a stop keeps the "
-            + "button; a generation held after three drops is downloaded again by the AI's re-ask after its row was dismissed, a stop "
-            + "keeps it, a missing SRT is fetched alone, one /jobs each; a voiceover row's Download again runs its recovery with no new "
-            + "batch; an upscale held after three drops (the charge settled when made), Cancel while downloading again keeps it, "
-            + "dismissed it is still found, and Download again saves it with one /jobs")
+            + "; a voice change whose download gave up: download_network after three GETs, its row's Download again lands the "
+            + "byte-identical files under the same job id, an expired address renewed once from the original job; the same change and "
+            + "Chinese after English asked again are new paid jobs; a stop keeps the button"
+            + "; a generation held after three drops stays held through a failed Download again, its own key downloads it after the row "
+            + "was dismissed, a stop and empty answers keep it, a missing SRT is fetched alone; a voiceover row's Download again runs its "
+            + "recovery once, never after a resume landed it, and survives a stop; an upscale's books at the charge from either field, "
+            + "Cancel while downloading again keeps it on its row; an official recovery held through a 503 then downloaded by its key"
+            + "; through the tools: generate_media's own key downloads the held job with no POST, key-less and 9:16 are new jobs, "
+            + "upscale_clip from project B is B's own new job")
         exit(0)
     }
 

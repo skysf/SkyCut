@@ -14,7 +14,15 @@ ROOT="$(mktemp -d)"
 BUNDLE_ID="com.srtflow.SrtFlow.voicerecoverycheck.run$$"
 find "${HOME}/Library/Preferences" -maxdepth 1 -name 'com.srtflow.SrtFlow.voicerecoverycheck.run*.plist' -mmin +5 -delete 2>/dev/null || true
 APP="${ROOT}/VoiceRecoveryCheck.app"
-test_app_cleanup_on_exit "${APP}" "${ROOT}"
+# The run's own Application Support folder (the official recovery's receipt, the provider marker the paid tool checks write when they
+# mark a key on the account) goes with the bundle, also when a check fails.
+SUPPORT="${HOME}/Library/Application Support/${BUNDLE_ID}"
+cleanup() {
+  remove_test_app "${APP}"
+  rm -rf -- "${ROOT}" "${SUPPORT}"
+}
+trap cleanup EXIT
+test_app_exit_signals
 mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources" "${ROOT}/work"
 cat > "${APP}/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -43,7 +51,8 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 \
   checks/VoiceRecovery/VoiceChangeFixture.swift checks/VoiceRecovery/VoiceChangeChecks.swift \
   checks/VoiceRecovery/VoiceChangeDirectChecks.swift checks/VoiceRecovery/VoiceChangeDownloadChecks.swift \
   checks/VoiceRecovery/GenerationDownloadChecks.swift checks/VoiceRecovery/VoiceoverDownloadChecks.swift \
-  checks/VoiceRecovery/UpscaleJobDownloadChecks.swift \
+  checks/VoiceRecovery/UpscaleJobDownloadChecks.swift checks/VoiceRecovery/OfficialRecoveryDownloadChecks.swift \
+  checks/VoiceRecovery/PaidToolEntryChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" \
   -o "${APP}/Contents/MacOS/VoiceRecoveryCheck"
 # 外层看门狗不能放在 Swift 协作线程池里；脚本超时明确红。

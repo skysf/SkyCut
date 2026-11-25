@@ -11,9 +11,11 @@ import Foundation
 // 交上之后停不下来的（已经开始了、取消没送到）照实说：积分花了，成品照样进用户的 Sky Studio 作品库。
 // 做完**不替换**：对比窗口里用户点了 Replace 才换（upscale 方案第 15 条）。2026-10-28 起走 Sky Studio（收费方案第 6 刀），之前走 fal。
 // A download that gave up (UpscaleUndelivered) ends the job failed with the localized line, a stop once it was made ends it stopped,
-// and both keep the result: Download again (the task row's button, `retryDownload`, or upscale_clip / the panel asked for the same
-// upscale) reads the job's current result, gets it, puts the sound back and saves it; nothing is submitted (2026-11-24). The charge
-// Sky Studio reported is settled on the day's books as soon as it is made, before anything is downloaded.
+// and both keep the result: Download again (this job's own task row, `retryDownload`) reads the job's current result, gets it, puts
+// the sound back and saves it; nothing is submitted (2026-11-24). upscale_clip or the panel asked again, even for the same input, is a
+// new paid upscale (user, 2026-11-25). The charge Sky Studio reported (either field, UpscaleDelivery.charge(of:)) is settled on the
+// day's books as soon as it is made, before anything is downloaded, and again when Download again reads a charge the first answer
+// did not carry.
 // 不管什么：裁 / 传 / 等 / 下 / 封声（UpscalePipeline）、换源（VideoEditProject+Upscale）、界面。
 
 @MainActor
@@ -207,14 +209,16 @@ final class UpscaleJob: ObservableObject, Identifiable {
         end(.failed(failure.map(SkyStudioDownloadWords.shown) ?? message), refunding: false)
     }
 
-    /// An error once the result was made: a stop holds it as stopped, anything else (sound, probe, save) with its own words.
+    /// An error once the result was made: a stop before any GET holds it as stopped, anything else (sound, probe, save) with its own
+    /// words (a stop during or after the download comes as UpscaleUndelivered, with its GETs).
     private func holdAfter(_ error: Error, delivery: UpscaleDelivery) {
-        if error is CancellationError || Task.isCancelled { return hold(delivery, .stopped) }
+        if error is CancellationError || Task.isCancelled { return hold(delivery, .stopped(attempts: 0)) }
         hold(delivery, nil, message: (error as? UpscalePipelineError)?.message ?? error.localizedDescription)
     }
 
-    /// Download again: the same paid result (only GETs; nothing quoted, uploaded or submitted), read from the job first so an expired
-    /// address is replaced, its sound put back and saved as the first try would have.
+    /// Download again: this job's paid result (only GETs; nothing quoted, uploaded or submitted), read from the job first so an expired
+    /// address is replaced and a charge the first answer did not carry reaches the day's books, its sound put back and saved as the
+    /// first try would have.
     func retryDownload() {
         guard canRetryDownload, let delivery = undelivered else { return }
         undelivered = nil
@@ -227,7 +231,13 @@ final class UpscaleJob: ObservableObject, Identifiable {
             var current = delivery
             if case .success(let found) = await SkyStudioJobKey.key(.silent) {
                 key = found
-                if let fresh = try? await SkyStudioAPI().job(delivery.jobID, key: found).result { current.result = fresh }
+                if let fresh = try? await SkyStudioAPI().job(delivery.jobID, key: found) {
+                    if let result = fresh.result { current.result = result }
+                    if let charged = UpscaleDelivery.charge(of: fresh) {
+                        current.creditsCharged = charged
+                        settleMade(current)
+                    }
+                }
             }
             do {
                 complete(try await UpscalePipeline.deliver(request, current, api: SkyStudioAPI(), key: key,
@@ -244,12 +254,6 @@ final class UpscaleJob: ObservableObject, Identifiable {
     var downloadsPaidResult: Bool {
         guard case .running = state else { return false }
         return made.value != nil
-    }
-
-    /// Whether this job holds a paid result for the same upscale (file, range, model, size): another would charge again for it.
-    func holdsResult(for original: URL, range: UpscaleRange, tier: String, target: UpscaleTarget) -> Bool {
-        canRetryDownload && request.originalURL.standardizedFileURL == original.standardizedFileURL && request.tier.id == tier
-            && request.target == target && abs(request.range.start - range.start) < 0.01 && abs(request.range.end - range.end) < 0.01
     }
 }
 
@@ -304,35 +308,22 @@ final class UpscaleActivity: ObservableObject {
         job.start()
     }
 
-    /// Held upscales whose row was dismissed (not shown): the panel and upscale_clip still find them, so the same upscale is never
-    /// charged again, and Download again lists them again. They go with their project.
-    private var dismissedHeld: [UpscaleJob] = []
-
     func remove(_ job: UpscaleJob) {
-        // Made and paid, downloading now: Cancel stops the download and keeps the job listed, held for Download again.
+        // Made and paid, downloading now: Cancel stops the download and keeps the job listed, held for Download again on its row.
         if job.downloadsPaidResult { return job.cancel() }
         job.cancel()
         jobs.removeAll { $0.id == job.id }
-        if job.canRetryDownload { dismissedHeld.append(job) }
         if compare == .job(job) { compare = nil }
     }
 
-    /// Download again (the task row, the inspector, the panel, upscale_clip): the held job is listed again and gets the same result.
+    /// Download again (this job's own task row): the same paid result, under the same job.
     func downloadAgain(_ job: UpscaleJob) {
-        dismissedHeld.removeAll { $0.id == job.id }
-        if !jobs.contains(where: { $0.id == job.id }) { jobs.append(job) }
         job.retryDownload()
     }
 
     /// 这个原片有没有在做 / 做完还没处理的任务。
     func job(forOriginal url: URL) -> UpscaleJob? {
         jobs.first { $0.request.originalURL == url }
-    }
-
-    /// The job that holds a paid result for this very upscale: the panel and upscale_clip offer its Download again instead of a new
-    /// paid job.
-    func heldDownload(original: URL, range: UpscaleRange, tier: String, target: UpscaleTarget) -> UpscaleJob? {
-        (jobs + dismissedHeld).first { $0.holdsResult(for: original, range: range, tier: tier, target: target) }
     }
 
     func present(panelFor clipID: UUID) { panel = UpscalePanelTarget(id: clipID) }
@@ -343,7 +334,6 @@ final class UpscaleActivity: ObservableObject {
         let closing = jobs.filter { $0.projectGeneration == projectGeneration }
         for job in closing { job.cancel() }
         jobs.removeAll { $0.projectGeneration == projectGeneration }
-        dismissedHeld.removeAll { $0.projectGeneration == projectGeneration }
         if case .job(let shown)? = compare, shown.projectGeneration == projectGeneration { compare = nil }
     }
 }

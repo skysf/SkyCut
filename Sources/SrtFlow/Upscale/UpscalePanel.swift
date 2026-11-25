@@ -207,18 +207,10 @@ struct UpscalePanel: View {
             if case .ready(let answer)? = offers.known(row.quote) { return answer } else { return nil }
         }
         let overLimit = spent + (quote?.credits ?? 0) > spend.dailyLimit + 0.0005
-        // This very upscale was made and paid but did not download (B47): offer its Download again, never a second paid job.
-        let held = selected.flatMap { row in
-            UpscaleActivity.shared.heldDownload(original: model.originalURL, range: model.range(for: choice, tier: row.tier), tier: row.tier.id,
-                                                target: target)
-        }
         Divider()
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                if held != nil {
-                    Text("This upscale is already made on Sky Studio but did not download. Download it again: nothing more is charged.")
-                        .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
-                } else if let selected {
+                if let selected {
                     let size = UpscalePanelModel.outputSize(quote, fallback: selected.estimatedSize)
                     Text(String(format: L10n("Saves next to the original as %@"), model.fileName(size: size, tier: selected.tier)))
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
@@ -228,19 +220,11 @@ struct UpscalePanel: View {
             }
             Spacer()
             Button("Cancel") { dismiss() }
-            if let held {
-                Button("Download again") {
-                    UpscaleActivity.shared.downloadAgain(held)
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-            } else {
-                Button(quote.map { String(format: L10n("Upscale · %@ credits"), SkyStudioCredits.text($0.credits)) } ?? L10n("Upscale")) {
-                    if let selected, let quote { start(selected: selected, quote: quote) }
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(quote == nil || selected?.refusal != nil || overLimit)
+            Button(quote.map { String(format: L10n("Upscale · %@ credits"), SkyStudioCredits.text($0.credits)) } ?? L10n("Upscale")) {
+                if let selected, let quote { start(selected: selected, quote: quote) }
             }
+            .keyboardShortcut(.defaultAction)
+            .disabled(quote == nil || selected?.refusal != nil || overLimit)
         }
     }
 

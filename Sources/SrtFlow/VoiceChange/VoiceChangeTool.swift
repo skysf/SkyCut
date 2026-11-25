@@ -44,12 +44,6 @@ enum VoiceChangeTool {
             throw AIToolError(problem.message)
         }
         let target = try await target(requested, catalog: catalog, key: key, services: services)
-        // This very change was made and paid but did not land (its download did not finish): its Download again, never a second charge.
-        if let held = VoiceChangeActivity.shared.heldChange(clipID: id, voice: target.id, direct: direct) {
-            held.retry()
-            return held.jobID.map { SkyStudioHeldDownloads.answer(jobID: $0) }
-                ?? .ok(["status": "downloading_again", "submitted_again": false, "next_step": "The same change was made earlier; SkyCut is downloading it again with no new charge."])
-        }
 
         // 收费之前：截声音、定语言、报价。截好的那段只在起了任务之后留着。
         let folder = services.workFolder.appendingPathComponent(UUID().uuidString, isDirectory: true)

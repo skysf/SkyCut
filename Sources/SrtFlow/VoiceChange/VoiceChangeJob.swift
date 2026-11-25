@@ -122,7 +122,7 @@ final class VoiceChangeJob {
     }
 
     /// Downloads the result and lands it. Whatever keeps it from landing here (the download gave up or was stopped, a file could not be
-    /// saved) holds the paid result for Download again (`hold`).
+    /// saved) holds the paid result for Download again on this job's own row (`hold`).
     private func deliver(_ result: SkyStudioVoiceConversion, server done: SkyStudioJobStatus) async {
         let files: VoiceChangeLanding.Files
         do {
@@ -130,32 +130,31 @@ final class VoiceChangeJob {
         } catch let failure as SkyStudioDownloadFailure {
             return hold(failure, result: result, server: done)
         } catch where error is CancellationError || Task.isCancelled {
-            return hold(.stopped, result: result, server: done)
+            return hold(.stopped(attempts: 0), result: result, server: done)   // stopped before any GET
         } catch {
             return hold(nil, result: result, server: done, message: "Sky Studio changed the voice, but SkyCut could not save "
                 + (direct ? "the voice file" : "the two files") + ": \(SkyStudioVoiceLibraryErrors.message(error))")
         }
+        status.releaseDownload()   // the files are here: nothing is held for this job any more
         await land(files, result: result, server: done)
     }
 
-    /// How a held change is downloaded again: the row's button, or change_voice asked for the same change again.
-    private static let retry = SkyStudioDownloadFailure.taskListRetry.dropLast().description + ", or call change_voice again for the same "
-        + "clip with the same voice and skip_separation: that only downloads this result again under this job id. The result is kept on "
-        + "Sky Studio for 60 days. Never start another voice change for it."
+    /// How a held change is downloaded again: only this job's own row. change_voice asked again is a new request (user, 2026-11-25),
+    /// so the AI is told it would be charged again.
+    private static let retry = SkyStudioDownloadFailure.taskListRetry + " The result is kept on Sky Studio for 60 days. Calling change_voice "
+        + "again starts a new voice change and is charged again, even for the same clip, voice and language."
 
     /// The paid result did not land: its download gave up (failed, the localized line), was stopped (stopped), or a file could not be
-    /// saved (`message`). It is kept for Download again (the row, the panel and change_voice for the same change). Nothing more was
-    /// charged.
+    /// saved (`message`). It is kept for Download again on this job's own row. Nothing more was charged.
     private func hold(_ failure: SkyStudioDownloadFailure?, result: SkyStudioVoiceConversion, server: SkyStudioJobStatus, message: String = "") {
         undelivered = (result, server)
         var detail = charges(server)
         if let failure { detail.merge(failure.fields(retry: Self.retry)) { _, new in new } }
-        else { detail["next_step"] = .string("Nothing more was charged. To download the same result again at no charge, " + Self.retry) }
+        else { detail["next_step"] = .string("Nothing more was charged. To download this same result again at no charge, " + Self.retry) }
         finish(failure?.kind == .stopped ? .cancelled : .failed, failure?.message ?? message, detail: detail,
                shown: failure.map(SkyStudioDownloadWords.shown))
-        // Strong: the row's button, the panel and change_voice keep this job until Download again starts.
+        // Strong: the row's button keeps this job until its result has landed.
         let retry: () -> Void = { [self] in retryDownload() }
-        VoiceChangeActivity.shared.hold(origin.clipID, .init(voice: target.id, direct: direct, jobID: job?.id, retry: retry))
         if let failure { status.holdDownload(failure, retry: retry) } else { status.retryDownload = retry }
     }
 
@@ -164,14 +163,15 @@ final class VoiceChangeJob {
     func retryDownload() {
         guard let pending = undelivered, let job else { return }
         undelivered = nil
-        VoiceChangeActivity.shared.release(origin.clipID)
         status.beginDownloadAgain()
         AIJobs.shared.reopen(job)
-        VoiceChangeActivity.shared.began(origin.clipID)
+        // The clip is marked as changing while this runs, unless a newer change of it already marked it (that one unmarks it).
+        let marks = !VoiceChangeActivity.shared.isChanging(origin.clipID)
+        if marks { VoiceChangeActivity.shared.began(origin.clipID) }
         task = Task { @MainActor in
             defer {
                 SkyStudioGenerationActivity.shared.remove(status)
-                VoiceChangeActivity.shared.ended(origin.clipID)
+                if marks { VoiceChangeActivity.shared.ended(origin.clipID) }
             }
             var result = pending.result
             if case .conversion(let current)? = try? await services.api.job(pending.server.jobID, key: key).voiceResult { result = current }
@@ -260,10 +260,13 @@ final class VoiceChangeJob {
         }
         status.advance(to: .downloading(fraction: nil), typicalSeconds: typical)
         let voiceShare = background == nil ? 1.0 : 0.5
+        var gets = 0
         do {
-            try await services.api.download(result.voiceURL, to: places.voice, renew: renewal(jobID) { $0.voiceURL }) { report($0 * voiceShare) }
+            gets += try await services.api.download(result.voiceURL, to: places.voice, renew: renewal(jobID) { $0.voiceURL }) {
+                report($0 * voiceShare)
+            }
             if let background {
-                try await services.api.download(background, to: places.background, renew: renewal(jobID) { $0.backgroundURL }) {
+                gets += try await services.api.download(background, to: places.background, renew: renewal(jobID) { $0.backgroundURL }) {
                     report(0.5 + $0 / 2)
                 }
             }
@@ -274,6 +277,10 @@ final class VoiceChangeJob {
         } catch {
             try? FileManager.default.removeItem(at: places.voice)
             if background != nil { try? FileManager.default.removeItem(at: places.background) }
+            // Stopped after the files came down, before they were measured: a stop with the GETs that brought them.
+            if gets > 0, SkyStudioDownloadFailure.from(error) == nil, error is CancellationError || Task.isCancelled {
+                throw SkyStudioDownloadFailure.stopped(attempts: gets)
+            }
             throw error
         }
     }

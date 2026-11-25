@@ -32,13 +32,15 @@ enum SkyStudioGenerateTool {
         let prompt = try args.string("prompt") ?? ""
         if try args.string("model") == "ideogram-remove-background", !args.has("operation") { ask.operation = "remove_background" }
         if kind != .image, ask.operation != "generate" { throw AIToolError("operation=\(ask.operation) requires kind=image; upscale_clip is video-only.") }
-        let givenKey = try args.string("idempotency_key")?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let idempotencyKey = givenKey ?? UUID().uuidString.lowercased()
-        let requestIdentity = SkyStudioGenerationRequests.identity(arguments: args.raw, project: String(describing: ObjectIdentifier(project)),
-            generation: project.documentGeneration, account: SkyStudioAccount.shared.stored?.me.account.id ?? "")
-        // A re-ask of a paid result waiting for Download again (this key, or this request without a key): the same result, never a new job.
-        if let again = SkyStudioGenerationRequests.heldAnswer(key: givenKey, identity: requestIdentity) { return again }
-        if let cached = try SkyStudioGenerationRequests.begin(idempotencyKey, identity: requestIdentity) { return cached }
+        let idempotencyKey = try args.string("idempotency_key")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? UUID().uuidString.lowercased()
+        let requestIdentity = SkyStudioGenerationRequests.identity(arguments: args.raw, key: idempotencyKey,
+            project: String(describing: ObjectIdentifier(project)), generation: project.documentGeneration,
+            account: SkyStudioAccount.shared.stored?.me.account.id ?? "")
+        // This key's own job holds a paid result that did not come down: Download again of that result, never a new job. Without
+        // this key (or with another one) it is a new request, charged again.
+        if let cached = try SkyStudioGenerationRequests.begin(idempotencyKey, identity: requestIdentity) {
+            return SkyStudioGenerationRequests.heldAnswer(for: cached) ?? cached
+        }
         defer { SkyStudioGenerationRequests.abandonPreparation(idempotencyKey) }
         let picked = try SkyStudioReferenceFiles.picks(args, kind: kind)
         if let approval = try AIWorkspace.shared.confirmReading(picked.files.map(\.file), verb: "send to Sky Studio", args: args, project: project) { return approval }

@@ -259,14 +259,15 @@ struct SkyStudioAPI: Sendable {
     /// 把成品下载到 `destination`（先下到它旁边的临时文件再挪过去，下到一半断了不留半个文件）。成品地址不带 Key。
     /// `onProgress`：收到的字节比例（服务器说了总长才有），做完一定报 1。
     /// Every paid result comes down here (CloudResultDownload does the GETs): a GET the network breaks is resumed or started again,
-    /// `downloadRetry.attempts` GETs in all, redirects included; a resumed answer that does not finish the result starts it again; a
-    /// 403 / 404 / 410, or an answer whose status never came through, asks `renew` (the original job's GET; nothing is ever submitted)
-    /// once for the current address. Giving up is `SkyStudioDownloadFailure`: nothing more was charged, and downloading it again is
-    /// free.
+    /// `downloadRetry.attempts` GETs in all, redirects included; only the whole result is kept; a 403 / 404 / 410, or an answer whose
+    /// status never came through, asks `renew` (the original job's GET; nothing is ever submitted) once for the current address.
+    /// Giving up, or a stop, is `SkyStudioDownloadFailure`: nothing more was charged, and the flow keeps this job's result for its
+    /// Download again. Returns the GETs sent.
+    @discardableResult
     func download(
         _ url: URL, to destination: URL, renew: (@Sendable () async throws -> URL?)? = nil,
         onProgress: @escaping @Sendable (Double) -> Void = { _ in }
-    ) async throws {
+    ) async throws -> Int {
         try await CloudResultDownload(session: session, retry: downloadRetry).run(url, to: destination, renew: renew, onProgress: onProgress)
     }
 

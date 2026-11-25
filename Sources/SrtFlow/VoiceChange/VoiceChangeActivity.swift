@@ -9,8 +9,6 @@ import Foundation
 // Clips whose last change stopped because Sky Studio's separation failed (2026-11-21) are remembered for this run of the App:
 // the panel opened again on such a clip says so and starts with the direct option on, so a retry is one click. A change of
 // that clip that lands forgets it.
-// Changes made and paid but not landed, because their download did not finish (2026-11-24): the panel and change_voice asked for the
-// same change of that clip (same voice, same direct option) start its Download again instead of a new paid job.
 // 不管什么：任务怎么跑（VoiceChangeJob）、面板里面（VoiceChangePanel / VoiceChangePanelModel）。
 
 /// 面板要为哪一段打开。
@@ -39,25 +37,6 @@ final class VoiceChangeActivity: ObservableObject {
     func separationFailed(_ clipID: UUID) -> Bool { separationFailures.contains(clipID) }
     func noteSeparationFailed(_ clipID: UUID) { separationFailures.insert(clipID) }
     func noteLanded(_ clipID: UUID) { separationFailures.remove(clipID) }
-
-    /// A change made and paid whose download did not finish, by clip (VoiceChangeJob.hold).
-    struct Held {
-        let voice: String
-        let direct: Bool
-        let jobID: String?
-        let retry: () -> Void
-    }
-
-    private var held: [UUID: Held] = [:]
-
-    func hold(_ clipID: UUID, _ change: Held) { held[clipID] = change }
-    func release(_ clipID: UUID) { held[clipID] = nil }
-
-    /// The held change of this clip with this voice and option: asking for it again downloads it again, never pays again.
-    func heldChange(clipID: UUID, voice: String, direct: Bool) -> Held? {
-        guard let change = held[clipID], change.voice == voice, change.direct == direct else { return nil }
-        return change
-    }
 
     /// 上次变声用的那个声音（`voice_…` / `gemini:<名字>`）；没用过是 nil。
     var lastVoiceID: String? {

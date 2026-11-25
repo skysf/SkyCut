@@ -8,8 +8,8 @@ import Foundation
 //   (SkyStudioUploadRetry.isTransient), so the two never disagree on what a dropped connection is;
 // - which HTTP answers mean the result's address may have expired or been withdrawn, so Sky Studio is asked once for a fresh one
 //   (the original job's `GET /jobs/{id}`; nothing is ever submitted again);
-// - what one try ended as (`Try`), for SkyStudioAPI.download only.
-// What it does not cover: sending anything (SkyStudioAPI.download owns the loop), the error when it gives up
+// - what one try ended as (`Try`), for CloudResultDownload only, and when what arrived is the whole result (`incompleteness`).
+// What it does not cover: sending anything (CloudResultDownload owns the loop), the error when it gives up
 // (SkyStudioDownloadFailure), the words the user reads (SkyStudioDownloadWords).
 // Rules: docs/architecture/sky-studio-jobs.md, "Downloads that the network interrupts".
 
@@ -42,13 +42,15 @@ struct SkyStudioDownloadRetry: Sendable {
     enum Try {
         /// The whole result is in the partial file beside the destination.
         case done
-        /// The network broke it (SkyStudioUploadRetry.isTransient), or what arrived is not the whole result; `resumeData` when the
-        /// system kept what had arrived (never for a result that did not add up: it starts again from nothing).
+        /// The network broke it (SkyStudioUploadRetry.isTransient); `resumeData` when the system kept what had arrived.
         case broken(detail: String, resumeData: Data?)
+        /// It finished, but what arrived is not the whole result (`incompleteness`): thrown away, the next GET starts from nothing.
+        case incomplete(detail: String)
         /// An answer began but the network broke it before its status came through: the system holds a download's answer back until
-        /// its body flows (a probe: even a 1 KB body is held, and the task's metrics carry no status either). It may be an expired
-        /// address whose error body stalled, so the job is asked for its current address first.
-        case heldBack(detail: String, resumeData: Data?)
+        /// its body flows (a probe: even a 1 KB body is held, and the task's metrics carry no status either). It counts as an answer
+        /// (a 500 whose body stalled looks the same): the job is asked once for its current address, and the same address is never
+        /// fetched again after it.
+        case heldBack(detail: String)
         /// The server answered with this status (not 2xx, not a redirect), even when its body then broke.
         case answered(status: Int)
         /// A redirect (3xx with a Location): followed by the next GET, which counts as one (the system never follows one by itself
@@ -58,21 +60,24 @@ struct SkyStudioDownloadRetry: Sendable {
         case unreachable(detail: String)
     }
 
-    /// Why a finished GET is not the whole result, or nil. A resumed answer (206) must reach the result's last byte
-    /// (`bytes a-b/total` with b = total - 1) and the file must then hold `total` bytes; a whole answer with a length must hold that
-    /// length. A resumed 206 `bytes 100000-249999/1000000` once became a 250,000-byte "result" at 100% (the review of PR #554).
-    /// `encoded`: the answer named a Content-Encoding, so the bytes on disk (decoded) are not the bytes counted: sizes are not compared.
-    static func incompleteness(status: Int, contentRange: String?, expectedLength: Int64, size: Int, encoded: Bool = false) -> String? {
+    /// Why a finished GET is not the whole result, or nil. An empty body is never a result. A resumed answer (206) must reach the
+    /// result's last byte (`bytes a-b/total` with b = total - 1) and the file must then hold `total` bytes; a whole answer with a length
+    /// must hold exactly that length. The system decodes a Content-Encoding even when identity was asked for and then reports the
+    /// decoded length (a probe, 2026-11-25), so sizes are always compared: a gzip 206 for the second half (`bytes 29-57/58`, 1,000
+    /// bytes decoded) once overwrote a whole 2,000-byte file, and a resumed 206 `bytes 100000-249999/1000000` became a 250,000-byte
+    /// "result" at 100% (the reviews of PR #554).
+    static func incompleteness(status: Int, contentRange: String?, expectedLength: Int64, size: Int) -> String? {
+        guard size > 0 else { return "an empty answer (HTTP \(status))" }
         if status == 206 {
             guard let range = contentRange, let parsed = parseContentRange(range) else {
                 return "a resumed answer without a usable Content-Range (\(contentRange ?? "none"))"
             }
-            guard let total = parsed.total, parsed.last == total - 1, encoded || size == total else {
+            guard let total = parsed.total, parsed.last == total - 1, size == total else {
                 return "a resumed answer that does not finish the result (\(range); \(size) bytes here)"
             }
             return nil
         }
-        guard !encoded, expectedLength > 0, Int64(size) != expectedLength else { return nil }
+        guard expectedLength > 0, Int64(size) != expectedLength else { return nil }
         return "\(size) of \(expectedLength) bytes arrived"
     }
 

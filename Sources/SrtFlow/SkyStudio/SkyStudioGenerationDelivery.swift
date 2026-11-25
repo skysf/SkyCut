@@ -7,9 +7,9 @@ import SrtFlowMCPKit
 // What it covers (moved out of SkyStudioGenerationRun on 2026-11-24, when Download again began to run it again): the result downloaded
 // into the generation folder (SkyStudioAPI.download: resumed, retried, an expired address renewed from the original job), an image's
 // extension fixed by its bytes, an editing copy of a WebM, the optional SRT, the official receipt told, generated music measured.
-// A download that gives up throws SkyStudioDownloadFailure, and a stop during the download throws `.stopped`, before anything is
-// saved: the run then holds the result for Download again. An SRT that did not come down leaves the video saved and is reported as
-// missing, so the run's re-ask can fetch only it.
+// A download that gives up, or is stopped, throws SkyStudioDownloadFailure before anything is saved: the run then holds the result for
+// Download again. An SRT that did not come down leaves the video saved and is reported as missing, so the job's own key can fetch only
+// it.
 // What it does not cover: the job, its billing and ending, holding and Download again (SkyStudioGenerationRun).
 
 @MainActor
@@ -55,12 +55,9 @@ struct SkyStudioGenerationDelivery {
         advance(.downloading(fraction: nil))
         let current = current
         let advance = advance
-        do {
-            try await api.download(result.url, to: destination, renew: current.map { read in { try await read()?.url } }) { fraction in
-                Task { @MainActor in advance(.downloading(fraction: CloudJobPhase.quantized(fraction))) }
-            }
-        } catch is CancellationError {
-            throw SkyStudioDownloadFailure.stopped
+        // Gave up or stopped: SkyStudioDownloadFailure (a stop with the GETs it sent), and nothing was saved.
+        try await api.download(result.url, to: destination, renew: current.map { read in { try await read()?.url } }) { fraction in
+            Task { @MainActor in advance(.downloading(fraction: CloudJobPhase.quantized(fraction))) }
         }
         saved(destination)
         var localImage: SkyStudioImageResult.Format?

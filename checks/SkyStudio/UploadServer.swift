@@ -11,7 +11,8 @@ import Foundation
 // the system's own transfer code is what is tested; no proxy and no real network.
 // Downloads (DownloadRetryChecks, 2026-11-24): each `GET /files/…` gets the next `GetReply`: the whole result (200 with an ETag and
 // Accept-Ranges, so the system can resume; a resumed try's Range, with a matching If-Range, gets 206 and the rest), part of the body
-// then the connection closed or reset, an HTTP error, or its head then a stall until the client goes away.
+// then the connection closed or reset, an HTTP error, its head then a stall until the client goes away, a short or gzip 206, a
+// redirect, or an empty 200.
 
 final class UploadServer: @unchecked Sendable {
     /// `…ThenStall` / `…ThenReset`: the answer's head and 1 KB of its body go out, then the connection hangs (the client times out) or
@@ -32,8 +33,13 @@ final class UploadServer: @unchecked Sendable {
     /// connection closed (FIN) or reset. `stall`: the head and 1 KB, then nothing until the client goes away. `statusCut`: an HTTP error
     /// whose head declares 64 KB, then 1 KB of it and the connection closed; `statusStall`: only its head, then nothing.
     /// `shortRange`: a resumed GET answered 206 with only that many bytes from where the Range starts (`bytes a-b/total`, b short of the
-    /// end), the answer itself whole. `redirect`: a 302 to another result on this server.
-    enum GetReply: Sendable { case file, slow, cut(Int), cutReset(Int), status(Int), statusCut(Int), statusStall(Int), stall, shortRange(Int), redirect(String) }
+    /// end), the answer itself whole. `redirect`: a 302 to another result on this server. `gzipRange`: whatever was asked, a gzip 206
+    /// `bytes 29-57/58` whose body decodes to the result's first 1,000 bytes (the review of PR #554: it once overwrote a whole file).
+    /// `empty`: a 200 with no body.
+    enum GetReply: Sendable {
+        case file, slow, cut(Int), cutReset(Int), status(Int), statusCut(Int), statusStall(Int), stall, shortRange(Int), redirect(String)
+        case gzipRange, empty
+    }
     static let etag = "\"skycut-check-1\""
 
     struct Seen: Sendable {
@@ -273,6 +279,18 @@ final class UploadServer: @unchecked Sendable {
         if case .redirect(let name) = reply {
             return respond(client, status: "302 Found", body: "", extra: ["Location: /files/\(name)"])
         }
+        if case .empty = reply {
+            return respond(client, status: "200 OK", body: "", extra: ["Content-Type: video/mp4"])
+        }
+        if case .gzipRange = reply {
+            let packed = Self.gzip(body.prefix(1_000))
+            let head = ["HTTP/1.1 206 Partial Content", "Content-Length: \(packed.count)", "Content-Type: video/mp4", "Content-Encoding: gzip",
+                        "Content-Range: bytes 29-57/58", "Connection: close"].joined(separator: "\r\n") + "\r\n\r\n"
+            write(client, Data(head.utf8) + packed)
+            shutdown(client, SHUT_WR)
+            close(client)
+            return
+        }
         var start = 0
         if validators, let range = headers["range"], range.hasPrefix("bytes="), headers["if-range"].map({ $0 == Self.etag }) ?? true,
            let offset = Int(range.dropFirst(6).prefix { $0 != "-" }), offset < body.count {
@@ -308,7 +326,7 @@ final class UploadServer: @unchecked Sendable {
         case .stall:
             write(client, body.subdata(in: start..<min(body.count, start + 1_024)))
             hold(client)
-        case .status, .statusCut, .statusStall, .redirect:
+        case .status, .statusCut, .statusStall, .redirect, .gzipRange, .empty:
             break
         }
     }
@@ -405,5 +423,17 @@ final class UploadServer: @unchecked Sendable {
         formatter.timeZone = TimeZone(identifier: "GMT")
         formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss 'GMT'"
         return formatter.string(from: date)
+    }
+
+    /// A gzip member (RFC 1952) around the system's raw DEFLATE of `bytes`.
+    static func gzip(_ bytes: Data) -> Data {
+        let deflated = (try? (bytes as NSData).compressed(using: .zlib)) as Data? ?? Data()
+        var crc: UInt32 = 0xFFFF_FFFF
+        for byte in bytes {
+            crc ^= UInt32(byte)
+            for _ in 0..<8 { crc = crc & 1 == 1 ? (crc >> 1) ^ 0xEDB8_8320 : crc >> 1 }
+        }
+        func little(_ value: UInt32) -> Data { withUnsafeBytes(of: value.littleEndian) { Data($0) } }
+        return Data([0x1F, 0x8B, 0x08, 0, 0, 0, 0, 0, 0, 0x03]) + deflated + little(~crc) + little(UInt32(truncatingIfNeeded: bytes.count))
     }
 }

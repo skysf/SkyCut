@@ -1,53 +1,65 @@
 import Foundation
 import SrtFlowMCPKit
 
-// generate_media's re-ask of a paid result held for Download again (2026-11-24, the review of PR #554;
-// docs/bugfixes/2026-11-24-download-lost-connection-no-retry.md): the key is not part of what a request is bound to, so the key SkyCut
-// returned works on the next call; a re-ask with that key, or the same request without a key, starts the held Download again (one
-// re-ask, one Download again) instead of minting a key and paying again; another request, another key, another scope or nothing held
-// leaves the call as it was; an official key's cached answer (a generation or a recovery) finds its held job by id. The run side
-// (what Download again does) is checked with real App objects in scripts/check-voice-recovery.sh.
+// generate_media's way back to a paid result held for Download again (2026-11-24 / 25, the reviews of PR #554;
+// docs/bugfixes/2026-11-24-download-lost-connection-no-retry.md), pure: the idempotency_key is part of what a request is bound to, as
+// before the PR, with the key SkyCut made filled in, so the key it returned names that same request; only that key's own cached answer
+// (its job id) reaches the held job, and the job stays held until a download of it succeeds. Another key, or none (which makes a new
+// one), is a new request (user, 2026-11-25: an identical paid request sent again is a deliberate new version). The same through the
+// tool entry, with POSTs counted at a fake server: PaidToolEntryChecks in scripts/check-voice-recovery.sh.
 
 @MainActor
 func runHeldDownloadChecks() async {
     let arguments: JSONValue = ["kind": "image", "prompt": "a cabin in snow"]
-    let withKey: JSONValue = ["kind": "image", "prompt": "a cabin in snow", "idempotency_key": "k-1", "confirm_token": "t-1"]
-    let identity = SkyStudioGenerationRequests.identity(arguments: arguments, project: "p", generation: 1, account: "acct")
-    checkEqual(SkyStudioGenerationRequests.identity(arguments: withKey, project: "p", generation: 1, account: "acct"), identity,
-               "the key and the confirm token are not part of what a request is bound to")
-    let other = SkyStudioGenerationRequests.identity(arguments: ["kind": "image", "prompt": "a lake"], project: "p", generation: 1, account: "acct")
+    func identity(_ args: JSONValue, _ key: String) -> JSONValue {
+        SkyStudioGenerationRequests.identity(arguments: args, key: key, project: "p", generation: 1, account: "acct")
+    }
+    // The key is part of the identity; the one SkyCut made is filled in when the caller gave none; the confirm token is not part.
+    let minted = "minted-\(UUID().uuidString)"
+    var named = arguments.objectValue ?? [:]
+    named["idempotency_key"] = .string(minted)
+    named["confirm_token"] = "t-1"
+    checkEqual(identity(arguments, minted), identity(.object(named), minted),
+               "the key SkyCut made names the same request when it comes back with the same arguments (a confirm token is not part)")
+    check(identity(arguments, "k-1") != identity(arguments, "k-2"), "the key is part of what a request is bound to")
+    check(identity(["kind": "image", "prompt": "a lake"], minted) != identity(arguments, minted), "the arguments are part of it")
 
     // A first call without a key: SkyCut made the key and started the job, whose download then gave up.
-    let key = "held-\(UUID().uuidString)"
     let job = "generate-held-\(UUID().uuidString.prefix(6))"
-    _ = try? SkyStudioGenerationRequests.begin(key, identity: identity)
-    SkyStudioGenerationRequests.complete(key, result: .ok(["status": "started", "job_id": .string(job)]))
+    _ = try? SkyStudioGenerationRequests.begin(minted, identity: identity(arguments, minted))
+    SkyStudioGenerationRequests.complete(minted, result: .ok(["status": "started", "job_id": .string(job)]))
     var retries = 0
     SkyStudioHeldDownloads.hold(job) { retries += 1 }
 
-    var answer = SkyStudioGenerationRequests.heldAnswer(key: key, identity: identity)
+    // The returned key with the same arguments: its own cached answer reaches its held job, which stays held while it downloads again.
+    let cached = try? SkyStudioGenerationRequests.begin(minted, identity: identity(.object(named), minted))
+    var answer = cached.flatMap(SkyStudioGenerationRequests.heldAnswer(for:))
     check(answer?.payload["status"] == "downloading_again" && answer?.payload["job_id"]?.stringValue == job
             && answer?.payload["submitted_again"] == false && retries == 1,
-          "the key SkyCut returned, with the same arguments: Download again under the same job id: \(String(describing: answer?.payload))")
-    check(!SkyStudioHeldDownloads.isHeld(job), "one re-ask, one Download again (released as it starts)")
-    check(SkyStudioGenerationRequests.heldAnswer(key: key, identity: identity) == nil && retries == 1,
-          "a second re-ask while the first Download again runs starts nothing")
-
-    SkyStudioHeldDownloads.hold(job) { retries += 1 }
-    answer = SkyStudioGenerationRequests.heldAnswer(key: nil, identity: identity)
+          "the key SkyCut returned, with the same arguments: Download again of that job: \(String(describing: answer?.payload))")
+    check(SkyStudioHeldDownloads.isHeld(job), "it stays held while that Download again runs (and when it fails again)")
+    answer = cached.flatMap(SkyStudioGenerationRequests.heldAnswer(for:))
     check(answer?.payload["job_id"]?.stringValue == job && retries == 2,
-          "the same request without a key downloads the held result again instead of minting a key and paying again")
+          "asked again, the same job is asked again (the run itself starts nothing while its Download again runs)")
 
-    SkyStudioHeldDownloads.hold(job) { retries += 1 }
-    check(SkyStudioGenerationRequests.heldAnswer(key: nil, identity: other) == nil, "another request goes on as before")
-    check(SkyStudioGenerationRequests.heldAnswer(key: "another-key", identity: identity) == nil, "another key goes on as before")
-    check(SkyStudioGenerationRequests.heldAnswer(key: nil, identity: identity, scope: "official-submission:acct") == nil,
-          "an ordinary request never reaches an official key's job, nor the other way round")
-    check(retries == 2 && SkyStudioHeldDownloads.isHeld(job), "none of those started anything")
+    // The same key with other arguments is refused, as before; another key is a new request: neither reaches the held job.
+    var refused = false
+    do { _ = try SkyStudioGenerationRequests.begin(minted, identity: identity(["kind": "image", "prompt": "a lake"], minted)) }
+    catch { refused = true }
+    let other = "other-\(UUID().uuidString)"
+    let fresh = try? SkyStudioGenerationRequests.begin(other, identity: identity(arguments, other))
+    SkyStudioGenerationRequests.abandonPreparation(other)
+    check(refused && fresh == nil && retries == 2,
+          "the same key with other arguments is refused, another key is a new request (nothing cached): neither downloads that job")
 
-    // An official key's cached answer (its generation's or its recovery's job id): that job's Download again.
-    answer = SkyStudioGenerationRequests.heldAnswer(for: .ok(["status": "recovering", "job_id": .string(job)]))
-    check(answer?.payload["job_id"]?.stringValue == job && retries == 3, "a cached official answer finds its held job by id")
-    check(SkyStudioGenerationRequests.heldAnswer(for: .ok(["status": "started", "job_id": .string(job)])) == nil,
+    // Once its result came down, the key's cached answer stands as it was.
+    SkyStudioHeldDownloads.release(job)
+    check(cached.flatMap(SkyStudioGenerationRequests.heldAnswer(for:)) == nil && !SkyStudioHeldDownloads.isHeld(job) && retries == 2,
           "nothing held: the cached answer stands as it was")
+
+    // An official key's cached answer (its generation's or its recovery's job id): that job's own Download again.
+    SkyStudioHeldDownloads.hold(job) { retries += 1 }
+    answer = SkyStudioGenerationRequests.heldAnswer(for: .ok(["status": "recovering", "job_id": .string(job)]))
+    check(answer?.payload["job_id"]?.stringValue == job && retries == 3, "a cached official answer reaches its own held job")
+    SkyStudioHeldDownloads.release(job)
 }

@@ -8,8 +8,9 @@ import SrtFlowMCPKit
 // 停的时候排队中的退钱 / 开始了的取消不了）→ 下载成品 → 把原片那一段声音封回去 → 探测 → 起名落盘。
 // 每一步报阶段（`CloudJobPhase`，上传 / 下载带字节比例），Task 被取消时每一步都停得下来，中间文件不留。
 // 结果是一个 `UpscaleOutcome`：文件、探测信息、来源记录（换源时拼成 `ClipSourceSwap.Replacement`）、实收的积分。
-// The delivery (download → sound → save) is its own step (`deliver`): a download that gave up throws `UpscaleUndelivered` with what
-// it needs, and Download again (UpscaleJob.retryDownload) runs only that step again: the same result, nothing submitted.
+// The delivery (download → sound → save) is its own step (`deliver`): a download that gave up or was stopped, or a stop before the
+// file was saved, throws `UpscaleUndelivered` with what it needs, and Download again (UpscaleJob.retryDownload) runs only that step
+// again: the same result, nothing submitted. Sky Studio's charge comes from whichever field it sent (`UpscaleDelivery.charge(of:)`).
 // 2026-10-28 起走 Sky Studio（收费方案第 6 刀），之前走 fal。自检用假 URLSession 走整条线（checks/Upscale）。
 // 不管什么：花钱的把关和记账、Key（UpscaleJob）；换源（VideoEditClipUpscale.swift）；界面。
 
@@ -60,15 +61,25 @@ struct UpscaleOutcome: Sendable {
 struct UpscaleDelivery: Sendable {
     var jobID: String
     var result: SkyStudioJobResult
-    /// Sky Studio's charge for it (`credits_charged`), when the finished status said.
+    /// Sky Studio's charge for it (`charge(of:)`), when the finished status said.
     var creditsCharged: Double?
     /// Where the uploaded part starts in the original (its sound is put back from there).
     var offset: Double
     var started: Date
+
+    /// The actual charge a job's status reports, from whichever field Sky Studio sent: the top-level `credits_charged`, else
+    /// `billing.credits_charged` (a status with only the billing block once left 75 reserved on the day's books for 72 charged, the
+    /// review of PR #554). nil when neither says.
+    static func charge(of status: SkyStudioJobStatus) -> Double? {
+        let charged = status.creditsCharged ?? status.billing?.json["credits_charged"]?.doubleValue
+        guard let charged, charged.isFinite, charged >= 0 else { return nil }
+        return charged
+    }
 }
 
-/// The paid upscale's download gave up (SkyStudioDownloadFailure, after SkyStudioAPI.download's own tries) or was stopped
-/// (`.stopped`): `delivery` is kept for Download again.
+/// The paid upscale did not come down here: its download gave up or was stopped (SkyStudioDownloadFailure, after
+/// SkyStudioAPI.download's own tries), or it was stopped while being saved (`.stopped` with the GETs sent). `delivery` is kept for
+/// Download again.
 struct UpscaleUndelivered: Error {
     let failure: SkyStudioDownloadFailure
     let delivery: UpscaleDelivery
@@ -177,14 +188,15 @@ enum UpscalePipeline {
             }
         }
         guard let result = done.result else { throw SkyStudioJobError.badAnswer("a finished job without a result") }
-        let delivery = UpscaleDelivery(jobID: done.jobID, result: result, creditsCharged: done.creditsCharged, offset: offset, started: started)
+        let delivery = UpscaleDelivery(jobID: done.jobID, result: result, creditsCharged: UpscaleDelivery.charge(of: done), offset: offset,
+                                       started: started)
         onMade(delivery)
         return try await deliver(request, delivery, api: api, key: key, ffmpeg: ffmpeg, workFolder: workFolder, phase: phase)
     }
 
     /// Downloads a finished upscale, puts the original sound back and saves it next to the original (Download again runs only this:
-    /// the same result, nothing submitted). A download that gave up throws `UpscaleUndelivered`. `key`: for a fresh address from the
-    /// original job when the old one expired (nil: no renewal).
+    /// the same result, nothing submitted). A download that gave up or was stopped, or a stop before it was saved, throws
+    /// `UpscaleUndelivered`. `key`: for a fresh address from the original job when the old one expired (nil: no renewal).
     static func deliver(
         _ request: UpscaleRequest, _ delivery: UpscaleDelivery, api: SkyStudioAPI, key: String?, ffmpeg: URL?, workFolder: URL,
         phase report: @escaping @Sendable (CloudJobPhase) -> Void
@@ -198,33 +210,45 @@ enum UpscalePipeline {
         let stamp = UUID().uuidString
         let temporaries = [workFolder.appendingPathComponent("\(stamp)-out.mp4"), workFolder.appendingPathComponent("\(stamp)-muxed.mp4")]
         defer { for url in temporaries { try? FileManager.default.removeItem(at: url) } }
-        let offset = delivery.offset
         phase(.downloading(fraction: nil))
         let id = delivery.jobID
         var renew: (@Sendable () async throws -> URL?)?
         if let key { renew = { try await api.job(id, key: key).result?.url } }
+        let gets: Int
         do {
-            try await api.download(delivery.result.url, to: temporaries[0], renew: renew) { fraction in
+            gets = try await api.download(delivery.result.url, to: temporaries[0], renew: renew) { fraction in
                 phase(.downloading(fraction: CloudJobPhase.quantized(fraction)))
             }
         } catch let failure as SkyStudioDownloadFailure {
-            throw UpscaleUndelivered(failure: failure, delivery: delivery)
-        } catch is CancellationError {
-            throw UpscaleUndelivered(failure: .stopped, delivery: delivery)   // stopped while downloading: still held for Download again
+            throw UpscaleUndelivered(failure: failure, delivery: delivery)   // gave up or stopped: held for Download again
         }
+        do {
+            return try await save(request, delivery, downloaded: temporaries[0], muxed: temporaries[1], ffmpeg: ffmpeg, phase: phase)
+        } catch where error is CancellationError || Task.isCancelled {
+            // Stopped once it was here but before it was saved: still held, with the GETs that brought it.
+            throw UpscaleUndelivered(failure: .stopped(attempts: gets), delivery: delivery)
+        }
+    }
+
+    /// The downloaded upscale with the original's sound put back, saved next to the original.
+    private static func save(
+        _ request: UpscaleRequest, _ delivery: UpscaleDelivery, downloaded: URL, muxed: URL, ffmpeg: URL?,
+        phase: @escaping @Sendable (CloudJobPhase) -> Void
+    ) async throws -> UpscaleOutcome {
         try Task.checkCancellation()
+        let offset = delivery.offset
 
         // 3. 探测；原片有声音就把那一段封回去（Sky Studio 存的是 SkyCut 传上去的那段，没有声音）；再探一遍。
         phase(.finishing)
-        var file = temporaries[0]
+        var file = downloaded
         var info = try await probe(file, ffmpeg: ffmpeg)
         var audioRestored = !request.originalInfo.hasAudio
         if request.originalInfo.hasAudio, let ffmpeg {
             try await UpscaleAudioMux.mux(
                 ffmpeg: ffmpeg, upscaled: file, original: request.originalURL, start: offset, duration: info.duration,
-                videoCodec: info.videoCodec, output: temporaries[1]
+                videoCodec: info.videoCodec, output: muxed
             )
-            file = temporaries[1]
+            file = muxed
             info = try await probe(file, ffmpeg: ffmpeg)
             audioRestored = true
         }

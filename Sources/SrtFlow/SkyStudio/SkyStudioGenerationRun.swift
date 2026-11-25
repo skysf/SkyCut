@@ -11,9 +11,10 @@ import SrtFlowMCPKit
 //    阶段（上传、排队带位置、处理、下载带字节比例）记在 `progress`：编辑器顶上的状态行订阅它，`get_job` 跑着时并进 phase 那几个字段，
 //    交上了还带 skystudio_job_id。
 // 4. 账：没交上、排队中取消了、只有 billing 明确全退 / 未扣才退；按最终净实收换；交上之后停不下来的、下载出错的不退（积分花了，成品在作品库里）。
-// 5. A download that gave up (SkyStudioDownloadFailure, after SkyStudioAPI.download's own resume / retries) ends the job failed with
-//    `download_network` / `download_refused` and the localized line, and keeps the result: Download again (the row's button, or
-//    generate_media with the same idempotency_key) downloads the same result under the same job id. Nothing is submitted again.
+// 5. A download that gave up or was stopped (SkyStudioDownloadFailure, after SkyStudioAPI.download's own resume / retries) ends the
+//    job failed (stopped: cancelled) with its code and the localized line, and keeps the result until it has come down: Download again
+//    (the row's button, or generate_media with this job's own idempotency_key) downloads this same result under the same job id.
+//    Nothing is submitted again; a call without that key is a new request and a new paid job.
 // 不管什么：参数怎么读、问价、把关（SkyStudioGenerateTool）；HTTP（SkyStudioAPI）；等的规矩（SkyStudioJobRun）。
 
 @MainActor
@@ -63,9 +64,9 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         let result: SkyStudioJobResult
         let charged: Double?
     }
-    /// The paid result whose download gave up or was stopped, kept for Download again; nil once a retry starts.
+    /// The paid result whose download gave up or was stopped, kept for Download again until it has come down.
     private var undelivered: Delivery?
-    /// Why the last download did not finish (get_job's code, GET count and next step); nil once a retry starts.
+    /// Why the last download did not finish (get_job's code, GET count and next step); nil while a Download again runs.
     private var downloadFailure: SkyStudioDownloadFailure?
 
     private func settle(_ value: SkyStudioBilling) {
@@ -316,15 +317,25 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
     // MARK: Delivery (download and finish; Download again)
 
     /// Downloads the paid result and finishes the job (SkyStudioGenerationDelivery). A download that gave up or was stopped holds the
-    /// result for Download again instead of ending it for good; an SRT that did not come down holds a caption-only retry.
+    /// result for Download again instead of ending it for good; once it has come down nothing is held for it any more; an SRT that did
+    /// not come down holds a caption-only retry.
     private func deliver(_ delivery: Delivery, api: SkyStudioAPI, key: String?) async throws {
         let delivered: SkyStudioGenerationDelivery.Delivered
         do {
-            delivered = try await delivering(api: api, key: key).deliver(delivery.result, api: api) { [weak self] in self?.savedOriginal = $0 }
+            delivered = try await delivering(api: api, key: key).deliver(delivery.result, api: api) { [weak self] file in
+                self?.savedOriginal = file
+                self?.arrived()
+            }
         } catch let failure as SkyStudioDownloadFailure {
             return hold(delivery, failure)
         }
         succeed(delivered, delivery)
+    }
+
+    /// The paid result is on this Mac: nothing is held for it any more (whatever the steps after the download do).
+    private func arrived() {
+        undelivered = nil
+        status.releaseDownload()
     }
 
     private func delivering(api: SkyStudioAPI, key: String?) -> SkyStudioGenerationDelivery {
@@ -340,15 +351,15 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         undelivered = delivery
         downloadFailure = failure
         finish(failure.kind == .stopped ? .cancelled : .failed, failure.message)
-        // Strong: the row's button and the AI's re-ask keep this run until Download again starts.
+        // Strong: the row's button and the job's own key keep this run until its result has come down.
         status.holdDownload(failure) { [self] in retryDownload() }
     }
 
-    /// Download again: the same result under the same job id, nothing quoted, uploaded or submitted (the row's button; generate_media
-    /// again with the same request). The original job's current result is read first, so an address that expired is replaced.
+    /// Download again: this job's result under the same job id, nothing quoted, uploaded or submitted (the row's button; generate_media
+    /// again with this job's idempotency_key). The original job's current result is read first, so an address that expired is
+    /// replaced. While it runs, asking again starts nothing more; it stays held until the result has come down.
     func retryDownload() {
-        guard let delivery = undelivered, let job else { return }
-        undelivered = nil
+        guard let delivery = undelivered, let job, job.status != .running else { return }
         downloadFailure = nil
         status.beginDownloadAgain()
         AIJobs.shared.reopen(job)
@@ -373,11 +384,12 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         return (api, key, fresh)
     }
 
-    /// The optional SRT that did not come down: the AI's re-ask (generate_media again with the same request) fetches only it, under
-    /// the same job id, and the job's result gains it.
+    /// The optional SRT that did not come down: generate_media again with this job's own idempotency_key fetches only it, under the
+    /// same job id, and the job's result gains it.
     private func holdCaption(_ url: URL, delivered: SkyStudioGenerationDelivery.Delivered, delivery: Delivery) {
         guard let job else { return }
         SkyStudioHeldDownloads.hold(job.id) { [self] in
+            guard job.status != .running else { return }
             AIJobs.shared.reopen(job)
             task = Task { @MainActor in
                 let (api, key, current) = await currentResult(delivery.result)
@@ -392,6 +404,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
 
     private func succeed(_ delivered: SkyStudioGenerationDelivery.Delivered, _ delivery: Delivery) {
         let (file, result, charged, localImage) = (delivered.file, delivery.result, delivery.charged, delivered.localImage)
+        if let job { SkyStudioHeldDownloads.release(job.id) }   // held again below only for an SRT that is still missing
         // SkyCut 自己做的文件：AI 接着把它放上时间线时不该再问「读点名文件夹以外的文件」。
         if project.map({ AIWorkspace.shared.allowsReading(file, project: $0) }) != true { AIReadGrants.shared.remember([file]) }
         let store = SkyStudioSpendStore.shared
@@ -418,9 +431,11 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         }
         switch delivered.captionIssue {
         case .missing(let url)?:
-            // Only a re-ask fetches it: the same request again downloads the SRT alone, under this job id.
+            // Only this job's own key fetches it: generate_media again with it downloads the SRT alone, under this job id.
             holdCaption(url, delivered: delivered, delivery: delivery)
-            detail["caption_issue"] = "Video saved; the optional SRT did not download. To fetch it, call generate_media again with the same arguments and idempotency_key: SkyCut downloads only the SRT, with no new generation and no new charge."
+            detail["caption_issue"] = .string("Video saved; the optional SRT did not download. To fetch it, call generate_media again with "
+                + "the same arguments and idempotency_key \"\(idempotencyKey)\": SkyCut then downloads only the SRT, under this job id, with "
+                + "no new generation and no new charge. A call without that idempotency_key is a new generation and is charged again.")
         case .tooLarge?:
             detail["caption_issue"] = "Video saved; the optional SRT is larger than the model's catalog allows, so it was not kept."
         case nil: break
@@ -492,11 +507,12 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         if let uploadFailure {
             payload.merge(uploadFailure.fields(retry: "call generate_media again without idempotency_key or with a new one (this one stays bound to this failed job).")) { _, upload in upload }
         }
-        // A paid result whose download gave up: downloaded again at no charge, never generated again.
+        // A paid result whose download gave up: this job's own key or row downloads it again at no charge; anything else is a new job.
         if let downloadFailure {
-            payload.merge(downloadFailure.fields(retry: "call generate_media again with the same arguments (and this idempotency_key, "
-                + (official == nil ? "or none" : "as official film generation requires") + "): that only downloads this result again under "
-                + "this job id. Or " + SkyStudioDownloadFailure.taskListRetry + " Never start a new generation for it.")) { _, download in download }
+            payload.merge(downloadFailure.fields(retry: "call generate_media again with the same " + (official == nil ? "" : "film ")
+                + "arguments and idempotency_key \"\(idempotencyKey)\": SkyCut then only downloads this result again under this job id. Or "
+                + SkyStudioDownloadFailure.taskListRetry + " A call without that idempotency_key, or with another one, is a new generation "
+                + "and is charged again.")) { _, download in download }
         }
         AIJobs.shared.finish(job, status, message: message, detail: .object(payload))
     }

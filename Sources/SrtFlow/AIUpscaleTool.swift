@@ -54,13 +54,6 @@ enum AIUpscaleTool {
             throw AIToolError(message(error))
         }
         let tier = try pick(tierName, from: tiers, target: target)
-        // This very upscale was made and paid but not saved here: its Download again (only GETs), never a second charge.
-        if let held = UpscaleActivity.shared.heldDownload(original: model.originalURL, range: model.range(for: choice, tier: tier), tier: tier.id,
-                                                          target: target) {
-            UpscaleActivity.shared.downloadAgain(held)
-            return held.aiJobID.map { SkyStudioHeldDownloads.answer(jobID: $0) } ?? .ok(["status": "downloading_again", "submitted_again": false,
-                "next_step": "This upscale was made earlier (started from SkyCut's panel) and only its download did not finish; SkyCut is downloading the same result again with no new charge. It shows in the cloud task list and opens the comparison when done."])
-        }
         let row = model.rows(tiers: [tier], choice: choice, target: target)[0]
         if let refusal = row.refusal {
             throw AIToolError("\(tier.id) cannot take this: \(refusal.message)")
@@ -231,7 +224,7 @@ enum AIUpscaleTool {
                 AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: " + failure.message,
                                      detail: .object(failure.fields(retry: "call upscale_clip again.")))
             } else if let failure = ended.downloadFailure {
-                // Made, only its download gave up: Download again gets it at no charge, never a new upscale.
+                // Made, only its download gave up: this job's row downloads it again at no charge; upscale_clip again is a new upscale.
                 AIJobs.shared.finish(aiJob, .failed, message: failure.message, detail: .object(heldFields(ended, failure.fields(retry: retry))))
             } else if ended.canRetryDownload {
                 AIJobs.shared.finish(aiJob, .failed, message: "Sky Studio made this upscale, but SkyCut could not save it: \(message)",
@@ -250,10 +243,10 @@ enum AIUpscaleTool {
         }
     }
 
-    /// How a held upscale is downloaded again: the row's button, or upscale_clip asked for the same upscale (same clip, range, tier and
-    /// target), which downloads it under this job id.
-    private static let retry = SkyStudioDownloadFailure.taskListRetry.dropLast().description + ", or call upscale_clip again with the same "
-        + "clip, range, tier and target: that only downloads this result again under this job id. Never start another upscale for it."
+    /// How a held upscale is downloaded again: only this job's own row (it runs this AI job again under its id). upscale_clip asked
+    /// again is a new request (user, 2026-11-25), so the AI is told it would be charged again.
+    private static let retry = SkyStudioDownloadFailure.taskListRetry + " Calling upscale_clip again starts a new upscale and is charged "
+        + "again, even for the same clip and settings."
 
     private static func heldFields(_ job: UpscaleJob, _ fields: [String: JSONValue]) -> [String: JSONValue] {
         var value = fields

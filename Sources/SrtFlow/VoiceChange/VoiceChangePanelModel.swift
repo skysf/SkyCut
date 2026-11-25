@@ -147,19 +147,6 @@ final class VoiceChangePanelModel: ObservableObject {
         requote()
     }
 
-    /// This very change (this clip, voice and direct option) was made and paid but did not land: the panel offers its Download again
-    /// instead of a new paid change (B47, 2026-11-24).
-    var heldDownload: VoiceChangeActivity.Held? {
-        target.flatMap { VoiceChangeActivity.shared.heldChange(clipID: clipID, voice: $0.id, direct: skipSeparation) }
-    }
-
-    /// Download again for the held change (only GETs, no new charge). True when it started (the panel closes).
-    func downloadAgain() -> Bool {
-        guard let held = heldDownload else { return false }
-        held.retry()
-        return true
-    }
-
     /// 按下「开始」：过每日硬预算、记账、起任务。起了回 true（面板关掉）。
     func start() -> Bool {
         // 一份报价只起一单（声音库第十节第 1 条）：按下去那一刻就锁，连按、任务做完之后再按都不再起。
