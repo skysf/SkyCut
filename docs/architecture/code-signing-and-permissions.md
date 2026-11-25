@@ -51,7 +51,9 @@ The user, 2026-11-25, after renewing the Apple Developer Program (an individual 
 | --- | --- | --- |
 | `com.apple.security.device.audio-input` | the microphone: narration while recording the screen, a voice sample for a new voice ([声音库](voice-library.md)第九节) | a probe app signed without it made tccd log «Prompting policy for hardened runtime; service: kTCCServiceMicrophone requires entitlement com.apple.security.device.audio-input but it is missing»; with it, nothing |
 | `com.apple.security.automation.apple-events` | `AIFinderSelection`: `osascript` asks Finder for its selection (`open_folder` with `from_finder`) | the same probe: the same line for kTCCServiceAppleEvents; with it, nothing |
-| none | screen recording and the Mac's sound (ScreenCaptureKit), the audio engine, ffmpeg, `skycut-mcp`, `skycut-web-motion` (WebKit runs the pages in its own processes), Kokoro (Core ML), the main-thread stack capture (it suspends only its own threads) | the E2E MCP suite and a Kokoro line on a Developer-ID, hardened copy of the release build gave the same results as an ad-hoc control |
+| none | the audio engine, ffmpeg, `skycut-mcp`, `skycut-web-motion` (WebKit runs the pages in its own processes), Kokoro (Core ML) | the E2E MCP suite and a Kokoro line on a Developer-ID, hardened copy of the release build gave the same results as an ad-hoc control |
+| none | screen recording and the Mac's sound (ScreenCaptureKit): the runtime has no gate for them, only the user's grant | with the user's grant on a hardened test build: the report, section 5 |
+| none | the main-thread stack capture: it suspends and reads only its own process's threads, which the runtime allows | not exercised (no stall during the runs) |
 
   No runtime exception (`com.apple.security.cs.*`: JIT, unsigned executable memory, library validation, DYLD variables;
   `get-task-allow`): nothing needs one. `checks/release-signing.sh` refuses them, and wants an entitlement for every usage
