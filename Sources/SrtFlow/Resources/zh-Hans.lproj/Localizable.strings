@@ -1571,6 +1571,9 @@
 "The result is ready on Sky Studio, but its storage refused the download (HTTP %d). Nothing more was charged." = "成品已在 Sky Studio 上做好，但存储拒绝了下载（HTTP %d）。没有再扣积分。";
 "Download again" = "重新下载";
 "Download the finished result again; nothing more is charged" = "重新下载已经做好的成品，不会再扣积分";
+"The result is ready on Sky Studio, but its download was stopped. Nothing more was charged; trying again downloads the same result." = "成品已在 Sky Studio 上做好，但下载被停下了。没有再扣积分；再试一次会重新下载同一份成品。";
+"This upscale is already made on Sky Studio but did not download. Download it again: nothing more is charged." = "这次放大已经在 Sky Studio 上做好，但没有下载下来。请重新下载：不会再扣积分。";
+"This change is already made on Sky Studio but did not download. Download it again: nothing more is charged." = "这次变声已经在 Sky Studio 上做好，但没有下载下来。请重新下载：不会再扣积分。";
 "This clip has no sound to change." = "这一段没有声音，变不了声。";
 "This clip is muted. Unmute it first, then change its voice." = "这一段静音了。先取消静音，再变声。";
 "This clip uses %1$@ of its source; a voice change takes at most %2$@ at a time. Split the clip first, then change each part." = "这一段用了素材的 %1$@；变声一次最长 %2$@。先把它分割开，再一段一段变。";

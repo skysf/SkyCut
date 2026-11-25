@@ -1571,6 +1571,9 @@
 "The result is ready on Sky Studio, but its storage refused the download (HTTP %d). Nothing more was charged." = "The result is ready on Sky Studio, but its storage refused the download (HTTP %d). Nothing more was charged.";
 "Download again" = "Download again";
 "Download the finished result again; nothing more is charged" = "Download the finished result again; nothing more is charged";
+"The result is ready on Sky Studio, but its download was stopped. Nothing more was charged; trying again downloads the same result." = "The result is ready on Sky Studio, but its download was stopped. Nothing more was charged; trying again downloads the same result.";
+"This upscale is already made on Sky Studio but did not download. Download it again: nothing more is charged." = "This upscale is already made on Sky Studio but did not download. Download it again: nothing more is charged.";
+"This change is already made on Sky Studio but did not download. Download it again: nothing more is charged." = "This change is already made on Sky Studio but did not download. Download it again: nothing more is charged.";
 "This clip has no sound to change." = "This clip has no sound to change.";
 "This clip is muted. Unmute it first, then change its voice." = "This clip is muted. Unmute it first, then change its voice.";
 "This clip uses %1$@ of its source; a voice change takes at most %2$@ at a time. Split the clip first, then change each part." = "This clip uses %1$@ of its source; a voice change takes at most %2$@ at a time. Split the clip first, then change each part.";
