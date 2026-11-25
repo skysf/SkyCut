@@ -354,8 +354,10 @@ fi
 grep -qF 'if let id = self.submitted.jobID { detail["skystudio_job_id"] = .string(id) }' "${GEN_RUN}" \
   || fail "${GEN_RUN}：get_job 跑着时要报阶段和 skystudio_job_id（liveDetail）"
 grep -qF 'cancel: { [weak self] in self?.cancel() }' "${GEN_RUN}" || fail "${GEN_RUN}：任务没有取消动作（停止按钮、cancel_job 停不了）"
-[ "$(count 'SkyStudioGenerationActivity.shared.add(status)' "${GEN_RUN}")" -eq 1 ] && [ "$(count 'SkyStudioGenerationActivity.shared.remove(status)' "${GEN_RUN}")" -eq 1 ] \
-  || fail "${GEN_RUN}：生成任务起手要登记进 SkyStudioGenerationActivity、结束拿掉（状态行从它读；各恰好一处）"
+# Since 2026-11-24 Download again (retryDownload) ends with a second remove: the row is still listed when it is pressed, so no second add.
+[ "$(count 'SkyStudioGenerationActivity.shared.add(status)' "${GEN_RUN}")" -eq 1 ] && [ "$(count 'SkyStudioGenerationActivity.shared.remove(status)' "${GEN_RUN}")" -eq 2 ] \
+  && grep -qF 'defer { SkyStudioGenerationActivity.shared.remove(status) }' <<<"$(awk '/    func retryDownload\(\) \{/,/^    \}/' "${GEN_RUN}")" \
+  || fail "${GEN_RUN}：生成任务起手要登记进 SkyStudioGenerationActivity、结束拿掉（状态行从它读；起手一处，execute 和 Download again 各拿掉一处）"
 grep -qF 'let generation = SkyStudioGenerationActivity.shared' "${STATUS_ROWS}" || fail "${STATUS_ROWS}：任务入口没订阅 Sky Studio 的生成任务"
 for file in "${GEN_TOOL}" "${GEN_RUN}" "${GEN_ACTIVITY}"; do
   if grep -nE 'NSAlert|runModal|beginSheetModal|NSOpenPanel|NSSavePanel|\.alert\(|confirmationDialog' "${file}"; then
@@ -394,9 +396,12 @@ grep -qF 'SkyStudioImageOperation.names' "${CONTROLS}" || fail "图片操作枚�
 grep -qF 'try SkyStudioImageOperation.validateRoute(args)' "${GEN_TOOL}" || fail "图片操作未在官方分派前拒绝 film"
 grep -qF 'if let operation { body["operation"] = .string(operation) }' Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \
   || fail "图片操作没有进入报价和提交，也无法绑定确认码"
-grep -qF 'SkyStudioImageResult.format(at: downloaded)' "${GEN_RUN}" \
-  && grep -qF 'SkyStudioImageResult.finalize(downloaded, format: format)' "${GEN_RUN}" \
-  || fail "生产下载之后未按真实图片字节确定扩展名"
+# Since 2026-11-24 the delivery (download and the steps after it) is its own type, which Download again runs again. Since 2026-11-26 the
+# image's bytes are checked, and name its extension, on the download's private file before it takes a name (CXD4 on PR #554).
+GEN_DELIVERY="Sources/SrtFlow/SkyStudio/SkyStudioGenerationDelivery.swift"
+grep -qF 'check: image.map(SkyStudioImageResult.downloadCheck)' "${GEN_DELIVERY}" \
+  && grep -qF 'let read = await MediaReadQueue.run(on: MediaReadQueue.analysis) { Result { try format(at: partial) } }' Sources/SrtFlow/SkyStudio/SkyStudioImageResult.swift \
+  || fail "生产下载之后未按真实图片字节确定扩展名（图片在落名之前按字节校验）"
 grep -qF 'operation != "generate"' "${REFERENCE_FILES}" || fail "特殊图片操作没有把 image 接到 image_url"
 
 # 9c. 官方路线必须接到同一个生产运行器：显式准备、精确报价、先落回执、恢复只查原单。
@@ -413,7 +418,7 @@ grep -qF 'SkyStudioGenerationRequests.completeStarted(operationKey, result: resp
   || fail "官方新提交不可无条件缓存；唯一未筛选 response 是显式准备任务"
 grep -qF 'official?.request ?? generation.job(' "${GEN_RUN}" || fail "生产运行器丢掉已审查的官方精确请求"
 grep -qF 'official.recovery.received(status)' "${GEN_RUN}" || fail "生产运行器没保存已知原单回执"
-grep -qF 'official?.recovery.delivered(' "${GEN_RUN}" || fail "生成结果没保存可恢复身份"
+grep -qF 'official?.recovery.delivered(' "${GEN_DELIVERY}" || fail "生成结果没保存可恢复身份"
 grep -qF 'await runner.resume(serverID)' "${RECOVERY}" || fail "重启恢复没有只查原单"
 if grep -qE 'runner\.run\(|api\.submit\(' "${RECOVERY}"; then fail "重启恢复不许重新 POST 收费"; fi
 grep -qF '"prepare_references"' Sources/SrtFlow/AIProjectBinding.swift || fail "官方准备没绑定会话拥有的工程"
@@ -560,7 +565,10 @@ source checks/sky-studio-wiring/upload-retry.sh
 # 19. Reference images fitted to the published limits (2026-11-23): checks/sky-studio-wiring/reference-fit.sh.
 source checks/sky-studio-wiring/reference-fit.sh
 
-# 20. SkyCut's own daily credit limit stopping a request (2026-11-24, MSG1): checks/sky-studio-wiring/daily-limit.sh.
+# 20. Downloads of paid results the network interrupts (2026-11-24): checks/sky-studio-wiring/download-retry.sh.
+source checks/sky-studio-wiring/download-retry.sh
+
+# 21. SkyCut's own daily credit limit stopping a request (2026-11-24, MSG1): checks/sky-studio-wiring/daily-limit.sh.
 source checks/sky-studio-wiring/daily-limit.sh
 
 # 0.18.62 真积分验收后的结果边界：下面每份纯值规则都必须接到实际工具 / 下载 / 刷新路径。

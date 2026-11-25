@@ -140,7 +140,8 @@ final class SkyStudioVoiceCloudBatches {
             }
             // 下载、分句或字幕失败都不能撤销云端成功记录，也不能把它退回 missing。
             recovery.value.received(done, at: index)
-            let charged = done.billing?.netCharged ?? done.creditsCharged ?? credits[position]
+            // The final charge only; a bill not final yet keeps this batch's reserved credits (SkyStudioJobStatus.finalCharge).
+            let charged = done.finalCharge ?? credits[position]
             budget?.settled(position, charged: charged)
             recovery.value.batches[index].charged = charged
             recovery.value.batches[index].uncertain = 0
@@ -188,12 +189,24 @@ final class SkyStudioVoiceCloudBatches {
         }
         if let file = recovery.value.batches[index].rawFile, FileManager.default.fileExists(atPath: file.path) { return (file, result) }
         let ext = result.url.pathExtension.isEmpty ? (result.contentType == "audio/mpeg" ? "mp3" : "wav") : result.url.pathExtension
-        let file = recovery.file.deletingLastPathComponent().appendingPathComponent("batch-\(index).\(ext)")
+        // `batch-<i>.<ext>` in the recovery folder, or the next free number: a file left there (say, by a crash before the record
+        // was saved) is never replaced.
+        let place = CloudResultPlace(folder: recovery.file.deletingLastPathComponent(), stem: "batch-\(index)", pathExtension: ext)
         report(.downloading(fraction: nil))
-        do {
-            try await api.download(result.url, to: file) { fraction in
-                Task { @MainActor in report(.downloading(fraction: CloudJobPhase.quantized(fraction))) }
+        // An expired address: a fresh one from this batch's original job (only GET; never submitted again).
+        var renew: (@Sendable () async throws -> URL?)?
+        if let id = recovery.value.batches[index].serverID {
+            let api = api
+            renew = { [weak self] in
+                guard let key = try await self?.resolvedKey() else { return nil }
+                return try await api.job(id, key: key).result?.url
             }
+        }
+        let file: URL
+        do {
+            file = try await api.download(result.url, into: place, renew: renew) { fraction in
+                Task { @MainActor in report(.downloading(fraction: CloudJobPhase.quantized(fraction))) }
+            }.url
             recovery.value.batches[index].rawFile = file
             try await recovery.save()
         } catch { throw SkyStudioVoiceProcessingError(stage: .download, underlying: error) }

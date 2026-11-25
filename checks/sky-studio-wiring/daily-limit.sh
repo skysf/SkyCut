@@ -100,18 +100,22 @@ CHANGE_JOB="Sources/SrtFlow/VoiceChange/VoiceChangeJob.swift"
 CHANGE_BILLING="Sources/SrtFlow/VoiceChange/VoiceChangeBilling.swift"
 grep -qF 'SkyStudioBalanceRefusal.refusal(of: error, accepted: serverID != nil)' "${CHANGE_JOB}" \
   || fail "${CHANGE_JOB}: a balance refusal counts as accepted once Sky Studio gave the change a job id (serverID != nil)"
-# - get_job asks a failed voice change's original job (GET only) and reads a refusal's bill; the books follow only a final bill
-#   (VoiceChangeBilling: a top-level credits_charged of 0 is not one; Codex CXM3);
+# - get_job asks a failed voice change's original job (GET only), reads a refusal's bill and replies with the books after settling;
+#   the books follow only a final charge, never a bare top-level credits_charged of 0 (VoiceChangeBilling; Codex CXM3, CXM4);
 [ -f "${CHANGE_BILLING}" ] || fail "can't find ${CHANGE_BILLING}: renamed? update checks/sky-studio-wiring/daily-limit.sh"
-grep -qF 'job.refresh = { [self] in await refreshOriginal() }' "${CHANGE_JOB}" \
+grep -qF 'job.refresh = { [self] in await refreshBill() }' "${CHANGE_JOB}" \
+  && grep -qF 'billPending || job.status == .failed || job.status == .cancelled' "${CHANGE_JOB}" \
   && grep -qF 'server = try await services.api.job(id, key: key)' "${CHANGE_JOB}" \
   && grep -qF 'SkyStudioJobError.request(failure).failure?.billing' "${CHANGE_JOB}" \
-  || fail "${CHANGE_JOB}: get_job asks the original job a refusal named and reads the bill a refusal carries"
-grep -qF 'VoiceChangeBilling.settle(&held, by: done.billing)' "${CHANGE_JOB}" \
+  && grep -qF 'AIJobs.shared.updateDetail(job, VoiceChangeBilling.refusalBill(billing))' "${CHANGE_JOB}" \
+  || fail "${CHANGE_JOB}: get_job asks the original job a refusal named, reads the bill a refusal carries and replies with today's books"
+grep -qF 'if let charged = VoiceChangeBilling.charge(of: done) {' "${CHANGE_JOB}" \
+  && grep -qF 'let charge = VoiceChangeBilling.charge(of: server)' "${CHANGE_JOB}" \
+  && grep -qF 'return status.billing == nil && charged == 0 ? nil : charged' "${CHANGE_BILLING}" \
   && grep -qF 'guard let charged = billing?.netCharged else { return }' "${CHANGE_BILLING}" \
-  || fail "${CHANGE_JOB}: the books follow only a final bill (VoiceChangeBilling.settle)"
-if grep -qE 'creditsCharged|try\? await services\.api\.job' "${CHANGE_JOB}" "${CHANGE_BILLING}"; then
-  fail "${CHANGE_JOB}: a voice change neither settles nor reports a top-level credits_charged, and reads a refusal's bill (no try? on the GET)"
+  || fail "${CHANGE_JOB}: the books and the receipt follow only a final charge, never a bare top-level 0 (VoiceChangeBilling.charge)"
+if grep -qE 'creditsCharged|server = try\? await services\.api\.job' "${CHANGE_JOB}" "${CHANGE_BILLING}"; then
+  fail "${CHANGE_JOB}: a voice change never settles by a bare top-level credits_charged, and reads a refusal's bill (no try? on get_job's GET)"
 fi
 # - a refund and a settlement go back to the day key recorded at booking, a settlement in one ledger write; a reservation saved
 #   without one uses only a day the ledger proves holds it, never a day worked out from its date (Codex CXM3);

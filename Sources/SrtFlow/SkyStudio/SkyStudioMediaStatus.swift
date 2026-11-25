@@ -23,6 +23,9 @@ final class SkyStudioMediaStatus: ObservableObject, Identifiable {
     @Published var stepNote: String?
     /// 分几批交的配旁白：几批好了 / 共几批、几批在跑、几批等空位（状态行照它写，不造百分比）；一批的、别的生成是 nil。
     @Published private(set) var batches: SkyStudioVoiceBatchBoard?
+    /// Set while a paid result whose download did not finish can be downloaded again (the row's Download again button): it downloads
+    /// this job's own result, nothing is submitted or charged. nil otherwise, and while that download runs.
+    @Published var retryDownload: (() -> Void)?
     var onCancel: () -> Void = {}
 
     init(kindLabel: String, modelTitle: String, credits: Double?, uploads: Bool, title: String? = nil,
@@ -49,4 +52,26 @@ final class SkyStudioMediaStatus: ObservableObject, Identifiable {
     }
 
     func cancel() { onCancel() }
+
+    /// Holds a paid result for Download again: the row reads the line and offers the button, and the job's own key finds it by its job
+    /// id (SkyStudioHeldDownloads) even after the row is dismissed.
+    func holdDownload(_ failure: SkyStudioDownloadFailure, retry: @escaping () -> Void) {
+        issue = SkyStudioDownloadWords.shown(failure)
+        retryDownload = retry
+        if let aiJobID { SkyStudioHeldDownloads.hold(aiJobID, retry: retry) }
+    }
+
+    /// Download again starts: the line and the button go while it runs, and the row is listed again (it may have been dismissed). The
+    /// result stays held (SkyStudioHeldDownloads) until it has come down.
+    func beginDownloadAgain() {
+        retryDownload = nil
+        issue = nil
+        SkyStudioGenerationActivity.shared.add(self)
+    }
+
+    /// The held result came down: nothing is held for this job any more.
+    func releaseDownload() {
+        if let aiJobID { SkyStudioHeldDownloads.release(aiJobID) }
+        retryDownload = nil
+    }
 }

@@ -26,9 +26,11 @@ enum SkyStudioGeneratedVideo {
         return false
     }
 
-    static func makeCopy(_ original: URL, to destination: URL, ffmpeg: URL) async throws {
-        let partial = destination.deletingLastPathComponent().appendingPathComponent(".\(UUID().uuidString).mp4")
-        defer { try? FileManager.default.removeItem(at: partial) }
+    /// An H.264 copy of `original` in `folder`: `stem.mp4`, or the next free number of that series when the name is taken. ffmpeg
+    /// writes a private file first, which then takes its name without replacing or removing anything (ExclusivePlacement).
+    static func makeCopy(_ original: URL, in folder: URL, stem: String, ffmpeg: URL) async throws -> URL {
+        let partial = folder.appendingPathComponent(".\(UUID().uuidString).mp4")
+        defer { CloudResultPlace.removePrivateFile(partial) }   // its private name; only a regular file
         let process = FFmpegProcess()
         try await withTaskCancellationHandler {
             try await process.run(executable: ffmpeg, arguments: [
@@ -37,6 +39,6 @@ enum SkyStudioGeneratedVideo {
                 "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", partial.path
             ], workingDirectory: nil)
         } onCancel: { process.cancel() }
-        try FileManager.default.moveItem(at: partial, to: destination)
+        return try await CloudResultPlace(folder: folder, stem: stem, pathExtension: "mp4").place(partial).url
     }
 }

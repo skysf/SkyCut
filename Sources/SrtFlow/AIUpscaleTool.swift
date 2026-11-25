@@ -109,6 +109,8 @@ enum AIUpscaleTool {
         job.aiJobID = aiJob.id
         job.onFinished = { finished in Task { await land(finished, aiJob: aiJob, project: project) } }
         job.onEnded = { ended in settle(ended, aiJob: aiJob) }
+        // Download again (the task row's button): the same AI job runs again under its id until the result lands or fails again.
+        job.onRetry = { _ in AIJobs.shared.reopen(aiJob) }
         UpscaleActivity.shared.add(job, opensCompare: false)
 
         let spend = SkyStudioSpendStore.shared
@@ -196,7 +198,6 @@ enum AIUpscaleTool {
             "duration": AIFormat.seconds(outcome.info.duration),
             "tier": .string(finished.request.tier.id),
             "skystudio_job_id": .string(outcome.jobID),
-            "credits_charged": .number(SkyStudioCredits.number(outcome.creditsCharged)),
             "spent_today_credits": .number(SkyStudioCredits.number(SkyStudioSpendStore.shared.spentToday())),
             "elapsed_seconds": .number(outcome.elapsed.rounded()),
             "next_step": .string(done.isEmpty
@@ -207,8 +208,33 @@ enum AIUpscaleTool {
         if !outcome.audioRestored {
             detail["note"] = "The original sound could not be put back (ffmpeg is missing); the upscaled file has no sound."
         }
+        detail.merge(billFields(outcome.creditsCharged, reserved: finished.request.credits)) { _, bill in bill }
+        if outcome.creditsCharged == nil {
+            // Not final yet: get_job reads the original job again until it is, then the books and this receipt take the final charge.
+            aiJob.refresh = { [finished] in
+                guard let charged = await finished.refreshBill() else { return }
+                AIJobs.shared.updateDetail(aiJob, Self.billFields(charged, reserved: finished.request.credits))
+            }
+        }
         let saved = await AIProjectTools.saveIfNeverSaved(project, after: .ok(.object(detail), changed: !done.isEmpty))
         AIJobs.shared.finish(aiJob, .done, message: done.isEmpty ? "Upscaled; nothing replaced." : "Upscaled and replaced \(done.count) clip(s).", detail: saved.payload)
+    }
+
+    /// What the receipt says about the charge: the final one, or (nil) that Sky Studio's bill is not final yet and the reservation stays.
+    private static func billFields(_ charged: Double?, reserved: Double) -> [String: JSONValue] {
+        var fields: [String: JSONValue] = ["spent_today_credits": .number(SkyStudioCredits.number(SkyStudioSpendStore.shared.spentToday())),
+                                           "billing_pending": .bool(charged == nil)]
+        if let charged {
+            fields["credits_charged"] = .number(SkyStudioCredits.number(charged))
+            fields["billing_note"] = "Sky Studio's bill for this upscale is final."
+        } else {
+            fields["credits_charged"] = .null
+            fields["credits_reserved"] = .number(SkyStudioCredits.number(reserved))
+            fields["billing_note"] = .string("Sky Studio has not finalized this upscale's bill (it may be under review): the "
+                + "\(SkyStudioCredits.text(reserved)) credits reserved stay on today's books until it is. get_job reads the original job "
+                + "again and reports the final charge; do not upscale again for it.")
+        }
+        return fields
     }
 
     /// 没做成 / 停下来了：把结局记给 AI 的任务（done 在 land 里记）。
@@ -228,14 +254,35 @@ enum AIUpscaleTool {
                 fields["code"] = .string(SkyStudioBalanceRefusal.code)
                 if let id = ended.skyStudioJobID { fields["skystudio_job_id"] = .string(id) }
                 AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: " + balance.failure.message, detail: .object(fields))
+            } else if let failure = ended.downloadFailure {
+                // Made, only its download gave up: this job's row downloads it again at no charge; upscale_clip again is a new upscale.
+                AIJobs.shared.finish(aiJob, .failed, message: failure.message, detail: .object(heldFields(ended, failure.fields(retry: retry))))
+            } else if ended.canRetryDownload {
+                AIJobs.shared.finish(aiJob, .failed, message: "Sky Studio made this upscale, but SkyCut could not save it: \(message)",
+                                     detail: .object(heldFields(ended, ["next_step": .string("Nothing more was charged. To download the same result again at no charge, " + retry)])))
             } else {
                 AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: \(message)", detail: detail)
             }
         case .cancelled(let stop):
-            AIJobs.shared.finish(aiJob, .cancelled, message: "The upscale was stopped. " + SkyStudioJobError.stopped(stop).message, detail: detail)
+            if let failure = ended.downloadFailure {
+                AIJobs.shared.finish(aiJob, .cancelled, message: failure.message, detail: .object(heldFields(ended, failure.fields(retry: retry))))
+            } else {
+                AIJobs.shared.finish(aiJob, .cancelled, message: "The upscale was stopped. " + SkyStudioJobError.stopped(stop).message, detail: detail)
+            }
         case .running, .done:
             break
         }
+    }
+
+    /// How a held upscale is downloaded again: only this job's own row (it runs this AI job again under its id). upscale_clip asked
+    /// again is a new request (user, 2026-11-25), so the AI is told it would be charged again.
+    private static let retry = SkyStudioDownloadFailure.taskListRetry + " Calling upscale_clip again starts a new upscale and is charged "
+        + "again, even for the same clip and settings."
+
+    private static func heldFields(_ job: UpscaleJob, _ fields: [String: JSONValue]) -> [String: JSONValue] {
+        var value = fields
+        if let id = job.skyStudioJobID { value["skystudio_job_id"] = .string(id) }
+        return value
     }
 
     private static func sizeLabel(_ size: CGSize) -> String { "\(Int(size.width.rounded()))×\(Int(size.height.rounded()))" }

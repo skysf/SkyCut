@@ -30,6 +30,21 @@ import SrtFlowMCPKit
             await runVoicePaidAudioChecks(root)
             try await runVoiceChangeChecks(root)
             try await runVoiceChangeDirectChecks(root)
+            try await runVoiceChangeDownloadChecks(root)
+            try await runVoiceChangeOwnFilesChecks(root)
+            // Every paid job the download checks start gives its job slot back once its Sky Studio job ended: a held download,
+            // Download again, a stop, a bill still pending never keep one (three slots stay with LibraryRestartChecks' parked jobs).
+            let slotsBefore = SkyStudioJobSlots.shared.snapshot.running[.shared] ?? 0
+            defer {
+                let after = SkyStudioJobSlots.shared.snapshot.running[.shared] ?? 0
+                require(after == slotsBefore, "every paid job the download checks started gave its job slot back (\(slotsBefore) before, \(after) after)")
+            }
+            try await runGenerationDownloadChecks(root)
+            try await runVoiceoverDownloadChecks(root)
+            try await runUpscaleJobDownloadChecks(root)
+            try await runPaidToolEntryChecks(root)   // last: it marks a key on the account
+            try await runOfficialRecoveryDownloadChecks(root)   // after it: the account verified against the fake /me
+            try await runOfficialFilmRunChecks(root)
         } catch {
             VoiceCheckLog.failures += 1
             print("FAIL: production voice recovery checks: \(error)")
@@ -38,6 +53,10 @@ import SrtFlowMCPKit
         require(AIKeepAwake.shared.holders == 0, "every AI job in these checks gave its keep-awake lease back (\(AIKeepAwake.shared.holders) left)")
         ProjectTeardown.stopPreview(OpenProjects.shared.primary)
         UserDefaults.standard.removePersistentDomain(forName: domain)
+        // This run's own Application Support folder (official receipts, the provider marker): the script removes it too.
+        if let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            try? FileManager.default.removeItem(at: support.appendingPathComponent(domain, isDirectory: true))
+        }
         if VoiceCheckLog.failures > 0 { print("FAIL: \(VoiceCheckLog.failures) production voice recovery checks"); exit(1) }
         print("PASS: production voice: whole-segment quote before job_id, one selection per segment, budget / refusal / local fallback before paying, "
             + "batches read together within the audio slots and landed in order, mid-script fallback for later batches, fallback_needs_one_time "
@@ -58,7 +77,22 @@ import SrtFlowMCPKit
             + "changed, refund on failure, no resend after an unknown submit, the panel's default voice / re-quote / budget / same job"
             + "; direct change: skip_separation in the quote and the job, the voice alone on one new track as one undo step, an unconfirmed "
             + "direct quote refused before paying, a default result without its background not landed, separation_failed failing with "
-            + "nothing landed and only the separation charged, the panel's localized line and its direct retry")
+            + "nothing landed and only the separation charged, the panel's localized line and its direct retry"
+            + "; a voice change whose download gave up: download_network after three GETs, its row's Download again lands the "
+            + "byte-identical files under the same job id, an expired address renewed once from the original job; the same change and "
+            + "Chinese after English asked again are new paid jobs; a stop keeps the button"
+            + "; a generation held after three drops stays held through a failed Download again, its own key downloads it after the row "
+            + "was dismissed, a stop and empty answers keep it, a missing SRT is fetched alone; a voiceover row's Download again runs its "
+            + "recovery once, never after a resume landed it, and survives a stop; an upscale's books at the charge from either field, "
+            + "Cancel while downloading again keeps it on its row, its bill under review keeps the reservation; an official recovery held "
+            + "through a 503 then downloaded by its key through generate_media; an official film generation's next step through the "
+            + "flow; a voice change's files take their names on disk (never another process's file), a cancel deletes only a file it "
+            + "placed while it is still that file and no timeline uses it, every GET counted, its bill kept reserved until get_job "
+            + "reads it final; PNG headers held until the image is saved; a folder at the name left whole"
+            + "; through the tools: generate_media's own key downloads the held job with no POST, key-less and 9:16 are new jobs, "
+            + "another key is a new job, a spaced key sent back is the same job, a blocked or read-only output folder holds the result; "
+            + "upscale_clip from project B is B's own new job, one saved while its bill is under review stays reserved until get_job "
+            + "reads it final")
         exit(0)
     }
 

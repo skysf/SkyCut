@@ -248,8 +248,9 @@ assert "AIClipHit.report(&entry, landing: landing, clip: clip)" in timeline, "�
 effects = code("Sources/SrtFlow/AISoundEffectRequest.swift")
 assert "AIClipHit.placement(hitAt: requested, hit: renderedHit, sourceIn: 0)" in effects, "✗ the placement rule must have one copy"
 run = code("Sources/SrtFlow/SkyStudio/SkyStudioGenerationRun.swift")
-assert run.count("generation.kind == .music ? await AIGeneratedMusicReport.measure(editable, project: project) : nil") == 1 \
-    and 'if let music { detail["music"] = music }' in run, "✗ a generated music job's get_job must carry the listen measurement"
+delivery = code("Sources/SrtFlow/SkyStudio/SkyStudioGenerationDelivery.swift")
+assert delivery.count("generation.kind == .music ? await AIGeneratedMusicReport.measure(editable, project: project) : nil") == 1 \
+    and 'if let music = delivered.music { detail["music"] = music }' in run, "✗ a generated music job's get_job must carry the listen measurement"
 report = code("Sources/SrtFlow/AIGeneratedMusicReport.swift")
 assert "AIListenFileAudio.listen(" in report and "beats: true" in report, "✗ get_job's music must be listen's own answer"
 PY

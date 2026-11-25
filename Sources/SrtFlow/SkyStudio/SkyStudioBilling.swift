@@ -11,8 +11,10 @@ struct SkyStudioBilling: Equatable, Sendable {
     }
     var status: String? { json["status"]?.stringValue }
     var needsReview: Bool { json["review_required"]?.boolValue == true || ["pending_review", "refund_pending"].contains(status ?? "") }
+    /// The bill is settled: charged, refunded or not charged, and not under review.
+    var isFinal: Bool { !needsReview && ["charged", "refunded", "not_charged"].contains(status ?? "") }
     var netCharged: Double? {
-        guard !needsReview, ["charged", "refunded", "not_charged"].contains(status ?? "") else { return nil }
+        guard isFinal else { return nil }
         if status == "not_charged" { return 0 }
         guard let amount = json["credits_charged"]?.doubleValue, amount.isFinite, amount >= 0 else { return nil }
         return amount
