@@ -26,7 +26,7 @@ struct SkyStudioGenerationDelivery {
 
     /// Why the optional SRT is not there (the video is saved either way).
     enum CaptionIssue {
-        /// Its download gave up: the run's re-ask fetches only it, from this address.
+        /// Its download gave up: the job's own idempotency_key fetches only it, from this address.
         case missing(URL)
         /// Larger than the catalog's `max_caption_bytes`: not kept.
         case tooLarge

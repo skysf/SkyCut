@@ -109,7 +109,7 @@ grep -qF 'let requestIdentity = SkyStudioGenerationRequests.identity(arguments: 
   || fail "${DOWNLOAD_TOOL}: generate_media reaches a held result only through its own key's cached answer"
 others="$(code_files_with 'heldAnswer\(key:|heldDownload\(|heldChange\(|dismissedHeld|holdsResult\(' || true)"
 [ -z "${others}" ] || fail "these files look a held result up by a request's parameters: $(tr '\n' ' ' <<<"${others}")— an identical paid request is a new job (user, 2026-11-25); only the job's own row / id / key reaches its result"
-others="$(grep -lE 'downloadAgain\(|retryDownload|SkyStudioHeldDownloads' "${DOWNLOAD_UPSCALE_TOOL}" "${DOWNLOAD_UPSCALE_PANEL}" \
+others="$(grep -lE 'downloadAgain|retryDownload|SkyStudioHeldDownloads|heldDownload|heldChange' "${DOWNLOAD_UPSCALE_TOOL}" "${DOWNLOAD_UPSCALE_PANEL}" \
           "${DOWNLOAD_UPSCALE_INSPECTOR}" "${DOWNLOAD_CHANGE_TOOL}" "${DOWNLOAD_CHANGE_PANEL}" "${DOWNLOAD_CHANGE_MODEL}" || true)"
 [ -z "${others}" ] || fail "these entries offer Download again for the same input: $(tr '\n' ' ' <<<"${others}")— they start a new paid job; Download again stays on the job's own row"
 
