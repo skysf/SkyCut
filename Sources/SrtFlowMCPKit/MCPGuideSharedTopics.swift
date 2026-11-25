@@ -84,6 +84,7 @@ enum MCPGuideSharedTopics {
     ])
 
     // 出处：sky-studio-jobs.md（报价、任务、取消、作品库），ai-control-mcp.md 第四节第 6、39、44、56 条，SkyStudioJobGate、AIDraftPolicy。
+    // Identical requests: sky-studio-jobs.md "Identical paid requests in a row" (SkyStudioRepeatGuard, 2026-11-26).
     static let paid = MCPGuideTopic(name: "paid", sections: [
         MCPGuideSection(name: MCPGuideSection.overview, text: """
         Paid work uses the user's Sky Studio credits.
@@ -102,6 +103,10 @@ enum MCPGuideSharedTopics {
         price). Set user_requested_overrides=true only when the user's own words name that setting ("4K", a model, a duration) and \
         quote them in user_request; "best quality" names nothing, so quote and ask. Without such words SkyCut asks anyway \
         (overrides_not_applied). full_access skips these questions.
+
+        Identical requests. The same request sent again to the same tool in a project is a new paid job; from the 2nd in a row the \
+        result says which one it is, and the 5th returns needs_confirmation in every mode (one question with any other): a yes \
+        covers the identical requests after it.
 
         The daily budget. A hard daily credit limit applies in every mode: over it, the result is status blocked with \
         daily_budget_exceeded and nothing starts. Tell the user; they can raise it in SkyCut Settings or ask you to change it with \

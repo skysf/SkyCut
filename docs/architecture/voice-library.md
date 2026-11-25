@@ -394,6 +394,9 @@
    满了等、**不重放收费 POST**：提交的回答丢了就是结果不明，那一笔留在账上、照实说；只有排着队的能取消）。做完按服务器的结算证据改账，没做成它退了的退回。
    A failed job that Sky Studio settles above zero (`billing.credits_charged`, such as `separation_failed` keeping the separation) is settled at that
    charge, not kept at the whole quote (item 12).
+   The one question (2026-11-26): the 5th identical change_voice in a row in a project asks once in both modes (`confirm_token`), and a panel's
+   change is never counted ([Sky Studio jobs](sky-studio-jobs.md), "Identical paid requests in a row"). After a failed download the panel on that clip
+   offers Download again as its main button and "Make a new version" for the paid one.
 6. **落地**（`VoiceChangeLanding`，纯值）：原片段**静音、不删**；**新开两条音频轨**（接在现有音频轨后面），人声、背景各一段，放在原片段同一时间；
    带上原片段的变速、音量、渐入渐出、音量曲线（曲线锚在源时间上，平移到新文件自己的时间）、声音场景；三段同一个链接组（原片段本来就在组里就沿用）；
    人声比原片段长的那几毫秒（Chatterbox HD 实测长 5–35 ms）只在时间线上裁到原长、文件不动。两段都用原片段的音量、不另加增益（导出的限幅器兜底）。

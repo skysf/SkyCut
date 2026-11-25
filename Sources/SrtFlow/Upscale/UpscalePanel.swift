@@ -7,11 +7,16 @@ import SwiftUI
 // 没有 Sky Studio 的 Key、报价没回来、这一段送不了也拦。
 // 模型和价从 Sky Studio 来（UpscaleOffers：/models、/quote），别的数从 UpscalePanelModel 来；起的任务进 UpscaleActivity（做完弹对比窗口，不自动替换）。
 // 本地化：sheet 不继承应用内语言，调用处套 `.appLanguage()`（checks/presented-views-app-language.sh）。
+// When this clip's own last upscale was made but did not come down (2026-11-26, SkyStudioPanelHeldDownload), Download again (free)
+// is the main button and the paid one reads "Make a new version (N credits)", under one line saying which is which.
 // 不管什么：任务本身（UpscaleJob）、换源（VideoEditProject+Upscale）。
 
 struct UpscalePanel: View {
     let project: VideoEditProject
     let model: UpscalePanelModel
+    /// This clip's own last upscale, made but not downloaded (read when the panel opens): Download again is the main button and the
+    /// paid one makes a new version (SkyStudioPanelHeldDownload, 2026-11-26).
+    let held: SkyStudioPanelHeldDownload?
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var spend = SkyStudioSpendStore.shared
     @StateObject private var offers = UpscaleOffers()
@@ -19,9 +24,10 @@ struct UpscalePanel: View {
     @State private var target: UpscaleTarget
     @State private var tierID: String?
 
-    init(project: VideoEditProject, model: UpscalePanelModel) {
+    init(project: VideoEditProject, model: UpscalePanelModel, held: SkyStudioPanelHeldDownload? = nil) {
         self.project = project
         self.model = model
+        self.held = held
         _choice = State(initialValue: model.defaultChoice)
         _target = State(initialValue: model.defaultTarget)
     }
@@ -208,6 +214,10 @@ struct UpscalePanel: View {
         }
         let overLimit = spent + (quote?.credits ?? 0) > spend.dailyLimit + 0.0005
         Divider()
+        if held != nil {
+            Label(SkyStudioPanelHeldText.upscaleLine, systemImage: "arrow.down.circle")
+                .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+        }
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 if let selected {
@@ -219,12 +229,31 @@ struct UpscalePanel: View {
                     .font(.caption).foregroundStyle(overLimit ? .red : .secondary)
             }
             Spacer()
-            Button("Cancel") { dismiss() }
-            Button(quote.map { String(format: L10n("Upscale · %@ credits"), SkyStudioCredits.text($0.credits)) } ?? L10n("Upscale")) {
-                if let selected, let quote { start(selected: selected, quote: quote) }
+            if let held {
+                // A paid result is waiting: getting it again is free and the main button; a new version is a new paid upscale.
+                // Three buttons do not fit one row in every language (Spanish cut the paid one): it gets its own row.
+                VStack(alignment: .trailing, spacing: 8) {
+                    Button(SkyStudioPanelHeldText.upscaleNewVersion(quote?.credits)) {
+                        if let selected, let quote { start(selected: selected, quote: quote) }
+                    }
+                    .disabled(quote == nil || selected?.refusal != nil || overLimit)
+                    .fixedSize()
+                    HStack(spacing: 12) {
+                        Button("Cancel") { dismiss() }
+                            .fixedSize()
+                        Button("Download again") { held.downloadAgain(); dismiss() }
+                            .keyboardShortcut(.defaultAction)
+                            .fixedSize()
+                    }
+                }
+            } else {
+                Button("Cancel") { dismiss() }
+                Button(quote.map { String(format: L10n("Upscale · %@ credits"), SkyStudioCredits.text($0.credits)) } ?? L10n("Upscale")) {
+                    if let selected, let quote { start(selected: selected, quote: quote) }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(quote == nil || selected?.refusal != nil || overLimit)
             }
-            .keyboardShortcut(.defaultAction)
-            .disabled(quote == nil || selected?.refusal != nil || overLimit)
         }
     }
 

@@ -1573,6 +1573,11 @@
 "The result is ready on Sky Studio, but its download was stopped. Nothing more was charged. To get the same result, use Download again on this task in the generation task list." = "The result is ready on Sky Studio, but its download was stopped. Nothing more was charged. To get the same result, use Download again on this task in the generation task list.";
 "The result is ready on Sky Studio, but SkyCut could not save it on this Mac. Nothing more was charged. Free some disk space or check the output folder, then use Download again on this task in the generation task list." = "The result is ready on Sky Studio, but SkyCut could not save it on this Mac. Nothing more was charged. Free some disk space or check the output folder, then use Download again on this task in the generation task list.";
 "Download again" = "Download again";
+"Sky Studio made this clip's last upscale, but it did not reach this Mac. Download again gets it at no charge; a new version is a new paid upscale." = "Sky Studio made this clip's last upscale, but it did not reach this Mac. Download again gets it at no charge; a new version is a new paid upscale.";
+"Sky Studio made this clip's last voice change, but it did not reach this Mac. Download again gets it at no charge; a new version is a new paid voice change." = "Sky Studio made this clip's last voice change, but it did not reach this Mac. Download again gets it at no charge; a new version is a new paid voice change.";
+"Make a new version" = "Make a new version";
+"Make a new version (%@ credits)" = "Make a new version (%@ credits)";
+"Make a new version (up to %@ credits)" = "Make a new version (up to %@ credits)";
 "Download the finished result again; nothing more is charged" = "Download the finished result again; nothing more is charged";
 "This clip has no sound to change." = "This clip has no sound to change.";
 "This clip is muted. Unmute it first, then change its voice." = "This clip is muted. Unmute it first, then change its voice.";

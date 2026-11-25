@@ -11,6 +11,8 @@ import SwiftUI
 // 播放器的时钟。本地化：sheet 不继承应用内语言，调用处套 `.appLanguage()`。
 // The direct option (2026-11-21) is a checkbox just above the price it changes, with one line on when to use it; the line on
 // top says what lands in each mode. After a failed separation an orange line above the checkbox says so.
+// When this clip's own last change was made but did not come down (2026-11-26, SkyStudioPanelHeldDownload), Download again (free)
+// is the main button and the paid one reads "Make a new version (up to N credits)", under one line saying which is which.
 
 struct VoiceChangePanel: View {
     @StateObject private var model: VoiceChangePanelModel
@@ -70,20 +72,42 @@ struct VoiceChangePanel: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Divider()
-            HStack(alignment: .center, spacing: 12) {
-                Text(String(format: L10n("Spent today %@ of your %@-credit daily limit"), SkyStudioCredits.text(spend.spentToday()), SkyStudioCredits.text(spend.dailyLimit)))
-                    .font(.caption)
-                    .foregroundStyle(overLimit ? .red : .secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                // 两个按钮不许被压缩（带价的那个最长）：左边那一句让它折行。
-                Button("Cancel") { dismiss() }
+            if let held = model.held {
+                // A paid result is waiting: getting it again is free and the main button; a new version is a new paid change.
+                // Three buttons do not fit one row of this narrow sheet in every language: the paid one gets its own row.
+                Label(SkyStudioPanelHeldText.voiceChangeLine, systemImage: "arrow.down.circle")
+                    .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .bottom, spacing: 12) {
+                    spentToday(overLimit)
+                    Spacer(minLength: 8)
+                    VStack(alignment: .trailing, spacing: 8) {
+                        Button(SkyStudioPanelHeldText.voiceChangeNewVersion(model.quote?.credits), action: start)
+                            .disabled(model.quote == nil || overLimit)
+                            .fixedSize()
+                            .accessibilityIdentifier("voice-change-start")
+                        HStack(spacing: 12) {
+                            Button("Cancel") { dismiss() }
+                                .fixedSize()
+                            Button("Download again") { held.downloadAgain(); dismiss() }
+                                .keyboardShortcut(.defaultAction)
+                                .fixedSize()
+                                .accessibilityIdentifier("voice-change-download-again")
+                        }
+                    }
+                }
+            } else {
+                HStack(alignment: .center, spacing: 12) {
+                    spentToday(overLimit)
+                    Spacer(minLength: 8)
+                    // 两个按钮不许被压缩（带价的那个最长）：左边那一句让它折行。
+                    Button("Cancel") { dismiss() }
+                        .fixedSize()
+                    Button(VoiceChangeText.button(model.quote), action: start)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(model.quote == nil || overLimit)
                     .fixedSize()
-                Button(VoiceChangeText.button(model.quote), action: start)
-                .keyboardShortcut(.defaultAction)
-                .disabled(model.quote == nil || overLimit)
-                .fixedSize()
-                .accessibilityIdentifier("voice-change-start")
+                    .accessibilityIdentifier("voice-change-start")
+                }
             }
         }
         .padding(20)
@@ -94,6 +118,14 @@ struct VoiceChangePanel: View {
         .sheet(isPresented: $creatingVoice) {
             NewVoiceSheet(mode: .create, store: store).appLanguage()
         }
+    }
+
+    /// Today's spending against the daily limit (red when the quote would go over it).
+    private func spentToday(_ overLimit: Bool) -> some View {
+        Text(String(format: L10n("Spent today %@ of your %@-credit daily limit"), SkyStudioCredits.text(spend.spentToday()), SkyStudioCredits.text(spend.dailyLimit)))
+            .font(.caption)
+            .foregroundStyle(overLimit ? .red : .secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     /// 按「开始」：就是确认（VoiceChangePanelModel.start）；起了任务就收起。

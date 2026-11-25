@@ -50,6 +50,11 @@ enum SkyStudioCharacterManageTool {
         var plan = try SkyStudioCharacterPlan.make(args, capabilities: capabilities, saved: saved, files: files)
         let workflow = SkyStudioCharacterWorkflow(api: SkyStudioAPI(), key: key)
         if isJob { plan = try await workflow.quote(plan) }
+        // A paid create / headshot as sent (photos by their bytes): identical ones in a row are counted, the 5th asks (SkyStudioRepeatGuard).
+        var sent: String?
+        if plan.isPaid, !quoteOnly, let job = plan.job {
+            sent = try await SkyStudioRequestDigest.identity(job, files: files.map { .init(role: $0.role, url: $0.file) })
+        }
         guard SkyStudioCharacterAccess.stamp(key) == stamp, try SkyStudioCharacterJobs.account() == account else { throw SkyStudioCharacterError.changed }
         if quoteOnly {
             return .ok(["status": "quoted", "credits": .number(plan.quote!.credits), "model_id": plan.quote!.model.map(JSONValue.string) ?? .null,
@@ -78,13 +83,14 @@ enum SkyStudioCharacterManageTool {
         let mutationIdentity = try plan.mutation.map { try JSONValue.decode(JSONEncoder().encode($0)) } ?? .null
         let identity = SkyStudioApproval.identity(job: plan.job!, credits: credits,
             context: ["files": .array(identities), "account_stamp": .string(stamp), "mutation": mutationIdentity, "character_usage": plan.quote?.characterUsage?.json ?? .null])
+        let repeated = sent.map { SkyStudioRepeatGuard.shared.check(.manageCharacters, project: project.documentGeneration, identity: $0, credits: credits) }
         let reservation: SkyStudioJobGate.Reservation?
         if plan.isPaid {
             switch try SkyStudioJobGate.decide(credits: plan.quote!.credits, summary: plan.title, identity: identity, args: args,
                 reason: "Approve this exact paid Character library operation, model and resolution.",
                 overrides: [.init(reason: "Approve this exact paid Character library operation, model and resolution.", names: AIOverrideQuote.characterNames)],
                 project: account,
-                profile: "character-native:" + SkyStudioCharacterCache.digest(identity)) {
+                profile: "character-native:" + SkyStudioCharacterCache.digest(identity), repeated: repeated) {
             case .needsConfirmation(let question): return question
             case .reserved(let approved): reservation = approved
             }
@@ -95,7 +101,8 @@ enum SkyStudioCharacterManageTool {
         do {
             try await SkyStudioCharacterJobs.persist(receipt, creating: true)
             let job = SkyStudioCharacterRun(receipt: receipt, key: key, project: project, plan: plan, approvedFiles: identities, reservation: reservation).start()
-            let response = SkyStudioCharacterJobs.response(job, receipt: receipt)
+            if let repeated { SkyStudioRepeatGuard.shared.started(repeated) }
+            let response = SkyStudioRepeatWords.adding(repeated, to: SkyStudioCharacterJobs.response(job, receipt: receipt))
             SkyStudioGenerationRequests.complete(operationKey, result: response, scope: scope)
             return response
         } catch {

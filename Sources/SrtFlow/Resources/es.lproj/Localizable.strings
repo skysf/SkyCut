@@ -1573,6 +1573,11 @@
 "The result is ready on Sky Studio, but its download was stopped. Nothing more was charged. To get the same result, use Download again on this task in the generation task list." = "El resultado está listo en Sky Studio, pero su descarga se detuvo. No se cobró nada más. Para obtener el mismo resultado, usa «Descargar de nuevo» en esta tarea de la lista de tareas de generación.";
 "The result is ready on Sky Studio, but SkyCut could not save it on this Mac. Nothing more was charged. Free some disk space or check the output folder, then use Download again on this task in the generation task list." = "El resultado está listo en Sky Studio, pero SkyCut no pudo guardarlo en este Mac. No se cobró nada más. Libera espacio en el disco o revisa la carpeta de salida y luego usa «Descargar de nuevo» en esta tarea de la lista de tareas de generación.";
 "Download again" = "Descargar de nuevo";
+"Sky Studio made this clip's last upscale, but it did not reach this Mac. Download again gets it at no charge; a new version is a new paid upscale." = "Sky Studio hizo el último escalado de este clip, pero no llegó a este Mac. «Descargar de nuevo» lo obtiene gratis; una versión nueva es otro escalado de pago.";
+"Sky Studio made this clip's last voice change, but it did not reach this Mac. Download again gets it at no charge; a new version is a new paid voice change." = "Sky Studio hizo el último cambio de voz de este clip, pero no llegó a este Mac. «Descargar de nuevo» lo obtiene gratis; una versión nueva es otro cambio de voz de pago.";
+"Make a new version" = "Hacer una versión nueva";
+"Make a new version (%@ credits)" = "Hacer una versión nueva (%@ créditos)";
+"Make a new version (up to %@ credits)" = "Hacer una versión nueva (máximo %@ créditos)";
 "Download the finished result again; nothing more is charged" = "Descarga de nuevo el resultado terminado; no se cobra nada más";
 "This clip has no sound to change." = "Este clip no tiene sonido que cambiar.";
 "This clip is muted. Unmute it first, then change its voice." = "Este clip está silenciado. Quita el silencio primero y luego cambia la voz.";

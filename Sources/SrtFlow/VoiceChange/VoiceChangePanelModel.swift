@@ -45,6 +45,9 @@ final class VoiceChangePanelModel: ObservableObject {
     @Published var skipSeparation = false { didSet { if skipSeparation != oldValue { requote() } } }
     /// This clip's last change stopped because the separation failed: the panel says so (and opened with the direct option on).
     let separationFailedBefore: Bool
+    /// This clip's own last change, made but not downloaded (read when the panel opens; settable for off-screen renders): Download
+    /// again is the main button and the paid one makes a new version (SkyStudioPanelHeldDownload, 2026-11-26).
+    var held: SkyStudioPanelHeldDownload?
     @Published private(set) var source: Source = .preparing
     /// 这一段说的是什么语言（检测出来的；检测不出来是 nil）。
     @Published private(set) var spoken: String?
@@ -74,6 +77,7 @@ final class VoiceChangePanelModel: ObservableObject {
         clipSeconds = clip.sourceDuration
         separationFailedBefore = VoiceChangeActivity.shared.separationFailed(clipID)
         skipSeparation = separationFailedBefore
+        held = SkyStudioPanelHeldDownload.voiceChange(project: project, clipID: clipID)
     }
 
     // MARK: 给界面读的

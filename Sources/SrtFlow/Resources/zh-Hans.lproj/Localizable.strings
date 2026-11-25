@@ -1573,6 +1573,11 @@
 "The result is ready on Sky Studio, but its download was stopped. Nothing more was charged. To get the same result, use Download again on this task in the generation task list." = "成品已在 Sky Studio 上做好，但下载被停下了。没有再扣积分。要拿到同一份成品，请在生成任务列表里这一项上点「重新下载」。";
 "The result is ready on Sky Studio, but SkyCut could not save it on this Mac. Nothing more was charged. Free some disk space or check the output folder, then use Download again on this task in the generation task list." = "成品已在 Sky Studio 上做好，但 SkyCut 没能把它存到这台 Mac 上。没有再扣积分。请先腾出磁盘空间或检查输出文件夹，再在生成任务列表里这一项上点「重新下载」。";
 "Download again" = "重新下载";
+"Sky Studio made this clip's last upscale, but it did not reach this Mac. Download again gets it at no charge; a new version is a new paid upscale." = "Sky Studio 已经做好这一段上次的 Upscale，但它没能下载到这台 Mac。点「重新下载」免费取回；新做一版是另一次收费的 Upscale。";
+"Sky Studio made this clip's last voice change, but it did not reach this Mac. Download again gets it at no charge; a new version is a new paid voice change." = "Sky Studio 已经做好这一段上次的变声，但它没能下载到这台 Mac。点「重新下载」免费取回；新做一版是另一次收费的变声。";
+"Make a new version" = "新做一版";
+"Make a new version (%@ credits)" = "新做一版（%@ 积分）";
+"Make a new version (up to %@ credits)" = "新做一版（最多 %@ 积分）";
 "Download the finished result again; nothing more is charged" = "重新下载已经做好的成品，不会再扣积分";
 "This clip has no sound to change." = "这一段没有声音，变不了声。";
 "This clip is muted. Unmute it first, then change its voice." = "这一段静音了。先取消静音，再变声。";

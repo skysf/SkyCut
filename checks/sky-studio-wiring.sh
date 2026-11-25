@@ -36,7 +36,7 @@
 #       设计只经 SkyStudioVoiceDesignOrder，对话框按下去先过每日硬预算（SkyStudioJobGate.reserveWithoutAsking）再起任务；
 #       界面不用确认码（AIConfirmations）、Key 只静默读；声音库的视图不读工程、不订阅播放器的时钟。
 #   13. **变声（声音 PR 9）**：AI 的 change_voice 和片段右键的面板同一条路（VoiceChangeSource.prepare → VoiceChangeOrder.draft → 先过每日
-#       硬预算 → VoiceChangeOrder.start，VoiceChangeJob 只在那里造）；只判每日硬预算、不用确认码；落地恰好一次 perform、规则只有
+#       硬预算 → VoiceChangeOrder.start，VoiceChangeJob 只在那里造）；只判每日硬预算（a 5th identical change asks via the gate）；落地一次 perform、规则只有
 #       VoiceChangeLanding.land 一份；上传用途只写一处；块只往 VoiceChangeActivity 写目标，面板的视图不读工程。
 #   15. Music length and a generated video's sound (2026-11-19), in checks/sky-studio-wiring/generation-length-sound.sh.
 #   18. Uploads the network interrupts (2026-11-23), in checks/sky-studio-wiring/upload-retry.sh: one PUT, retried in SkyStudioAPI.upload;

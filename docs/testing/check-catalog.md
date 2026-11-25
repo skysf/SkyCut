@@ -415,8 +415,20 @@
     rule, the wholeness check, placement only through ExclusivePlacement (nothing at the name replaced or removed), the image check
     before the name, `renew:` on every paid download, holding until the result came down (an output folder that cannot be made too),
     the key in a request's identity as read, final bills only (upscale, voice change, refreshed by get_job), a voice change's files
-    given up by identity, no lookup of a held job by parameters and no Download again on the panels, tools or inspector, the rows, the
+    given up by identity, no lookup of a held job by parameters and no Download again on the tools or inspector, the rows, the
     hook's fence and the probe. Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
+- Identical paid requests in a row (2026-11-26, backlog B47 / B51): `scripts/check-sky-studio.sh` → `RepeatGuardChecks` (counting per
+  project + tool, only what started counts, other tools and projects do not break a run, a different request starts one, the 5th
+  asks and a yes covers only its run; the line and notes; identities: the canvas aspect, language, voice, options, model, prompt,
+  a character's revision, a source range, files by their bytes (a copy is the same, a changed file is not), never the key or price
+  cap, large files by samples; the gate: the 5th asks in full access and as one question with the draft reason in ask mode, a
+  draft-only token refused, the daily limit first, the lone question, design under a standing grant).
+  `scripts/check-voice-recovery.sh` → `RepeatRequestChecks` / `RepeatPanelChecks` (the tool entries with POSTs counted: generate_media
+  2nd–4th lines, the 5th asking before any POST, the same question when unanswered, the token, the 6th / 7th, an earlier job's key,
+  another project, 9:16 then 16:9, ask mode; upscale_clip's one merged question; change_voice's own question, another language or
+  voice; panels never counted; the panels' Download again for their own clip after a failed download, not for another project).
+  `checks/sky-studio-wiring/repeat-requests.sh` (sourced from download-retry.sh) pins where each tool counts, asks and adds the line,
+  that only the gate approves, that nothing on the panels' path counts, and how the panels find a held job.
 - Reference-image fitting: `scripts/check-sky-studio.sh` → `ReferenceFitChecks` (which records allow fitting, also on Sky
   Studio's own records; the strictest limits of a chain, each limit met exactly / one over / one under, refusals naming the
   limit, the exact copy size inside the aspect range, the chain, the reference check, the refusal listing each model's limit,
