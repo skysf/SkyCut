@@ -7,6 +7,7 @@ import SrtFlowMCPKit
 // of its body. One drop: the next try works at the same address. Three: the upload ends as upload_network after three tries, nothing
 // whole arrived, and the next upload in the process is not dropped. Unset, zero or garbage: nothing is dropped. That builds without
 // DEBUG (as release) carry no trace of the hook is checked by the same script with `strings`.
+// The download hook (SRTFLOW_TEST_DOWNLOAD_DROPS, 2026-11-24) is checked in the same binary: DownloadFaultChecks.swift.
 
 let key = "sk-" + String(repeating: "A", count: 43)
 let size = 2_000_000
@@ -15,10 +16,12 @@ let size = 2_000_000
 func api(_ server: UploadServer) -> SkyStudioAPI {
     var retry = SkyStudioUploadRetry()
     retry.sleep = { _ in }
+    var downloads = SkyStudioDownloadRetry()
+    downloads.sleep = { _ in }
     let configuration = URLSessionConfiguration.ephemeral
     configuration.connectionProxyDictionary = [:]
     return SkyStudioAPI(session: URLSession(configuration: configuration), base: URL(string: "http://127.0.0.1:\(server.port)/api/skycut/v1")!,
-                        version: "0.18.50", machine: nil, uploadRetry: retry)
+                        version: "0.18.50", machine: nil, uploadRetry: retry, downloadRetry: downloads)
 }
 
 func drops(_ value: String?) {
@@ -95,6 +98,7 @@ do {
         drops(value)
         check(!CloudUploadFault.claimDrop(), "\(CloudUploadFault.environmentKey)=\(value ?? "(unset)") drops nothing")
     }
+    await runDownloadFaultChecks(server, folder: folder)
 } catch {
     check(false, "the local upload server starts: \(error)")
 }

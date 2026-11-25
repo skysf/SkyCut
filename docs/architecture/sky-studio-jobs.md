@@ -220,6 +220,195 @@ Manual regression before a release (the checks cannot cut a real uplink):
       not cut off at the default window size. get_job has `code: upload_network`, `upload_attempts: 3` and `charged: false`, and
       no credits move.
 
+### Downloads that the network interrupts (2026-11-24, narrowed 2026-11-25, rounds 4 and 5 2026-11-26)
+
+Every paid output comes to this Mac through `SkyStudioAPI.download` (which hands it to `CloudResultDownload`) after Sky Studio made
+it: a generation and its caption sidecar, the official recovery, voiceover batches, an upscale, a voice change's files. A dropped
+connection there used to fail the job at once, so the user paid for a result SkyCut never saved
+([case](../bugfixes/2026-11-24-download-lost-connection-no-retry.md); the reviews of PR #554 found the gaps listed there). These rules
+hold:
+
+1. **Three GETs in all, redirects included** (`SkyStudioDownloadRetry`), 1 s then 2 s apart after a broken one. "Broken by the
+   network" is the upload's own rule (`SkyStudioUploadRetry.isTransient`). Every GET asks for the bytes as they are
+   (`Accept-Encoding: identity`; a resume keeps the request).
+   - **Resumed** from where it stopped when the system kept what had arrived: the error's own resume data, sent as `Range` with
+     `If-Range`. Progress goes on from the bytes already here, counted against the whole length (a 206's Content-Range total).
+     Resume data is only ever the system's own, from that error: data from anywhere else can crash `downloadTask(withResumeData:)`.
+     An answer with any Content-Encoding but identity is never resumed: its next GET starts again without a Range.
+   - **Started again** when nothing was kept (no ETag / Accept-Ranges, or the server sent everything again): progress back to 0.
+   - **Only the whole result is the result.** It is written into a private file next to where it goes and placed only when whole
+     (`SkyStudioDownloadRetry.wholeness`) and usable by the flow's own check (`check:`: an image's bytes must decode, and they name
+     its extension; a length-less answer holding only a PNG header once passed): never an empty body; a resumed 206 must reach the last byte (`bytes a-b/total`,
+     b = total - 1) with `total` bytes on disk; a 200 with a length must hold exactly it. The system decodes a Content-Encoding even
+     when identity was asked for and reports the decoded size as the length (a probe), so an encoded answer can never be checked:
+     an encoded 206 is never the result (a gzip 206 `bytes 29-52/53` decoded to exactly 53 bytes and overwrote a whole 2,000-byte
+     file on the first GET), and an encoded 200, like a 200 without a length, is whole but unchecked. Anything else is thrown away,
+     the result started again, and three of them end `download_incomplete`.
+   - **It takes its name without replacing or removing anything** (`CloudResultPlace`, through `ExclusivePlacement.placeOwned`, the
+     same placement as exports: an exclusive rename, else a hard link, else an `O_EXCL` copy): `stem.ext`, or the next free number of
+     that series at that moment. A name taken by anything (a file, a folder with its contents, a name that differs only in case, a
+     file SkyCut Beta or another process just placed) is never touched; names are never claimed only in memory. The placed file is
+     the flow's own by device and inode (`CloudResultFile.file`): a flow that gives it up removes it with
+     `ExclusivePlacement.discard`, only while it is still that file. Placing a WebM's editing copy and an upscale next to its
+     original go the same way. (Replacing a file at the name once overwrote a whole file with a gzip 206 and removed a folder that
+     had taken the name; two voice changes in SkyCut and SkyCut Beta overwrote each other's voice.) The download's own private files
+     (its partial, a flow's temporary files) are removed by name only while they are regular files, never recursively
+     (`CloudResultPlace.removePrivateFile`: a folder that took a `.part-*` path between two GETs was once removed with its contents).
+   - **The system never follows a redirect** here: a 3xx with a Location is followed by the next GET, which counts as one, and later
+     tries go to the target directly (three tries were once six GETs).
+2. **An HTTP answer is never tried again as it is**, even when its body broke afterwards (a 403 whose body broke is a 403).
+   - What URLSession does (local probes): an error answer whose body is cut (FIN or RST) completes **without** an error, with its
+     status. An answer whose body stalls before any of it flows times out with its status held back: `task.response` is nil and the
+     task's metrics carry no status either, only that an answer began. That held-back answer counts as an answer (a 500 whose body
+     stalled looks the same): it asks the job for its current address once and goes there when it differs; the same address is
+     never fetched again after it, so at most that one more GET, then the result is held.
+   - **403 / 404 / 410** (the address expired or was withdrawn) asks the original job once for its current address (`renew`:
+     `GET /jobs/{id}`, only a read) and tries it when it differs and a try is left. The same address again, a second refusal or a
+     failed renewal ends the download as refused; the words say "also at the fresh address" only when a GET went to one.
+     **Nothing is ever submitted again.**
+   - Any other answer (a 500 too) and a connection that does not work at all (TLS, address) end it at once.
+3. **Giving up, or a stop, is `SkyStudioDownloadFailure`**, an error of its own (it only comes after a job is done, never through
+   `SkyStudioJobRun`); only `CloudResultDownload` builds one, and a flow stopped outside a GET says `.stopped(attempts:)` with the GETs
+   it had sent:
+   - kinds and codes: interrupted and could not connect are `download_network`, not whole is `download_incomplete`, refused (with its
+     status) is `download_refused`, stopped is `download_stopped`, and this Mac could not keep it (moving the system's download in,
+     placing it, the disk, an output folder that cannot be made: a flow says `.notSaved`) is `download_not_saved`; `download_attempts` is the GETs really
+     sent (a stop once always said 0), all of a flow's GETs when it downloads more than one file (a voice change's stop during its
+     background once said 1 of 2);
+   - the AI gets the English `message`, the code, `download_attempts`, `download_error`, and a `next_step` that says the result was
+     made, nothing more was charged, the exact way back to this job's result (below), and what a new call would do instead (a new
+     paid job). Neither asserts the charge: billing may still be pending, and each job's own billing fields say it;
+   - the user reads one line per kind (`SkyStudioDownloadWords`, English, 简体中文, Español): the result is ready on Sky Studio, what
+     kept it from this Mac, nothing more was charged, and "use Download again on this task in the generation task list". It never
+     suggests asking for the same thing again, and it names the network, never a proxy.
+4. **The paid result is kept for Download again on its own job until it has come down**, whatever kept it from landing: the download
+   gave up, it was stopped, it could not be saved here (a file where the output folder should be once ended the job and lost the way
+   back), or a local step after it failed (an upscale's sound or save, a voice change's files). The job ends failed
+   (stopped: cancelled) and its task row stays with the line and a **Download again** button. Download again reads the original job's
+   current result first (fresh addresses for expired ones; when the job cannot be read now, the held result is used), then downloads
+   it, only GETs, under the same AI job id (`AIJobs.reopen`, so get_job follows it). While it runs, asking again starts nothing more;
+   if it fails again, the result stays held. Never charged again: no quote, upload, reservation or POST happens. Only the job's own
+   identity reaches it:
+   - generate_media (`SkyStudioGenerationRun`, the delivery in `SkyStudioGenerationDelivery`): the row's button, and generate_media
+     called again **with that job's idempotency_key** and the same arguments, which answers `downloading_again` with the same job id.
+     It stays held until the result is placed after its check (an image that decodes): a result that fails the check is a failed
+     download, never an arrived one.
+     The key is part of what a request is bound to, as before this PR, as SkyCut reads it: trimmed, the same at intake and in the
+     receipt (a key sent with spaces, then copied from the receipt, was once refused as other inputs), or the one SkyCut made for a
+     call without one, so the key it returned names that same request. It works after the row is dismissed: held results are registered by job id
+     (`SkyStudioHeldDownloads`, released only once the result came down). An optional SRT that did not come down leaves the video
+     saved with `caption_issue`, and that key fetches only the SRT;
+   - official film generation and the official recovery: the row's button, and generate_media with the same film arguments and that
+     operation's own key (its cached answer names the held job); a recovery after a restart reads the receipt as before. A film
+     submission without a key is refused before anything is sent, so its next step never says that one is charged;
+   - upscale (`UpscaleJob`, `UpscalePipeline.deliver`): the job's own task row; Cancel during the paid download keeps the job there,
+     stopped and held. Sky Studio's charge reaches the day's books as soon as it is made (`onMade`) once its bill is final, from
+     whichever field it sends (`UpscaleDelivery.charge(of:)`: the bill's net `credits_charged`, else the top-level one), and again
+     when Download again's re-read carries a final charge the first answer did not; the saved upscale reports that same charge.
+     While the bill is under review, a refund is pending or it is still reserved, the reservation stays (a bill under review once
+     settled at its 72 of 75 and was reported as charged), also when the first download succeeds: the receipt says
+     `billing_pending` with `credits_reserved` (never the quote as the charge), and get_job reads the original job again
+     (`UpscaleJob.refreshBill`) until the bill is final, then the books and the receipt take that charge;
+   - voice change (`VoiceChangeJob`): the job's own task row (the result stays on Sky Studio for 60 days); the job no longer loops on
+     its own (that multiplied the GETs). Its files belong to its own cloud job: each takes its name on disk when it is whole
+     (`VoiceChangeOutputName.places` → `CloudResultPlace`; the background numbers from 2 when its stem matches the voice's in case
+     only), and a failure or a stop deletes only a file that download placed, while it is still that file and no open project's
+     timeline uses it (two jobs once chose the same two paths and a cancel deleted the other's files; across SkyCut and SkyCut Beta
+     a new job overwrote the old one's voice; a cancel deleted a file that had replaced its own). Its bill settles only once final,
+     as an upscale's (`SkyStudioJobStatus.finalCharge`, get_job reads it again), and every receipt after that says the settled bill
+     (a Download again once showed it pending again);
+   - voiceover batches: the row's button runs the same local recovery as `add_voiceover resume=recovery_file` (only GETs the original
+     jobs; `generate_missing` stays off), as a new job, from the record as it is on disk (a resume that already landed the voiceover
+     leaves it inserted, so the row adds nothing); a user's stop during the batch download keeps the button. A batch file that does
+     not decode is forgotten (and removed), so the resume downloads it again from its original job (a 4-byte WAV once made the paid
+     batch unreachable); a batch recovered while its bill is under review keeps its unknown amount (`SkyStudioJobStatus.finalCharge`).
+   - **Asking again for the same thing is a new request** (user, 2026-11-25: "an identical paid request sent again is a deliberate new
+     version"): generate_media without that job's key (or with another), upscale_clip, change_voice and the upscale / voice change
+     panels start a new paid job, even for identical input; nothing maps a new request to an old held job by its parameters (that
+     once handed a 9:16 request the old 16:9 image, a Chinese voice change the old English one, and project B's upscale to project
+     A's clip). The upscale inspector shows the download line but offers no Download again (it finds jobs by their source file). A
+     guard for many identical repeats in a row is a separate change.
+   - Dismissing the row keeps generate_media's key as a way back; quitting SkyCut gives it up (the result stays in the user's Sky
+     Studio library; a voice change's 60 days; voiceover's recovery file; the official receipt).
+
+Checks:
+- `DownloadRetryChecks` and `DownloadEdgeChecks` in `scripts/check-sky-studio.sh`, against the local server (`UploadServer.swift` serves
+  results with an ETag and Range support):
+  - one drop mid-body: the second GET resumes (Range, If-Range), every GET asks for identity bytes, progress never goes back, the
+    file is byte-identical;
+  - without validators the next GET starts again (progress back to 0); a reset then a cut then the rest;
+  - three drops: interrupted after three GETs, nothing left, and a later download of the same address gets the identical file;
+  - a short 206: thrown away (it never reads 100%) and the next GET fetches the whole result; a gzip 206 for the second half, and one
+    decoding to exactly its total (`bytes 29-52/53`): never the result, three of them `download_incomplete`, the 2,000-byte file at
+    the destination untouched; a whole gzip 200 takes the next free name beside that file; a gzip 200 the network broke starts again
+    without a Range; an empty 200: never the result;
+  - a folder at the name (with a file in it) and a name differing only in case are left whole, the result takes the next number; a
+    folder SkyCut may not write, before the GET and once the result is whole, ends `download_not_saved` after one GET (the real write
+    errors, which a reverse check maps back to a network failure);
+  - a 403 whose body stalls: the job's fresh address at once; a 500 whose body stalls with the same address from the job, or with no
+    way to ask: one GET; stalled at both addresses: two GETs, never a third;
+  - a redirect, a cut, then the rest: three GETs; a redirect then drops: three GETs, not six;
+  - a 403 renewed once to a fresh address that works; a 404 without renewal, a 404 whose body broke after its head, the same address
+    again (never called a fresh one), a second refusal and a 500 each end refused; a TLS failure ends as could not connect; a stop
+    mid-body, during the pause and during the second GET stops promptly, leaves nothing and says the GETs it sent;
+  - the wholeness rule, Content-Range and redirect targets as pure checks;
+  - `ImageResultChecks`: an image's check names its extension; a PNG header alone is thrown away and the next GET's image is saved,
+    three of them end `download_incomplete` with nothing placed.
+- `ExclusivePlacementChecks` (`swift run SrtFlowCoreChecks`, also on exFAT): `placeOwned` leaves a folder at the name whole and says
+  which file it placed; `discard` never removes a file that replaced it.
+- `HeldDownloadChecks` in `scripts/check-sky-studio.sh`: the key is part of a request's identity (trimmed; SkyCut's own key filled
+  in); only that key's cached answer reaches the held job, which stays held while it downloads again and until it is released;
+  another key is a new request.
+- `scripts/check-voice-recovery.sh` (real App objects, fake Sky Studio):
+  - `PaidToolEntryChecks`, through the tool entries with POSTs counted: generate_media's returned key downloads the held job's
+    identical file with no POST after its row was dismissed, a key-less call and another key are each exactly one new POST, 9:16
+    after 16:9 is a new job asking for 9:16; a key sent with spaces, sent back as the receipt gives it, is the same request; an
+    output folder a file stands in for holds the result (`download_not_saved`, no file GET), and once it is fixed the job's own key
+    downloads it with no POST; so does an output folder SkyCut may not write (after its one GET); upscale_clip from project B for
+    project A's held source is B's own new job (A's clip untouched, A still held); an upscale saved while its bill is under review
+    keeps 75 reserved with `billing_pending`, and get_job settles it at 72 once the bill is final;
+  - `GenerationDownloadChecks` (held after three drops, held again after a failed Download again, nothing started twice, the key path
+    after the row was dismissed, a stop with its one GET, empty answers, PNG headers held until the image is saved, a folder at the
+    name left whole, a missing SRT), `VoiceChangeDownloadChecks` (the same change and Chinese after English are new jobs; the held
+    row's Download again, a stop, an expired address; a bill under review kept reserved until get_job reads it final),
+    `UpscaleJobDownloadChecks` (the books at 72 of 75 from each charge field alone and from Download again's re-read; 75 kept while
+    the bill is under review, 72 once it is final; Cancel while downloading again), `VoiceoverDownloadChecks` (the row's recovery,
+    never twice after a resume, a stop keeps the button), `OfficialRecoveryDownloadChecks` (through generate_media with film
+    arguments and the operation's key: held, held again through a 503 while reading the job, then downloaded by that key, nothing
+    quoted or submitted), `OfficialFilmRunChecks` (a real official film generation, its production plan and authority, held after
+    three drops: its next step says a key-less film call is refused, never charged), `VoiceChangeOwnFilesChecks` (the background's
+    stem never matches the voice's; cancelling a new change while the held one's Download again lands leaves the held one's files on
+    the timeline; another process's file at the voice's name is never replaced or deleted; a voice called like the background lands
+    as its own file; a stop during the background says both GETs, keeps a voice a timeline uses, never deletes a file that replaced
+    its voice, and deletes a voice nothing uses); and the paid jobs of all these download checks give their job slots back (a held
+    download, Download again, a stop, a pending bill never keep one: a slot goes back when the Sky Studio job ends).
+- `runUpscaleDownloadChecks` in `scripts/check-upscale.sh`: a charge counts only once its bill is final (under review, a refund pending,
+  still reserved: none), the bill's net first.
+- `DownloadChecks` in `scripts/check-upscale.sh`: the charge handed over before any download (each field alone), held after three
+  drops, Download again with no new upload or job, a stop held with its GETs.
+- `checks/sky-studio-wiring/download-retry.sh` pins the single GET inside the loop, identity bytes, the answer read first, the
+  held-back rule, the wholeness check, `renew:` on every paid download, holding until the result came down, the key in a request's
+  identity, no lookup of a held job by parameters and no Download again on the panels, tools or inspector, the rows' buttons, the
+  hook's fence and the probe.
+
+**Smoke tests against the real Sky Studio: `SRTFLOW_TEST_DOWNLOAD_DROPS=N`, debug builds only** (`CloudDownloadFault`, reached only
+from `CloudResultDownload.fetch` inside `#if DEBUG`). The first N GETs of the process are cut once a quarter of the body (at most
+256 KB) arrived: cancelled with the system's resume data and ended as URLError -1005, so the next GET resumes. A body that arrived
+whole before the cut is still dropped (the next GET starts again); an HTTP answer stands. With `N=1` the job completes with the file
+whole; with `N=3` it fails with the line and `download_network`, and Download again gets the same file with no new job. The hook's
+checks (`checks/UploadFault/DownloadFaultChecks.swift`, in the `-D DEBUG` binary) and the release probe (`scripts/debug-hook-probe.sh`,
+whose refusal of the debug build must name both hooks) are as for uploads.
+
+Manual regression before a release (the checks cannot cut a real link):
+
+- [ ] Turn Wi-Fi off for a few seconds while a generated video downloads: the row's download percentage pauses, then goes on from
+      where it was (or from 0) and the job completes.
+- [ ] Keep the network off through the download: after about 3 s the row shows the line in English, 简体中文 and Español with
+      Download again, get_job has `code: download_network`, `download_attempts: 3` and the job's idempotency_key; network back,
+      Download again: the same job id completes, the file is there and Sky Studio's billing shows one charge.
+- [ ] With a held upscale and a held voice change, open their panels for the same input: each offers its usual paid button (a new
+      job), and only the held job's own row offers Download again.
+
 ## 二、Sky Studio 那边实测的细节（2026-10-28 真服务器跑过 8 种活）
 
 - `/uploads`：PUT 时**原样带上回答里 `headers` 的每一项**，少带或改了签名对不上。PUT 成功后 `file_url` 马上能读。`purpose`：`video`（mp4 / mov，≤ 200 MB）、`image`（jpeg / png / webp，≤ 30 MB）、`audio`（wav / mp3，≤ 15 MB），60 天后自动删。
@@ -235,6 +424,8 @@ Manual regression before a release (the checks cannot cut a real uplink):
 | --- | --- |
 | `SkyStudioAPI.swift` | 请求：`/models`、`/quote`、`/uploads` + PUT、`/jobs`、`/jobs/{id}`、`/jobs/{id}/cancel`、下载成品（传文件经 `CloudTransferDelegate`：流着发 / 收、字节进度） |
 | `SkyStudioUploadRetry.swift` / `SkyStudioUploadWords.swift` | A PUT the network breaks: which errors are tried again, the pauses, the `/uploads` ticket and when to renew it, the error after the last try (English and fields for the AI) / the user's localized line (section 1, "Uploads that the network interrupts") |
+| `SkyStudioDownloadRetry.swift` / `SkyStudioDownloadFailure.swift` / `SkyStudioDownloadWords.swift` | A paid result's GET the network breaks: tries, pauses, which answers renew the address, one try's outcome, wholeness and redirect targets / the error after the last try (English and fields for the AI) / the user's localized line (section 1, "Downloads that the network interrupts"); the GETs themselves are `CloudMedia/CloudResultDownload.swift` |
+| `SkyStudioHeldDownloads.swift` / `SkyStudioGenerationDelivery.swift` | Paid generation results held for Download again by their own AI job id until they came down (the job's own idempotency_key finds them after the row is dismissed) / a generation's delivery (download, image format, WebM copy, SRT, official receipt, music), which Download again runs again |
 | `SkyStudioJob.swift` | 纯值：请求体（`/quote` 的那一份去掉 inputs、max_credits、idempotency_key）、报价、任务的状态、成品、取消的结果 |
 | `SkyStudioModels.swift` | 纯值：`/models` 读成 `SkyStudioCatalog`（按 kind 找、上限、参数的取值） |
 | `SkyStudioJobRun.swift` | 交一件活、等它做完：交之前领槽、满了等着再交、照 `poll_after_seconds` 问、断网几次不算、停的规矩；`SkyStudioJobError` |
@@ -424,7 +615,8 @@ Manual regression before a release (the checks cannot cut a real uplink):
 - `scripts/check-sky-studio.sh` 第 8 组（`SpendChecks.swift`）：积分的每日上限默认 1,000、额度内照做 / 超了不做、记账退回按那一天、上限夹住取整、存下来读回来一样。
 - `scripts/check-sky-studio.sh` group 13 (`UploadRetryChecks.swift` with `UploadServer.swift`, a real local 127.0.0.1 server and no proxy):
   uploads the network interrupts, as listed under section 1, "Uploads that the network interrupts". `checks/sky-studio-wiring/upload-retry.sh`
-  checks that there is one PUT and how each job that uploads is wired.
+  checks that there is one PUT and how each job that uploads is wired. Downloads the network interrupts (`DownloadRetryChecks.swift` and
+  `DownloadEdgeChecks.swift`, the same server) and their wiring (`checks/sky-studio-wiring/download-retry.sh`): section 1, "Downloads that the network interrupts".
 - `scripts/check-sky-studio.sh` 第 9 组（`GenerationChecks.swift`）：generate_media 种类的词表和 `SkyStudioGeneration` 对账、每种的默认值（画幅跟画布 / 首帧、
   目录没给取值时视频 5 秒 768p、音效 5 秒 wav、音乐纯音乐不给时长）、秒数取整、用不上的参数说一句不送、请求体（首帧放 `inputs.image_url`、`/jobs` 才带 `max_credits`）、
   问句和状态行上的记号、离谁最近的画幅、成品的扩展名。

@@ -9,6 +9,10 @@ import Foundation
 // with `slowRead` the server reads 32 KB every 10 ms, so a client that cuts early is seen mid-body). Each connection carries one
 // request (`Connection: close`), so the client never reuses a connection and never replays a request on its own. Real sockets, so
 // the system's own transfer code is what is tested; no proxy and no real network.
+// Downloads (DownloadRetryChecks, 2026-11-24): each `GET /files/…` gets the next `GetReply`: the whole result (200 with an ETag and
+// Accept-Ranges, so the system can resume; a resumed try's Range, with a matching If-Range, gets 206 and the rest), part of the body
+// then the connection closed or reset, an HTTP error, its head then a stall until the client goes away, a short or gzip 206, a
+// redirect, or an empty 200.
 
 final class UploadServer: @unchecked Sendable {
     /// `…ThenStall` / `…ThenReset`: the answer's head and 1 KB of its body go out, then the connection hangs (the client times out) or
@@ -23,6 +27,22 @@ final class UploadServer: @unchecked Sendable {
     /// the signed address is https, which this plain server cannot speak), or the connection dropped after the request.
     /// `status`: an HTTP error with a plain body; `refusal`: Sky Studio's own error answer; `noAddress`: a 200 without `upload_url`.
     enum TicketReply: Sendable { case ticket(life: TimeInterval?, tls: Bool = false), drop, status(Int), refusal(Int, code: String, reason: String? = nil), noAddress }
+
+    /// What a `GET /files/…` gets. `slow`: the whole result in 32 KB pieces every 10 ms (a client that cuts early is seen mid-body).
+    /// `cut` / `cutReset`: the head (the whole length declared) and that many body bytes from where the Range starts, then the
+    /// connection closed (FIN) or reset. `stall`: the head and 1 KB, then nothing until the client goes away. `statusCut`: an HTTP error
+    /// whose head declares 64 KB, then 1 KB of it and the connection closed; `statusStall`: only its head, then nothing.
+    /// `shortRange`: a resumed GET answered 206 with only that many bytes from where the Range starts (`bytes a-b/total`, b short of the
+    /// end), the answer itself whole. `redirect`: a 302 to another result on this server. `gzipRange`: whatever was asked, a gzip 206
+    /// with that Content-Range whose body decodes to the result's first `decoded` bytes (the reviews of PR #554: `bytes 29-52/53`
+    /// decoding to exactly 53 bytes once overwrote a whole file). `gzipWhole`: a 200 with the whole result gzip-encoded (its length
+    /// cannot be checked); `gzipCut`: the same, declaring its encoded length, cut halfway through it (FIN). `empty`: a 200 with no
+    /// body.
+    enum GetReply: Sendable {
+        case file, slow, cut(Int), cutReset(Int), status(Int), statusCut(Int), statusStall(Int), stall, shortRange(Int), redirect(String)
+        case gzipRange(decoded: Int, range: String), gzipWhole, gzipCut, empty
+    }
+    static let etag = "\"skycut-check-1\""
 
     struct Seen: Sendable {
         let method: String
@@ -45,6 +65,10 @@ final class UploadServer: @unchecked Sendable {
     private var clockOffset: TimeInterval = 0
     private var slowRead = false
     private var seen: [Seen] = []
+    private var gets: [GetReply] = [.file]
+    private var getsServed = 0
+    private var result = Data()
+    private var validators = true
 
     init() throws {
         let socket = Darwin.socket(AF_INET, SOCK_STREAM, 0)
@@ -81,6 +105,21 @@ final class UploadServer: @unchecked Sendable {
         seen = []
         lock.unlock()
     }
+
+    /// The next download scenario: what the GETs get in order (the last one repeats), the result's bytes, and whether its answers carry
+    /// an ETag / Accept-Ranges / Last-Modified (without them the system cannot resume). Clears the log.
+    func configureDownload(gets: [GetReply], result: Data, validators: Bool = true) {
+        lock.lock()
+        self.gets = gets.isEmpty ? [.file] : gets
+        getsServed = 0
+        self.result = result
+        self.validators = validators
+        seen = []
+        lock.unlock()
+    }
+
+    /// The result's address on this server (`tls`: https, which this plain server cannot speak).
+    func resultURL(_ name: String, tls: Bool = false) -> URL { URL(string: "\(tls ? "https" : "http")://127.0.0.1:\(port)/files/\(name)")! }
 
     var log: [Seen] {
         lock.lock()
@@ -139,6 +178,14 @@ final class UploadServer: @unchecked Sendable {
             // A TLS client on this plain server (an https address): a plain answer makes its handshake fail.
             lock.unlock()
             respond(client, status: "400 Bad Request", body: "", extra: [])
+            return
+        }
+        if request.method == "GET", request.path.hasPrefix("/files/") {
+            let answer = gets[min(getsServed, gets.count - 1)]
+            getsServed += 1
+            let (body, validated) = (result, validators)
+            lock.unlock()
+            serveGet(client, answer, body: body, validators: validated, headers: request.headers)
             return
         }
         let reply: PutReply?
@@ -214,6 +261,94 @@ final class UploadServer: @unchecked Sendable {
         }
     }
 
+    /// A download's answer: a resumed try's Range is honoured only with validators and a matching If-Range (else the whole body again).
+    private func serveGet(_ client: Int32, _ reply: GetReply, body: Data, validators: Bool, headers: [String: String]) {
+        if case .status(let code) = reply {
+            respond(client, status: "\(code) Error", body: "<Error><Code>AccessDenied</Code></Error>", extra: ["Content-Type: application/xml"])
+            return
+        }
+        if case .statusCut(let code) = reply {
+            begin(client, status: "\(code) Error", declaredLength: 65_536)
+            usleep(200_000)
+            shutdown(client, SHUT_WR)
+            close(client)
+            return
+        }
+        if case .statusStall(let code) = reply {
+            begin(client, status: "\(code) Error", declaredLength: 65_536, bodyBytes: 0)
+            return hold(client)
+        }
+        if case .redirect(let name) = reply {
+            return respond(client, status: "302 Found", body: "", extra: ["Location: /files/\(name)"])
+        }
+        if case .empty = reply {
+            return respond(client, status: "200 OK", body: "", extra: ["Content-Type: video/mp4"])
+        }
+        if case .gzipRange(let decoded, let range) = reply {
+            let packed = Self.gzip(body.prefix(decoded))
+            let head = ["HTTP/1.1 206 Partial Content", "Content-Length: \(packed.count)", "Content-Type: video/mp4", "Content-Encoding: gzip",
+                        "Content-Range: \(range)", "Connection: close"].joined(separator: "\r\n") + "\r\n\r\n"
+            write(client, Data(head.utf8) + packed)
+            shutdown(client, SHUT_WR)
+            close(client)
+            return
+        }
+        if case .gzipWhole = reply { return serveGzip(client, Self.gzip(body), cutAfter: nil, validators: validators) }
+        if case .gzipCut = reply {
+            let packed = Self.gzip(body)
+            return serveGzip(client, packed, cutAfter: packed.count / 2, validators: validators)
+        }
+        var start = 0
+        if validators, let range = headers["range"], range.hasPrefix("bytes="), headers["if-range"].map({ $0 == Self.etag }) ?? true,
+           let offset = Int(range.dropFirst(6).prefix { $0 != "-" }), offset < body.count {
+            start = offset
+        }
+        // A short 206 ends `bytes` past where the Range starts, short of the result's end.
+        var end = body.count
+        if case .shortRange(let bytes) = reply, start > 0 { end = min(body.count - 1, start + bytes) }
+        var head = [start > 0 ? "HTTP/1.1 206 Partial Content" : "HTTP/1.1 200 OK", "Content-Length: \(end - start)",
+                    "Content-Type: video/mp4", "Connection: close"]
+        if validators { head += ["ETag: \(Self.etag)", "Accept-Ranges: bytes", "Last-Modified: Mon, 23 Nov 2026 07:00:00 GMT"] }
+        if start > 0 { head.append("Content-Range: bytes \(start)-\(end - 1)/\(body.count)") }
+        write(client, Data((head.joined(separator: "\r\n") + "\r\n\r\n").utf8))
+        switch reply {
+        case .file, .shortRange:
+            write(client, body.subdata(in: start..<end))
+            shutdown(client, SHUT_WR)
+            close(client)
+        case .slow:
+            var at = start
+            while at < body.count, isRunning {
+                let end = min(body.count, at + 32_768)
+                guard write(client, body.subdata(in: at..<end)) else { break }
+                at = end
+                usleep(10_000)
+            }
+            shutdown(client, SHUT_WR)
+            close(client)
+        case .cut(let bytes), .cutReset(let bytes):
+            write(client, body.subdata(in: start..<min(body.count, start + bytes)))
+            usleep(200_000)   // the client takes in what arrived before the connection goes
+            if case .cutReset = reply { resetAndClose(client) } else { shutdown(client, SHUT_WR); close(client) }
+        case .stall:
+            write(client, body.subdata(in: start..<min(body.count, start + 1_024)))
+            hold(client)
+        case .status, .statusCut, .statusStall, .redirect, .gzipRange, .gzipWhole, .gzipCut, .empty:
+            break
+        }
+    }
+
+    /// A 200 with a gzip body (its encoded length declared), whole or cut after `cutAfter` encoded bytes.
+    private func serveGzip(_ client: Int32, _ packed: Data, cutAfter: Int?, validators: Bool) {
+        var head = ["HTTP/1.1 200 OK", "Content-Length: \(packed.count)", "Content-Type: video/mp4", "Content-Encoding: gzip", "Connection: close"]
+        if validators { head += ["ETag: \(Self.etag)", "Accept-Ranges: bytes", "Last-Modified: Mon, 23 Nov 2026 07:00:00 GMT"] }
+        write(client, Data((head.joined(separator: "\r\n") + "\r\n\r\n").utf8))
+        write(client, packed.prefix(cutAfter ?? packed.count))
+        if cutAfter != nil { usleep(200_000) }   // the client takes in what arrived before the connection goes
+        shutdown(client, SHUT_WR)
+        close(client)
+    }
+
     /// Keep the connection open without answering until the client closes it (a cancel) or the server stops.
     private func hold(_ client: Int32) {
         var buffer = [UInt8](repeating: 0, count: 256)
@@ -246,14 +381,17 @@ final class UploadServer: @unchecked Sendable {
         close(client)
     }
 
-    private func write(_ client: Int32, _ bytes: Data) {
+    /// False when the client went away before all of it was sent.
+    @discardableResult
+    private func write(_ client: Int32, _ bytes: Data) -> Bool {
         bytes.withUnsafeBytes { raw in
             var sent = 0
             while sent < raw.count {
                 let count = send(client, raw.baseAddress!.advanced(by: sent), raw.count - sent, 0)
-                if count <= 0 { break }
+                if count <= 0 { return false }
                 sent += count
             }
+            return true
         }
     }
 
@@ -303,5 +441,17 @@ final class UploadServer: @unchecked Sendable {
         formatter.timeZone = TimeZone(identifier: "GMT")
         formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss 'GMT'"
         return formatter.string(from: date)
+    }
+
+    /// A gzip member (RFC 1952) around the system's raw DEFLATE of `bytes`.
+    static func gzip(_ bytes: Data) -> Data {
+        let deflated = (try? (bytes as NSData).compressed(using: .zlib)) as Data? ?? Data()
+        var crc: UInt32 = 0xFFFF_FFFF
+        for byte in bytes {
+            crc ^= UInt32(byte)
+            for _ in 0..<8 { crc = crc & 1 == 1 ? (crc >> 1) ^ 0xEDB8_8320 : crc >> 1 }
+        }
+        func little(_ value: UInt32) -> Data { withUnsafeBytes(of: value.littleEndian) { Data($0) } }
+        return Data([0x1F, 0x8B, 0x08, 0, 0, 0, 0, 0, 0, 0x03]) + deflated + little(~crc) + little(UInt32(truncatingIfNeeded: bytes.count))
     }
 }

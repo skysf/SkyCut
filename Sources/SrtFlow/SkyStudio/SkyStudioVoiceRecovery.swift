@@ -26,6 +26,13 @@ final class SkyStudioVoiceRecovery {
 
     private init(file: URL, value: SkyStudioVoiceCheckpoint) { self.file = file; self.value = value }
 
+    /// The record as it is on disk now: a recovery started from it never works from a copy another recovery has moved on since
+    /// (a failed row's Download again after a successful resume, 2026-11-25).
+    static func reading(_ file: URL) async throws -> SkyStudioVoiceRecovery {
+        let value = try await MediaReadQueue.run(on: MediaReadQueue.voice) { Result { try SkyStudioVoiceRecoveryStore.read(file) } }.get()
+        return SkyStudioVoiceRecovery(file: file, value: value)
+    }
+
     func save() async throws {
         let snapshot = value, file = file, previous = saving
         let next = Task {
@@ -81,8 +88,8 @@ final class SkyStudioVoiceRecovery {
         // confirm_token 也可能是在答「读别处的文件」：这一次要问读的，令牌就不当一次性费用的答复（SkyStudioVoiceFallbackFee）。
         var readAsked = !readsWithoutAsking([file], project: project)
         if let ask = try AIWorkspace.shared.confirmReading([file], verb: "read voiceover recovery", args: args, project: project) { return ask }
-        let value = try await MediaReadQueue.run(on: MediaReadQueue.voice) { Result { try SkyStudioVoiceRecoveryStore.read(file) } }.get()
-        let recovery = SkyStudioVoiceRecovery(file: file, value: value)
+        let recovery = try await reading(file)
+        let value = recovery.value
         let input = try recovery.input(for: project)
         // 记录里的文件也过既有读取授权；恢复文件不是任意路径读权限的通行证。
         let files = value.batches.compactMap(\.rawFile) + value.outputs.values.map(\.url)

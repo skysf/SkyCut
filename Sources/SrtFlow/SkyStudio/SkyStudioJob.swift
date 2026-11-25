@@ -193,6 +193,16 @@ struct SkyStudioJobStatus: Equatable, Sendable {
 
     var isFinished: Bool { state == .done || state == .failed || state == .cancelled }
 
+    /// Sky Studio's final charge for this job, from whichever field it sent: the bill's net `credits_charged`, else the top-level one.
+    /// nil while the bill is not final (under review, a refund pending, still reserved) or when neither says: the reservation then stays
+    /// on the day's books until a final bill comes (a bill under review was once settled at its own amount, or at the quote, and
+    /// reported as charged: the reviews of PR #554).
+    var finalCharge: Double? {
+        if let billing, !billing.isFinal { return nil }
+        guard let charged = billing?.netCharged ?? creditsCharged, charged.isFinite, charged >= 0 else { return nil }
+        return charged
+    }
+
     init(jobID: String, state: State?) {
         self.jobID = jobID
         self.state = state

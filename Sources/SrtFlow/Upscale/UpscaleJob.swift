@@ -10,6 +10,12 @@ import Foundation
 // 没花出去的退回账上：没交上（裁、传的时候停了 / 出错）、排队中取消了、Sky Studio 说没做成（它自己退钱）。账的那一笔是 `SkyStudioHeldCredits`（和生成共用）。
 // 交上之后停不下来的（已经开始了、取消没送到）照实说：积分花了，成品照样进用户的 Sky Studio 作品库。
 // 做完**不替换**：对比窗口里用户点了 Replace 才换（upscale 方案第 15 条）。2026-10-28 起走 Sky Studio（收费方案第 6 刀），之前走 fal。
+// A download that gave up (UpscaleUndelivered) ends the job failed with the localized line, a stop once it was made ends it stopped,
+// and both keep the result: Download again (this job's own task row, `retryDownload`) reads the job's current result, gets it, puts
+// the sound back and saves it; nothing is submitted (2026-11-24). upscale_clip or the panel asked again, even for the same input, is a
+// new paid upscale (user, 2026-11-25). The charge Sky Studio reported (either field, UpscaleDelivery.charge(of:)) is settled on the
+// day's books as soon as it is made, before anything is downloaded, and again when Download again reads a charge the first answer
+// did not carry.
 // 不管什么：裁 / 传 / 等 / 下 / 封声（UpscalePipeline）、换源（VideoEditProject+Upscale）、界面。
 
 @MainActor
@@ -60,6 +66,16 @@ final class UpscaleJob: ObservableObject, Identifiable {
     var skyStudioJobID: String? { submitted.jobID }
     /// The upload did not happen: `state` carries the user's localized line, upscale_clip tells the AI this in English.
     private(set) var uploadFailure: SkyStudioUploadFailure?
+    /// The paid result's download gave up: `state` carries the user's localized line, upscale_clip gives the AI the code.
+    private(set) var downloadFailure: SkyStudioDownloadFailure?
+    /// Download again can get the paid result (the task row's button).
+    @Published private(set) var canRetryDownload = false
+    /// Called when Download again starts (upscale_clip runs its AI job again under the same id).
+    var onRetry: ((UpscaleJob) -> Void)?
+    /// What Download again needs; nil once it starts.
+    private var undelivered: UpscaleDelivery?
+    /// Set the moment Sky Studio finished it (from the pipeline's thread): a stop after that keeps the paid result.
+    private let made = MadeUpscale()
 
     init(request: UpscaleRequest, clipIDs: [UUID], owner: CloudTaskOwner, title: String, approval: Approval = .panel) {
         self.request = request
@@ -116,20 +132,20 @@ final class UpscaleJob: ObservableObject, Identifiable {
         // 3. 流水线。
         let submitted = self.submitted
         do {
-            let result = try await UpscalePipeline.run(
+            let made = self.made
+            complete(try await UpscalePipeline.run(
                 request, api: SkyStudioAPI(), key: key, ffmpeg: MediaToolchain.shared.runtime?.url, workFolder: Self.workFolder,
-                onSubmitted: { submitted.mark($0) }
-            ) { [weak self] phase in
-                Task { @MainActor in
-                    guard let self, case .running(let progress) = self.state else { return }
-                    self.state = .running(progress.advanced(to: phase))
-                }
-            }
-            held?.settle(charged: result.creditsCharged)
-            outcome = result
-            state = .done
-            onFinished?(self)
-            onEnded?(self)
+                onSubmitted: { submitted.mark($0) },
+                onMade: { [weak self] delivery in
+                    made.value = delivery
+                    Task { @MainActor in self?.settleMade(delivery) }
+                }, phase: reporter
+            ))
+        } catch let undelivered as UpscaleUndelivered {
+            hold(undelivered.delivery, undelivered.failure)
+        } catch where made.value != nil {
+            // Made and paid but not saved here (stopped, or a local step failed): the result stays held for Download again.
+            holdAfter(error, delivery: made.value!)
         } catch let error as SkyStudioJobError {
             switch error {
             case .stopped(let stop):
@@ -158,6 +174,111 @@ final class UpscaleJob: ObservableObject, Identifiable {
         if refunding { held?.refund() }
         state = final
         onEnded?(self)
+    }
+
+    /// Phases go to the UI (on the main actor; only while running).
+    private var reporter: @Sendable (CloudJobPhase) -> Void {
+        { [weak self] phase in
+            Task { @MainActor in
+                guard let self, case .running(let progress) = self.state else { return }
+                self.state = .running(progress.advanced(to: phase))
+            }
+        }
+    }
+
+    private func complete(_ result: UpscaleOutcome) {
+        // The final charge when Sky Studio's bill is final; otherwise the reservation stays until it is (refreshBill).
+        if let charged = result.creditsCharged { held?.settle(charged: charged) }
+        outcome = result
+        state = .done
+        onFinished?(self)
+        onEnded?(self)
+    }
+
+    /// Sky Studio made it: the day's books take the charge it reported now, whatever happens to the download.
+    private func settleMade(_ delivery: UpscaleDelivery) {
+        if let charged = delivery.creditsCharged { held?.settle(charged: charged) }
+    }
+
+    /// The paid result was not saved here: its download gave up (failed, the localized line), it was stopped (stopped), or a local
+    /// step failed (`message`). It is kept for Download again; nothing more was charged.
+    private func hold(_ delivery: UpscaleDelivery, _ failure: SkyStudioDownloadFailure?, message: String = "") {
+        undelivered = delivery
+        downloadFailure = failure
+        canRetryDownload = true
+        if failure?.kind == .stopped { return end(.cancelled(.alreadyStarted), refunding: false) }
+        end(.failed(failure.map(SkyStudioDownloadWords.shown) ?? message), refunding: false)
+    }
+
+    /// An error once the result was made: a stop before any GET holds it as stopped, anything else (sound, probe, save) with its own
+    /// words (a stop during or after the download comes as UpscaleUndelivered, with its GETs).
+    private func holdAfter(_ error: Error, delivery: UpscaleDelivery) {
+        if error is CancellationError || Task.isCancelled { return hold(delivery, .stopped(attempts: 0)) }
+        hold(delivery, nil, message: (error as? UpscalePipelineError)?.message ?? error.localizedDescription)
+    }
+
+    /// Download again: this job's paid result (only GETs; nothing quoted, uploaded or submitted), read from the job first so an expired
+    /// address is replaced and a charge the first answer did not carry reaches the day's books, its sound put back and saved as the
+    /// first try would have.
+    func retryDownload() {
+        guard canRetryDownload, let delivery = undelivered else { return }
+        undelivered = nil
+        downloadFailure = nil
+        canRetryDownload = false
+        state = .running(CloudJobProgress(phase: .downloading(fraction: nil), typicalSeconds: request.typicalSeconds))
+        onRetry?(self)
+        task = Task { @MainActor in
+            var key: String?
+            var current = delivery
+            if case .success(let found) = await SkyStudioJobKey.key(.silent) {
+                key = found
+                if let fresh = try? await SkyStudioAPI().job(delivery.jobID, key: found) {
+                    if let result = fresh.result { current.result = result }
+                    if let charged = UpscaleDelivery.charge(of: fresh) {
+                        current.creditsCharged = charged
+                        settleMade(current)
+                    }
+                }
+            }
+            do {
+                complete(try await UpscalePipeline.deliver(request, current, api: SkyStudioAPI(), key: key,
+                                                           ffmpeg: MediaToolchain.shared.runtime?.url, workFolder: Self.workFolder, phase: reporter))
+            } catch let undelivered as UpscaleUndelivered {
+                hold(undelivered.delivery, undelivered.failure)
+            } catch {
+                holdAfter(error, delivery: current)
+            }
+        }
+    }
+
+    /// A saved upscale whose bill was not final: Sky Studio's original job read again (only a GET), and once its bill is final the day's
+    /// books take that charge and the outcome says it. Returns the final charge, or nil while it is still not final (get_job calls this:
+    /// a bill under review was once left at the quote, CXD4 on PR #554).
+    func refreshBill() async -> Double? {
+        guard let pending = outcome, pending.creditsCharged == nil else { return nil }
+        guard case .success(let key) = await SkyStudioJobKey.key(.silent),
+              let status = try? await SkyStudioAPI().job(pending.jobID, key: key),
+              let charged = UpscaleDelivery.charge(of: status), outcome?.creditsCharged == nil else { return nil }
+        held?.settle(charged: charged)
+        outcome?.creditsCharged = charged
+        outcome?.record.credits = charged
+        return charged
+    }
+
+    /// Sky Studio made it and SkyCut is downloading or saving it right now: a stop keeps the paid result for Download again.
+    var downloadsPaidResult: Bool {
+        guard case .running = state else { return false }
+        return made.value != nil
+    }
+}
+
+/// The paid result once Sky Studio made it, set from the pipeline's thread and read by the job.
+private final class MadeUpscale: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: UpscaleDelivery?
+    var value: UpscaleDelivery? {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
     }
 }
 
@@ -203,9 +324,16 @@ final class UpscaleActivity: ObservableObject {
     }
 
     func remove(_ job: UpscaleJob) {
+        // Made and paid, downloading now: Cancel stops the download and keeps the job listed, held for Download again on its row.
+        if job.downloadsPaidResult { return job.cancel() }
         job.cancel()
         jobs.removeAll { $0.id == job.id }
         if compare == .job(job) { compare = nil }
+    }
+
+    /// Download again (this job's own task row): the same paid result, under the same job.
+    func downloadAgain(_ job: UpscaleJob) {
+        job.retryDownload()
     }
 
     /// 这个原片有没有在做 / 做完还没处理的任务。

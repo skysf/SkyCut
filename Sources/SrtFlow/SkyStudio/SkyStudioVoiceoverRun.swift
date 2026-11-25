@@ -216,7 +216,35 @@ final class SkyStudioVoiceoverRun {
         if let blocked = error as? SkyStudioVoiceBudgetProblem {
             extra.merge(SkyStudioJobGate.budgetBlocked(credits: blocked.credits, store: .shared).payload.objectValue ?? [:]) { _, new in new }
         }
+        // A batch Sky Studio made whose download gave up or was stopped (the user's stop included): the code and the GET count; the
+        // row reads the localized line and its Download again runs the same local recovery as resume=recovery_file (only GETs the
+        // original jobs; nothing is generated).
+        let download = SkyStudioDownloadFailure.from((error as? SkyStudioVoiceProcessingError)?.underlying ?? error)
+        if let download {
+            extra.merge(download.fields(retry: SkyStudioDownloadFailure.taskListRetry.dropLast().description + ", or call add_voiceover "
+                + "with only resume=\"\(recoveryFile.path)\" (it reads the original jobs and downloads their audio; it never pays to "
+                + "generate). Calling add_voiceover again with the lines is a new voiceover and is charged again.")) { _, new in new }
+        }
         finish(cancelled ? .cancelled : .failed, text)
+        if let download, recovery != nil { status.holdDownload(download) { [self] in recoverDownload() } }
+    }
+
+    /// Download again: a new recovery job for this recovery file as it is on disk now (add_voiceover resume=recovery_file,
+    /// generate_missing off), and this row gives way to it. Read fresh: a resume that already landed this voiceover leaves the record
+    /// `applied`, so that recovery adds nothing again (the old copy in memory would land it twice).
+    private func recoverDownload() {
+        guard let file = recovery?.file, let project, status.retryDownload != nil else { return }
+        status.retryDownload = nil   // one press, one recovery
+        let services = services
+        Task { @MainActor in
+            guard let fresh = try? await SkyStudioVoiceRecovery.reading(file), let input = try? fresh.input(for: project) else {
+                status.retryDownload = { [self] in recoverDownload() }   // nothing started: the button stays
+                return
+            }
+            status.releaseDownload()
+            SkyStudioGenerationActivity.shared.dismiss(status)
+            _ = SkyStudioVoiceoverRun(input: input, project: project, recovery: fresh, generateMissing: false, services: services).start()
+        }
     }
 
     /// 回任务号时说好要先装本机转写模型的：交第一批之前装（状态行「准备本机转写」，get_job 的 local_step）。装不上就当这台 Mac
@@ -409,7 +437,7 @@ final class SkyStudioVoiceoverRun {
         if let wrapped = error as? SkyStudioVoiceProcessingError { return isCancellation(wrapped.underlying) }
         if error is CancellationError || (error as? URLError)?.code == .cancelled { return true }
         if case .stopped? = error as? SkyStudioJobError { return true }
-        return false
+        return SkyStudioDownloadFailure.from(error)?.kind == .stopped   // a stop during a batch's download
     }
 
     private var projectUnchanged: Bool {

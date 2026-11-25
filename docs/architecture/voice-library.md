@@ -405,7 +405,17 @@
 8. **联动**：落地本身不动主轨画面，联动什么都不挪。之后照[联动](timeline-linkage.md)的规矩：原片段在主轨上时，两段新音频压在它上面——挪它跟着挪、
    真删它跟着删（规矩 2）；三段又在同一个链接组里，联动开着时裁、分割、变速一起（`linkedClipIDs`）。联动关着什么都不跟（规矩 10）。
 9. **文件**（`VoiceChangeOutputName`）：`<原名> - <声音名>.wav`、`<原名> - 背景.wav`（「背景」照界面语言写），放原素材的文件夹，写不进去退到工程的家、
-   再退到下载；撞名加编号、不覆盖；扩展名照服务器报的类型（背景不是 WAV 时它另报）。下载断了再试两次（钱已经花了，成品地址 60 天有效）。
+   再退到下载；撞名加编号、不覆盖；扩展名照服务器报的类型（背景不是 WAV 时它另报）。Since 2026-11-24 the download is
+   SkyStudioAPI.download's (resumed or retried, three GETs in all, an expired address renewed from the job; the job no longer loops
+   on its own). Whatever keeps the files from landing (the download gave up or was stopped, a file could not be saved) keeps the
+   result for Download again on the job's own task row (no new charge; the result stays on Sky Studio for 60 days). change_voice
+   or the panel asked again, even for the same clip, voice and language, is a new paid change (user, 2026-11-25; [Sky Studio
+   jobs](sky-studio-jobs.md), "Downloads that the network interrupts"). Since 2026-11-26 the files belong to their own cloud job:
+   each takes its name on disk only when it is whole, never replacing anything (`VoiceChangeOutputName.places` → `CloudResultPlace`,
+   the next free number when the name is taken, also by SkyCut Beta or by a name that differs only in case), and a failure or a stop
+   deletes only a file that download placed, while it is still that file and no open project's timeline uses it (two changes once
+   chose the same two names and a cancel deleted the other's files; SkyCut and SkyCut Beta overwrote each other's voice). Its bill
+   settles only once final (get_job reads the job again until it is).
 10. **界面**（方案 5.5）：时间线上的块右键「换成我的声音…」**只往 `VoiceChangeActivity` 写一个目标**（块不读工程、不做 IO）；面板由挂在检查器底下的
     `VoiceChangePresenter` 摆（`Equatable` + `.equatable()`，同 `UpscalePresenter`；只在那一段所在的工程窗口里摆）。面板用共用的声音选择器
     （`VoicePickerView`：我的声音、设计的声音、预设排最后——预设的样音只有几秒，当变声目标没验证过）。默认选谁（`defaultSelection`）：我的声音只有一个

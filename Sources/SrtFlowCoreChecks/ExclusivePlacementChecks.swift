@@ -41,6 +41,7 @@ private func placementScenarios(in folder: URL, drive: String) {
     exactNames(in: folder, drive: drive)
     sets(in: folder, drive: drive)
     series(in: folder, drive: drive)
+    ownedPlacement(in: folder, drive: drive)
     scratchFiles(in: folder, drive: drive)
     let left = privateNames(in: folder)
     check(left.isEmpty, "\(drive): nothing private is left in the folder: \(left)")
@@ -119,6 +120,38 @@ private func series(in folder: URL, drive: String) {
     let copy = try? ExclusivePlacement.place(copied, in: folder, stem: "Cut", pathExtension: "mp4", from: 1, copying: true)
     check(copy?.lastPathComponent == "Cut 4.mp4" && copy.flatMap(read) == "copy" && read(copied) == "copy",
           "\(drive): onto another drive the file is copied in and the original is left to its owner: \(copy?.lastPathComponent ?? "nil")")
+}
+
+/// `placeOwned`: the placed file is the caller's own by device and inode; a folder at the name is never touched, and `discard`
+/// removes the placed file only while it is still that file (a paid download given up after a cancel once deleted a file that had
+/// replaced it, and placing removed a folder that took the name: CXD4 on PR #554).
+private func ownedPlacement(in folder: URL, drive: String) {
+    let blocking = folder.appendingPathComponent("Shot.png", isDirectory: true)
+    try? FileManager.default.createDirectory(at: blocking, withIntermediateDirectories: true)
+    try? write("inside", blocking.appendingPathComponent("keep.txt"))
+    let first = folder.appendingPathComponent("first.tmp")
+    try? write("result", first)
+    guard let owned = try? ExclusivePlacement.placeOwned(first, in: folder, stem: "Shot", pathExtension: "png", from: 1) else {
+        return check(false, "\(drive): placeOwned places the file")
+    }
+    var isFolder: ObjCBool = false
+    check(owned.url.lastPathComponent == "Shot 2.png" && read(owned.url) == "result"
+          && FileManager.default.fileExists(atPath: blocking.path, isDirectory: &isFolder) && isFolder.boolValue
+          && read(blocking.appendingPathComponent("keep.txt")) == "inside",
+          "\(drive): a folder at the name is left whole and the file moves on: \(owned.url.lastPathComponent)")
+    ExclusivePlacement.discard(owned)
+    check(!FileManager.default.fileExists(atPath: owned.url.path), "\(drive): discard removes the placed file while it is still the caller's")
+
+    let second = folder.appendingPathComponent("second.tmp")
+    try? write("result", second)
+    guard let replaced = try? ExclusivePlacement.placeOwned(second, in: folder, stem: "Shot", pathExtension: "png", from: 1) else {
+        return check(false, "\(drive): placeOwned places the second file")
+    }
+    try? Data("someone else's".utf8).write(to: replaced.url, options: .atomic)
+    ExclusivePlacement.discard(replaced)
+    check(read(replaced.url) == "someone else's", "\(drive): discard never removes a file that replaced the placed one")
+    try? FileManager.default.removeItem(at: replaced.url)
+    try? FileManager.default.removeItem(at: blocking)
 }
 
 /// `scratch` / `discard`: only the caller's own file is ever removed.

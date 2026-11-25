@@ -45,7 +45,16 @@ final class SkyStudioVoiceRender {
         guard batch.speech.parts.contains(where: { recovery.value.outputs[$0.line] == nil }) else { return }
         let pcm: SkyStudioVoiceAudio.PCM
         do { pcm = try await SkyStudioVoiceAudio.decode(file) }
-        catch { throw SkyStudioVoiceProcessingError(stage: .localSplit, underlying: error) }
+        catch {
+            // A batch file that does not decode is not the batch: forgotten (and removed), so a resume downloads it again from its
+            // original job instead of failing on it every time (a 4-byte WAV once made the paid batch unreachable, CXD5 on PR #554).
+            if !(error is CancellationError), recovery.value.batches[index].rawFile == file {
+                recovery.value.batches[index].rawFile = nil
+                try? await recovery.save()
+                CloudResultPlace.removePrivateFile(file)
+            }
+            throw SkyStudioVoiceProcessingError(stage: .localSplit, underlying: error)
+        }
         let analysis: SkyStudioVoiceCheckpoint.Analysis
         if let saved = recovery.value.batches[index].analysis { analysis = saved }
         else {

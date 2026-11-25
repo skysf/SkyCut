@@ -1,10 +1,12 @@
 import Foundation
 import ImageIO
+import os
 import SrtFlowMCPKit
 import UniformTypeIdentifiers
 
 // MARK: - 生成图片的实际格式与尺寸
 // 管什么：下载后用 ImageIO 读格式 / 实际像素，纠正扩展名而不重编码；不改远端元数据、不重新生成、不解释扣费。
+// The check runs on the download's private file before it takes a name (SkyStudioGenerationDelivery: the name comes from the bytes).
 enum SkyStudioImageResult {
     struct Format: Equatable, Sendable {
         var fileExtension: String
@@ -28,10 +30,17 @@ enum SkyStudioImageResult {
         return Format(fileExtension: suffix == "jpeg" ? "jpg" : suffix, contentType: mime, width: size.width, height: size.height)
     }
 
-    static func finalize(_ file: URL, format: Format, claim: (String) -> URL) throws -> URL {
-        guard file.pathExtension.lowercased() != format.fileExtension else { return file }
-        let corrected = claim(format.fileExtension)
-        try FileManager.default.moveItem(at: file, to: corrected)
-        return corrected
+    /// The download's check of an image result (SkyStudioAPI.download `check:`), on its private file before it takes a name: its
+    /// bytes decode, and they name its extension; `found` keeps what was read. A length-less answer holding only a PNG header once
+    /// passed as the result, its Download again already released (CXD4 on PR #554); now it is thrown away and fetched again.
+    static func downloadCheck(
+        _ found: OSAllocatedUnfairLock<Format?> = .init(initialState: nil)
+    ) -> @Sendable (URL) async throws -> String? {
+        { partial in
+            let read = await MediaReadQueue.run(on: MediaReadQueue.analysis) { Result { try format(at: partial) } }
+            guard case .success(let format) = read else { throw CloudResultUnusable(reason: "not an image that decodes") }
+            found.withLock { $0 = format }
+            return format.fileExtension
+        }
     }
 }

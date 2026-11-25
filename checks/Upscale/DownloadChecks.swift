@@ -1,0 +1,141 @@
+import Foundation
+import SrtFlowMCPKit
+
+// A paid upscale's download (2026-11-24, backlog B40 and the review of PR #554; docs/bugfixes/2026-11-24-download-lost-connection-no-
+// retry.md), through the real pipeline against the fake Sky Studio (SkyStudioStub):
+// - three lost connections: the pipeline throws UpscaleUndelivered (interrupted, three GETs) carrying what Download again needs, and
+//   Sky Studio's charge (72 of the 75 reserved) was handed over as soon as it was made, before any download (UpscaleJob settles the
+//   day's books there, whatever happens to the download);
+// - Download again (UpscalePipeline.deliver) saves the same result with no new upload and no new job;
+// - a stop before its first GET keeps the result held (stopped, 0 GETs);
+// - a finished status with only `billing.credits_charged` hands over that same actual charge;
+// - a charge counts only once its bill is final: under review, a refund pending or still reserved, none is handed over (the reservation
+//   stays), whichever field carries it (CXD3 on PR #554: a bill under review once settled at its 72 and was reported as charged).
+// UpscaleJob's glue (settling at `onMade`, holding, the row) runs with real App objects in scripts/check-voice-recovery.sh
+// (UpscaleJobDownloadChecks) and is pinned by checks/sky-studio-wiring/download-retry.sh.
+
+func runUpscaleDownloadChecks(_ request: UpscaleRequest, base: String, bucket: String, uploaded: String, resultURL: String, fakeBytes: Data,
+                              ffmpeg: URL?, work: URL) async {
+    var retry = SkyStudioDownloadRetry()
+    retry.sleep = { _ in }
+    let api = SkyStudioAPI(session: SkyStudioStub.session, base: URL(string: base)!, version: "0.18.50", machine: String(repeating: "a", count: 64),
+                           downloadRetry: retry)
+    let done = #"{"job_id": "job-up", "status": "done", "credits_charged": 72, "result": {"url": "\#(resultURL)", "generation_id": "gen-up", "content_type": "video/mp4", "width": 1920, "height": 1080, "duration": 2.5, "fps": 24}}"#
+    let drops = DropCount(3)
+    SkyStudioStub.reset { seen in
+        switch (seen.method, seen.url) {
+        case ("POST", base + "/uploads"): return .http(200, uploaded)
+        case ("PUT", bucket): return .http(200, "")
+        case ("POST", base + "/jobs"), ("GET", base + "/jobs/job-up"): return .http(200, done)
+        case ("GET", resultURL): return drops.take() ? .failure(.networkConnectionLost) : .data(200, fakeBytes)
+        default: return .http(404, #"{"error": {"code": "not_found", "message": "unexpected \#(seen.method) \#(seen.url)"}}"#)
+        }
+    }
+    let made = MadeLog()
+    var held: UpscaleUndelivered?
+    do {
+        _ = try await UpscalePipeline.run(request, api: api, key: "sk-test", ffmpeg: ffmpeg, workFolder: work, sleep: { _ in },
+                                          onMade: { made.add($0) }) { _ in }
+        check(false, "three lost connections: the upscale is not saved")
+    } catch let undelivered as UpscaleUndelivered {
+        held = undelivered
+    } catch {
+        check(false, "three lost connections end as UpscaleUndelivered, got \(error)")
+    }
+    check(held?.failure.kind == .interrupted && held?.failure.attempts == 3 && held?.delivery.jobID == "job-up"
+            && held?.delivery.creditsCharged == 72 && abs((held?.delivery.offset ?? 0) - request.range.start) < 0.001,
+          "three lost connections: held with the job, its charge and where its part starts")
+    check(made.all.count == 1 && made.all.first?.creditsCharged == 72,
+          "Sky Studio's charge (72, not the 75 reserved) is handed over as soon as it is made, before any download")
+    checkEqual(SkyStudioStub.log.filter { $0.url == resultURL }.count, 3, "three GETs of the result")
+    checkEqual((try? FileManager.default.contentsOfDirectory(atPath: work.path)) ?? [], [], "nothing half-written is left")
+    guard let held else { return }
+
+    // Download again: only the delivery (GETs), saved as the first try would have; a file already at its name next to the original
+    // is never replaced (the upscale takes the next number: the save used to move it over a name picked earlier).
+    do {
+        let outcome = try await UpscalePipeline.deliver(request, held.delivery, api: api, key: "sk-test", ffmpeg: ffmpeg, workFolder: work) { _ in }
+        check(FileManager.default.fileExists(atPath: outcome.file.path) && outcome.creditsCharged == 72 && outcome.jobID == "job-up",
+              "Download again saves the same result: \(outcome.file.lastPathComponent)")
+        let earlier = Data("an earlier file at the upscale's name".utf8)
+        try? earlier.write(to: outcome.file)
+        let again = try await UpscalePipeline.deliver(request, held.delivery, api: api, key: "sk-test", ffmpeg: ffmpeg, workFolder: work) { _ in }
+        check(again.file != outcome.file && (try? Data(contentsOf: outcome.file)) == earlier && FileManager.default.fileExists(atPath: again.file.path),
+              "a file already at the upscale's name is never replaced; the upscale takes the next number: \(again.file.lastPathComponent)")
+        try? FileManager.default.removeItem(at: outcome.file)
+        try? FileManager.default.removeItem(at: again.file)
+    } catch {
+        check(false, "Download again saves the result, got \(error)")
+    }
+    check(SkyStudioStub.log.filter { $0.method == "POST" }.map(\.url) == [base + "/uploads", base + "/jobs"],
+          "Download again sends no new upload and no new job")
+
+    // A stop while downloading: the result stays held for Download again.
+    let stopping = Task { () -> Error? in
+        while !Task.isCancelled { await Task.yield() }
+        do {
+            _ = try await UpscalePipeline.deliver(request, held.delivery, api: api, key: "sk-test", ffmpeg: ffmpeg, workFolder: work) { _ in }
+            return nil
+        } catch {
+            return error
+        }
+    }
+    stopping.cancel()
+    let stopped = await stopping.value
+    check((stopped as? UpscaleUndelivered)?.failure.kind == .stopped && (stopped as? UpscaleUndelivered)?.failure.attempts == 0,
+          "a stop before its first GET keeps the paid result and says no GET was sent: \(String(describing: stopped))")
+
+    // Only `billing.credits_charged` in the finished status: the same actual charge is handed over (it once stayed at the 75 reserved).
+    let billingOnly = #"{"job_id": "job-up", "status": "done", "billing": {"status": "charged", "credits_charged": 72}, "result": {"url": "\#(resultURL)", "generation_id": "gen-up", "content_type": "video/mp4", "width": 1920, "height": 1080, "duration": 2.5, "fps": 24}}"#
+    let billingDrops = DropCount(3)
+    SkyStudioStub.reset { seen in
+        switch (seen.method, seen.url) {
+        case ("POST", base + "/uploads"): return .http(200, uploaded)
+        case ("PUT", bucket): return .http(200, "")
+        case ("POST", base + "/jobs"), ("GET", base + "/jobs/job-up"): return .http(200, billingOnly)
+        case ("GET", resultURL): return billingDrops.take() ? .failure(.networkConnectionLost) : .data(200, fakeBytes)
+        default: return .http(404, #"{"error": {"code": "not_found", "message": "unexpected \#(seen.method) \#(seen.url)"}}"#)
+        }
+    }
+    let madeFromBilling = MadeLog()
+    _ = try? await UpscalePipeline.run(request, api: api, key: "sk-test", ffmpeg: ffmpeg, workFolder: work, sleep: { _ in },
+                                       onMade: { madeFromBilling.add($0) }) { _ in }
+    check(madeFromBilling.all.count == 1 && madeFromBilling.all.first?.creditsCharged == 72,
+          "with only billing.credits_charged, Sky Studio's actual charge (72) is handed over before any download")
+    runFinalChargeChecks()
+}
+
+/// UpscaleDelivery.charge(of:): the charge only once the bill is final, from whichever field carries it.
+private func runFinalChargeChecks() {
+    func charge(_ fields: String) -> Double? {
+        (try? JSONValue.decode(Data(#"{"job_id": "job-up", "status": "done", \#(fields)}"#.utf8)))
+            .flatMap(SkyStudioJobStatus.init(json:)).flatMap(UpscaleDelivery.charge(of:))
+    }
+    checkEqual(charge(#""billing": {"status": "pending_review", "review_required": true, "credits_charged": 72}"#), nil,
+               "a bill under review hands over no charge (the 75 reserved stays)")
+    checkEqual(charge(#""credits_charged": 72, "billing": {"status": "charged", "review_required": true, "credits_charged": 72}"#), nil,
+               "nor does the top-level field while the bill is under review")
+    checkEqual(charge(#""billing": {"status": "refund_pending", "credits_charged": 72}"#), nil, "a refund pending hands over no charge")
+    checkEqual(charge(#""credits_charged": 72, "billing": {"status": "reserved", "credits_reserved": 75}"#), nil,
+               "a bill still reserved hands over no charge")
+    checkEqual(charge(#""billing": {"status": "charged", "credits_charged": 72}"#), 72, "a final bill's charge")
+    checkEqual(charge(#""credits_charged": 75, "billing": {"status": "refunded", "credits_charged": 40}"#), 40, "a final bill's net charge first")
+    checkEqual(charge(#""billing": {"status": "charged"}, "credits_charged": 72"#), 72, "a final bill without an amount: the top-level one")
+    checkEqual(charge(#""credits_charged": 72"#), 72, "no bill: the top-level charge")
+}
+
+/// How many of the next result GETs lose their connection (the stub answers on URLSession's threads).
+private final class DropCount: @unchecked Sendable {
+    private let lock = NSLock()
+    private var left: Int
+    init(_ count: Int) { left = count }
+    func take() -> Bool { lock.withLock { guard left > 0 else { return false }; left -= 1; return true } }
+}
+
+/// What `onMade` handed over.
+private final class MadeLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [UpscaleDelivery] = []
+    func add(_ delivery: UpscaleDelivery) { lock.withLock { items.append(delivery) } }
+    var all: [UpscaleDelivery] { lock.withLock { items } }
+}

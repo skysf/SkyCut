@@ -48,7 +48,10 @@ enum SkyStudioOfficialGenerateTool {
         if !quoteOnly {
             let identity: JSONValue = ["arguments": .string(digest), "account": .string(scope.accountID),
                                        "project": .string(scope.projectPath), "generation": prepare ? .number(Double(scope.projectGeneration)) : .null]
-            if let prior = try SkyStudioGenerationRequests.begin(operationKey, identity: identity, scope: stage) { return prior }
+            // The same key again while its generation or recovery holds a paid result: Download again (only GETs), never a new job.
+            if let prior = try SkyStudioGenerationRequests.begin(operationKey, identity: identity, scope: stage) {
+                return SkyStudioGenerationRequests.heldAnswer(for: prior) ?? prior
+            }
         }
         defer { if !quoteOnly { SkyStudioGenerationRequests.abandonPreparation(operationKey, scope: stage) } }
         if !prepare && !quoteOnly,
