@@ -1370,7 +1370,7 @@
 
 "SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@. Raise it in %5$@, or wait until %6$@, when it resets." = "SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@. Raise it in %5$@, or wait until %6$@, when it resets.";
 
-"SkyCut's own daily credit limit stops this, not your Sky Studio balance: it allows %1$@ credits a day and this needs %2$@, so waiting does not help. Raise it in %3$@." = "SkyCut's own daily credit limit stops this, not your Sky Studio balance: it allows %1$@ credits a day and this needs %2$@, so waiting does not help. Raise it in %3$@.";
+"SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@, more than a whole day allows, so waiting does not help. Raise it in %5$@." = "SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@, more than a whole day allows, so waiting does not help. Raise it in %5$@.";
 
 "Change Limit…" = "Change Limit…";
 

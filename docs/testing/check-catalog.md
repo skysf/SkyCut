@@ -389,10 +389,12 @@
     - `BalanceRefusalChecks`: the refusal in request and job errors, before admission or not (a 402 with a job id and pending billing
       queries the original job); the account, the numbers only when sent, the recharge address fallback, the retry; the line and its
       path in every table; a refused price check names no order or bill.
-    - `SpendChecks`: one moment per reservation across midnight.
+    - `SpendChecks`: one moment per reservation across midnight; a refund after the time zone changed goes back to the day key it was
+      booked on.
     - `ReferenceTotalChecks`: the actual totals.
   - `scripts/check-voice-recovery.sh`:
-    - `VoiceChangeBalanceChecks`: change_voice into a plain 402 and into one with pending billing, with real App objects;
+    - `VoiceChangeBalanceChecks`: change_voice into a plain 402 and into one with pending billing, with real App objects; get_job then
+      GETs the original job and settles by its billing;
     - the voiceover's budget stop: its options, the numbers read at the refusal, its own resume;
     - the mid-voiceover fee over the limit, with both ways (`FallbackFeeChecks`).
   - `checks/sky-studio-wiring/daily-limit.sh` pins:
