@@ -98,8 +98,8 @@ private func settleDayChecks() {
     let spend = SkyStudioSpendStore.shared
     guard let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) else { return require(false, "yesterday exists") }
     let before = spend.ledger.spent(on: yesterday), today = spend.spentToday()
-    spend.record(760, now: yesterday)
-    var held = SkyStudioHeldCredits(SkyStudioJobGate.Reservation(credits: 760, day: yesterday))
+    let bookedDay = spend.record(760, now: yesterday)
+    var held = SkyStudioHeldCredits(SkyStudioJobGate.Reservation(credits: 760, day: yesterday, dayKey: bookedDay))
     held.settle(charged: 751.4)
     require(abs(spend.ledger.spent(on: yesterday) - before - 751.4) < 0.001 && abs(spend.spentToday() - today) < 0.001,
             "a charge settled the next day stays on the day it was reserved: yesterday +\(spend.ledger.spent(on: yesterday) - before), today +\(spend.spentToday() - today)")

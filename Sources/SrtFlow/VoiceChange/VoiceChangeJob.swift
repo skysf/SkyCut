@@ -117,14 +117,15 @@ final class VoiceChangeJob {
                 ? "The voice change was stopped before Sky Studio accepted it; nothing was charged."
                 : SkyStudioVoiceLibraryErrors.uncharged(error))
         }
-        if let charged = done.billing?.netCharged ?? done.creditsCharged { held.settle(charged: charged) }
+        // Only a final bill moves the books (VoiceChangeBilling): a result without its files keeps the reservation until one comes.
+        VoiceChangeBilling.settle(&held, by: done.billing)
         guard case .conversion(let result)? = done.voiceResult else {
             return finish(.failed, "Sky Studio finished but returned no voice and background files; do not start the same change again "
-                + "before checking this job with Sky Studio.", detail: charges(done))
+                + "before checking this job with Sky Studio.", detail: VoiceChangeBilling.charges(done))
         }
         guard direct || result.backgroundURL != nil else {
             return finish(.failed, "Sky Studio finished without the separated background file, so SkyCut changed nothing on the timeline; "
-                + "do not start the same change again before checking this job with Sky Studio.", detail: charges(done))
+                + "do not start the same change again before checking this job with Sky Studio.", detail: VoiceChangeBilling.charges(done))
         }
         let files: VoiceChangeLanding.Files
         do {
@@ -132,7 +133,7 @@ final class VoiceChangeJob {
         } catch {
             return finish(.failed, "Sky Studio changed the voice (the credits were spent), but SkyCut could not save "
                 + (direct ? "the voice file" : "the two files") + ": "
-                + "\(SkyStudioVoiceLibraryErrors.message(error)) The result stays on Sky Studio for 60 days.", detail: charges(done))
+                + "\(SkyStudioVoiceLibraryErrors.message(error)) The result stays on Sky Studio for 60 days.", detail: VoiceChangeBilling.charges(done))
         }
         await land(files, result: result, server: done)
     }
@@ -205,11 +206,20 @@ final class VoiceChangeJob {
         guard !refreshing, let job, job.status == .failed || job.status == .cancelled, let id = serverID ?? originalID else { return }
         refreshing = true
         defer { refreshing = false }
-        guard let server = try? await services.api.job(id, key: key) else { return }
-        if let billing = server.billing {
-            if billing.returnedAll { held.refund() } else if let charged = billing.netCharged, charged > 0 { held.settle(charged: charged) }
-        }
-        var detail = charges(server)
+        let server: SkyStudioJobStatus
+        do {
+            server = try await services.api.job(id, key: key)
+        } catch let failure as SkyStudioFailure {
+            // A refusal can carry the job's final bill (a 402 billed 6.5): settle by it. A try? here dropped it, so the books kept 9.
+            guard let billing = SkyStudioJobError.request(failure).failure?.billing else { return }
+            VoiceChangeBilling.settle(&held, by: billing)
+            var detail = VoiceChangeBilling.detail(billing)
+            detail["billing_note"] = .string(billing.message)
+            AIJobs.shared.updateDetail(job, detail)
+            return
+        } catch { return }
+        VoiceChangeBilling.settle(&held, by: server.billing)
+        var detail = VoiceChangeBilling.charges(server)
         if let state = server.state { detail["skystudio_status"] = .string(state.rawValue) }
         if let billing = server.billing { detail["billing_note"] = .string(billing.message) }
         AIJobs.shared.updateDetail(job, detail)
@@ -279,7 +289,7 @@ final class VoiceChangeJob {
     }
 
     private func land(_ files: VoiceChangeLanding.Files, result: SkyStudioVoiceConversion, server: SkyStudioJobStatus) async {
-        var detail = charges(server)
+        var detail = VoiceChangeBilling.charges(server)
         detail["voice_file"] = .string(AIWorkspace.shared.display(files.voice))
         if let background = files.background { detail["background_file"] = .string(AIWorkspace.shared.display(background.file)) }
         detail["skip_separation"] = .bool(direct)
@@ -363,16 +373,6 @@ final class VoiceChangeJob {
     }
 
     // MARK: 结果
-
-    private func charges(_ server: SkyStudioJobStatus) -> [String: JSONValue] {
-        var value: [String: JSONValue] = ["skystudio_job_id": .string(server.jobID)]
-        if let charged = server.billing?.netCharged ?? server.creditsCharged {
-            value["credits_charged"] = .number(SkyStudioCredits.number(charged))
-        }
-        if let billing = server.billing { value["billing"] = billing.json }
-        value["spent_today_credits"] = .number(SkyStudioCredits.number(SkyStudioSpendStore.shared.spentToday()))
-        return value
-    }
 
     private func live() -> [String: JSONValue] {
         var value = status.progress?.json() ?? [:]

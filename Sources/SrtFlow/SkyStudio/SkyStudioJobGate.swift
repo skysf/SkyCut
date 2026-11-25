@@ -17,13 +17,14 @@ enum SkyStudioJobGate {
         let credits: Double
         let day: Date
         /// The ledger's day key it was booked on: its refund and settlement go back to exactly this day, even when the time
-        /// zone changed since (MSG1 review, 2026-11-25). Without one (a record saved before), it is worked out from `day`.
-        let dayKey: String
+        /// zone changed since (MSG1 review, 2026-11-25). nil for a voice library order saved before day keys: it refunds or
+        /// settles only on a day the ledger proves holds it (SkyStudioHeldCredits), never on one worked out from `day` (CXM3).
+        let dayKey: String?
 
-        init(credits: Double, day: Date, dayKey: String? = nil) {
+        init(credits: Double, day: Date, dayKey: String?) {
             self.credits = credits
             self.day = day
-            self.dayKey = dayKey ?? DailySpendLedger.dayKey(for: day)
+            self.dayKey = dayKey
         }
     }
 
@@ -95,14 +96,15 @@ enum SkyStudioJobGate {
     static func budgetBlocked(credits: Double, store: SkyStudioSpendStore, now: Date = Date(), access: AIAccessStore? = nil,
                               outcome: String = "Nothing was started or charged.", retry: String = "repeat this call") -> AIToolResult {
         budgetBlocked(SkyCutDailyLimit.Numbers(limit: store.dailyLimit, spent: store.spentToday(now: now), needed: credits, now: now),
-                      access: access, outcome: outcome, retry: retry)
+                      access: access, store: store, outcome: outcome, retry: retry)
     }
 
     /// The same from numbers read when the request was refused (a voiceover's missing batches build the result later).
-    static func budgetBlocked(_ numbers: SkyCutDailyLimit.Numbers, access: AIAccessStore? = nil,
+    /// `store`: whose limit revision the raise's token is bound to (the shared one in the app).
+    static func budgetBlocked(_ numbers: SkyCutDailyLimit.Numbers, access: AIAccessStore? = nil, store: SkyStudioSpendStore? = nil,
                               outcome: String = "Nothing was started or charged.", retry: String = "repeat this call") -> AIToolResult {
         let raise = SkyCutDailyLimit.suggestedLimit(numbers).flatMap {
-            AISettingsApproval.limitRaise(to: $0, currentLimit: numbers.limit, access: access)
+            AISettingsApproval.limitRaise(to: $0, currentLimit: numbers.limit, access: access, spend: store)
         }
         return .ok(.object(SkyCutDailyLimit.aiResult(numbers, appPath: SkyCutDailyLimit.settingsPath(L10n),
                                                      englishPath: SkyCutDailyLimit.settingsPath { $0 }, raise: raise,

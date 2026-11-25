@@ -60,4 +60,5 @@ func voiceChangeBalanceChecks(_ root: URL) async throws {
         require(abs(SkyStudioSpendStore.shared.spentToday() - books) < 0.0001, "and the refunded reservation leaves the books")
     } else { require(false, "the billed change has a job") }
     for row in SkyStudioGenerationActivity.shared.runs where row.issue != nil { SkyStudioGenerationActivity.shared.dismiss(row) }
+    try await voiceChangeSettleChecks(root)
 }

@@ -85,20 +85,44 @@ for entry in Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift Sources/SrtFl
   grep -qF 'SkyStudioCharacterError.tool(error, beforeSubmission: true)' "${entry}" \
     || fail "${entry}: a refused price check says nothing was submitted (SkyStudioCharacterError.tool(error, beforeSubmission: true))"
 done
-# - every paid job says whether Sky Studio had accepted it before a balance refusal (a polled 402 may come with a charge);
+# - every paid job says whether Sky Studio had accepted it before a balance refusal (a polled 402 may come with a charge), from the
+#   job's own state, never a constant; the voice change from its Sky Studio job id (Codex CXM3: pinned to false, nothing went red);
 for job in Sources/SrtFlow/SkyStudio/SkyStudioGenerationRun.swift Sources/SrtFlow/SkyStudio/SkyStudioVoiceoverRun.swift \
            Sources/SrtFlow/VoiceChange/VoiceChangeJob.swift Sources/SrtFlow/SkyStudio/SkyStudioVoiceLibraryJob.swift \
            Sources/SrtFlow/SkyStudio/SkyStudioCharacterRun.swift Sources/SrtFlow/Upscale/UpscaleJob.swift; do
   grep -qF 'SkyStudioBalanceRefusal.refusal(of: error, accepted:' "${job}" \
     || fail "${job}: a balance refusal says whether Sky Studio had accepted the job (SkyStudioBalanceRefusal.refusal(of:accepted:))"
+  if grep -qE 'SkyStudioBalanceRefusal\.refusal\(of: error, accepted: (true|false)\)' "${job}"; then
+    fail "${job}: whether Sky Studio had accepted the job comes from the job's own state, never a constant"
+  fi
 done
-# - get_job asks a failed voice change's original job (GET only) and settles by its billing;
-grep -qF 'job.refresh = { [self] in await refreshOriginal() }' Sources/SrtFlow/VoiceChange/VoiceChangeJob.swift \
-  && grep -qF 'services.api.job(id, key: key)' Sources/SrtFlow/VoiceChange/VoiceChangeJob.swift \
-  || fail "Sources/SrtFlow/VoiceChange/VoiceChangeJob.swift: get_job asks the original job a refusal named"
-# - a refund and a settlement go back to the day key recorded at booking;
-grep -qF 'store.refund(held.credits, dayKey: held.dayKey)' Sources/SrtFlow/SkyStudio/SkyStudioHeldCredits.swift \
-  || fail "Sources/SrtFlow/SkyStudio/SkyStudioHeldCredits.swift: a refund goes back to the day key recorded at booking"
+CHANGE_JOB="Sources/SrtFlow/VoiceChange/VoiceChangeJob.swift"
+CHANGE_BILLING="Sources/SrtFlow/VoiceChange/VoiceChangeBilling.swift"
+grep -qF 'SkyStudioBalanceRefusal.refusal(of: error, accepted: serverID != nil)' "${CHANGE_JOB}" \
+  || fail "${CHANGE_JOB}: a balance refusal counts as accepted once Sky Studio gave the change a job id (serverID != nil)"
+# - get_job asks a failed voice change's original job (GET only) and reads a refusal's bill; the books follow only a final bill
+#   (VoiceChangeBilling: a top-level credits_charged of 0 is not one; Codex CXM3);
+[ -f "${CHANGE_BILLING}" ] || fail "can't find ${CHANGE_BILLING}: renamed? update checks/sky-studio-wiring/daily-limit.sh"
+grep -qF 'job.refresh = { [self] in await refreshOriginal() }' "${CHANGE_JOB}" \
+  && grep -qF 'server = try await services.api.job(id, key: key)' "${CHANGE_JOB}" \
+  && grep -qF 'SkyStudioJobError.request(failure).failure?.billing' "${CHANGE_JOB}" \
+  || fail "${CHANGE_JOB}: get_job asks the original job a refusal named and reads the bill a refusal carries"
+grep -qF 'VoiceChangeBilling.settle(&held, by: done.billing)' "${CHANGE_JOB}" \
+  && grep -qF 'guard let charged = billing?.netCharged else { return }' "${CHANGE_BILLING}" \
+  || fail "${CHANGE_JOB}: the books follow only a final bill (VoiceChangeBilling.settle)"
+if grep -qE 'creditsCharged|try\? await services\.api\.job' "${CHANGE_JOB}" "${CHANGE_BILLING}"; then
+  fail "${CHANGE_JOB}: a voice change neither settles nor reports a top-level credits_charged, and reads a refusal's bill (no try? on the GET)"
+fi
+# - a refund and a settlement go back to the day key recorded at booking, a settlement in one ledger write; a reservation saved
+#   without one uses only a day the ledger proves holds it, never a day worked out from its date (Codex CXM3);
+HELD="Sources/SrtFlow/SkyStudio/SkyStudioHeldCredits.swift"
+grep -qF 'store.refund(held.credits, dayKey: key)' "${HELD}" \
+  && grep -qF 'store.settle(reserved: held.credits, charged: charged, dayKey: key)' "${HELD}" \
+  && grep -qF 'held.dayKey ?? store.ledger.provenDayKey(holding: held.credits, bookedAt: held.day)' "${HELD}" \
+  || fail "${HELD}: a refund and a settlement go to the booking's day key (a settlement in one write), a keyless one to a proven day"
+if grep -qF 'DailySpendLedger.dayKey(for:' "${HELD}"; then
+  fail "${HELD}: a refund or a settlement never works its day out from the reservation's date (the time zone may have changed)"
+fi
 # - a mid-voiceover MiniMax version keeps its own failure step across a restart, and the fee step knows full access;
 grep -qF 'failureStep: "The MiniMax version was not built. Resume the narration from its recovery file' Sources/SrtFlow/SkyStudio/SkyStudioVoiceFallbackFee.swift \
   && grep -qF 'credits: credits, standing: ask == .standing))' Sources/SrtFlow/SkyStudio/SkyStudioVoiceFallbackFee.swift \

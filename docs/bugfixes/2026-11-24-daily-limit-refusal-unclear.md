@@ -60,6 +60,18 @@ task row whatever the app's language. On upscale and change voice the AI got onl
      send its lines again.
    - The fee step promised another question in full access with the standing consent, where resuming builds directly. The character
      tool's refused price check still pointed at an order. Reverting the generation's price-check entry kept the guard green.
+7. **Found in the third check (Codex CXM3, 2026-11-26, money items only):**
+   - A 1,000 → 1,500 token was refused at 2,000, but after the user set 1,000 again it wrote 1,500: the token compared only the
+     current value. A used token replayed with the same limit plus `theme=classic` wrote the theme: with nothing to approve, the
+     token was never checked.
+   - A reservation without a day key (a voice library order saved before keys) refunded into a day worked out in today's time zone:
+     in Tokyo the next day's 80 became 20 and 50 more were let through.
+   - **Already in main:** a settlement was a refund and then a booking, two writes. 60 held, 20 spent, 40 charged, killed between
+     the writes: 20 on the books, the order already deleted, 70 more let through under 100.
+   - The voice change: a try? on the original job's GET dropped a 402's final bill (billed 6.5, the books kept 9); without a final
+     bill get_job reported a top-level credits_charged of 0 as the charge; a default result without its background released all
+     9 before the job reported its failure.
+   - No check went red when only the settle-date rule was reverted, or when the voice change's accepted flag was pinned to false.
 
 ## Fix
 
@@ -130,6 +142,17 @@ task row whatever the app's language. On upscale and change voice the AI got onl
     - a voice library order keeps its caller's failure step across a restart (`failureStep`).
   - The fee step words full access with the standing consent.
   - The character tool's price check goes through `beforeSubmission`, and the guard pins both real entries.
+
+- **Third-check fixes:**
+  - The token is bound to the limit's revision (`SkyStudioSpendStore.limitRevision`): any change since its question voids it. A
+    call that carries a token has it checked first. One that is not accepted asks again when the call changes the mode or the
+    limit, and otherwise writes nothing and says to repeat the call without it.
+  - A keyless reservation refunds or settles only into the one day the ledger proves holds it
+    (`DailySpendLedger.provenDayKey`), else it leaves the books and logs it.
+  - A settlement is one ledger write (`SkyStudioSpendStore.settle`). The voice library order is still deleted first: deleting it
+    after the write would let a restart settle it twice.
+  - A voice change's books move only by a final bill (`VoiceChangeBilling`): a refusal's bill for the original job counts, a
+    top-level 0 is neither settled nor reported, and a result without its background keeps the 9 until a bill comes.
 
 ## Similar refusals
 
@@ -247,4 +270,7 @@ numbers, and what the user can do? The review re-judged three items.
   charged.
 - One decision, one moment: a check, its booking and its refund read the clock once. Numbers reported later are the ones read at the
   refusal.
+- An approval or a reservation carries what it was decided on (the limit's revision, the booking's day key). When that is missing,
+  prove it or leave the books; never work it out again from today's state.
+- Books move by a final bill only, in one write: two writes can be cut in half.
 - A button in a sheet must not take away the window behind it: edit in place.

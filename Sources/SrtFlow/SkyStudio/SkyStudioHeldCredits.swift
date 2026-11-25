@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - 一单 Sky Studio 的活记在本机积分账上的那一笔
 //
@@ -9,10 +10,14 @@ import Foundation
 // - **退回**（只退一次）：没交上（裁、传的时候停了 / 出错）、排队中取消了、Sky Studio 说没做成（它自己退钱）；
 // - **按实收换**：做完了，服务器按实际的文件算，比报价低就收低的。
 // 交上之后停不下来的（已经开始了、取消没送到）不退：积分花了。upscale（UpscaleJob）和生成（SkyStudioGenerationRun）共用这一份。
+// Both go to the day key recorded at booking. A reservation without one (a voice library order saved before day keys) uses only a
+// day the ledger proves holds it; otherwise the books stay as they are, counting too much rather than too little, and the log says
+// so (Codex CXM3). A settlement is one ledger write (SkyStudioSpendStore.settle).
 // 不管什么：账本怎么存、每日上限（SkyStudioSpendStore）；要不要问用户（SkyStudioJobGate）。
 
 @MainActor
 struct SkyStudioHeldCredits {
+    private static let log = Logger(subsystem: "com.srtflow.SrtFlow", category: "credit-ledger")
     private var held: SkyStudioJobGate.Reservation?
     private let store: SkyStudioSpendStore
 
@@ -32,16 +37,22 @@ struct SkyStudioHeldCredits {
     /// 没花出去：退回（只退一次）。
     mutating func refund() {
         guard let held else { return }
-        store.refund(held.credits, dayKey: held.dayKey)
+        if let key = bookedDay(of: held, for: "refund") { store.refund(held.credits, dayKey: key) }
         self.held = nil
     }
 
     /// 做完：账上记的是报价，换成实收（一般一样）。实收记在预留的那一天：Sky Studio 交的时候就扣了，
     /// 跨了零点（SkyCut 重启之后第二天才接着跟完的声音库收费单）也不挪到今天的额度上。
     mutating func settle(charged: Double) {
-        guard let held, abs(held.credits - charged) > 0.0001 else { return }
-        store.refund(held.credits, dayKey: held.dayKey)
-        store.record(charged, dayKey: held.dayKey)
-        self.held = SkyStudioJobGate.Reservation(credits: charged, day: held.day, dayKey: held.dayKey)
+        guard let held, abs(held.credits - charged) > 0.0001, let key = bookedDay(of: held, for: "settlement") else { return }
+        store.settle(reserved: held.credits, charged: charged, dayKey: key)
+        self.held = SkyStudioJobGate.Reservation(credits: charged, day: held.day, dayKey: key)
+    }
+
+    /// The day key the reservation was booked on; for one saved without it, the only day the ledger proves holds it, else nil.
+    private func bookedDay(of held: SkyStudioJobGate.Reservation, for action: String) -> String? {
+        if let key = held.dayKey ?? store.ledger.provenDayKey(holding: held.credits, bookedAt: held.day) { return key }
+        Self.log.notice("Credit \(action, privacy: .public) of \(held.credits) left on the books: the reservation has no day key and the ledger does not prove its day")
+        return nil
     }
 }

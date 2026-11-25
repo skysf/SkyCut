@@ -22,6 +22,10 @@ final class SkyStudioSpendStore: ObservableObject {
 
     @Published private(set) var dailyLimit: Double
     @Published private(set) var ledger: DailySpendLedger
+    /// How many times the daily limit changed in this run. A set_settings token is bound to it, so any change since its question
+    /// voids the token, also a change back to the same value (Codex CXM3: a 1,000 → 1,500 token wrote 1,500 after the user went to
+    /// 2,000 and back to 1,000). Tokens live only in memory, so the count does too.
+    private(set) var limitRevision = 0
 
     private let defaults: UserDefaults
 
@@ -41,6 +45,7 @@ final class SkyStudioSpendStore: ObservableObject {
         let next = Self.clamped(value)
         guard next != dailyLimit else { return }
         dailyLimit = next
+        limitRevision += 1
         defaults.set(next, forKey: Self.limitKey)
     }
 
@@ -76,6 +81,17 @@ final class SkyStudioSpendStore: ObservableObject {
     func refund(_ credits: Double, dayKey: String) {
         var next = ledger
         next.refund(credits, dayKey: dayKey)
+        save(next)
+    }
+
+    /// Swaps a reservation for the actual charge on the day it was booked, in one ledger write. Written as a refund and then a
+    /// booking, a kill between the two lost the charge (60 held, 20 spent, 40 charged: 20 left on the books and 70 more allowed
+    /// under 100; Codex CXM3).
+    func settle(reserved: Double, charged: Double, dayKey: String, now: Date = Date()) {
+        var next = ledger
+        next.refund(reserved, dayKey: dayKey)
+        next.add(charged, dayKey: dayKey)
+        next.prune(now: now)
         save(next)
     }
 

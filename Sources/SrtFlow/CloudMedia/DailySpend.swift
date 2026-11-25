@@ -62,6 +62,27 @@ struct DailySpendLedger: Codable, Equatable, Sendable {
         if left == 0 { days[key] = nil } else { days[key] = left }
     }
 
+    /// The days `date` falls on somewhere on Earth (UTC−12 to UTC+14): two or three in a row. A booking made at `date` in a time
+    /// zone nobody recorded sits on one of them.
+    static func possibleDayKeys(for date: Date, calendar: Calendar = .current) -> [String] {
+        var keys: [String] = []
+        for hours in [-12, 0, 14] {
+            var zoned = calendar
+            zoned.timeZone = TimeZone(secondsFromGMT: hours * 3_600) ?? calendar.timeZone
+            let key = dayKey(for: date, calendar: zoned)
+            if !keys.contains(key) { keys.append(key) }
+        }
+        return keys
+    }
+
+    /// The day a booking of `amount` made at `date` provably sits on when its day key was not recorded (a reservation saved before
+    /// day keys): the only one of its possible days that still holds that much. nil when none or several do, and then no day is
+    /// guessed: refunding into a day worked out in today's time zone took the next day's 80 down to 20 (Codex CXM3).
+    func provenDayKey(holding amount: Double, bookedAt date: Date, calendar: Calendar = .current) -> String? {
+        let holding = Self.possibleDayKeys(for: date, calendar: calendar).filter { (days[$0] ?? 0) + DailySpendPolicy.slack >= amount }
+        return holding.count == 1 ? holding[0] : nil
+    }
+
     /// 只留最近的几天：账本不该越攒越长。
     mutating func prune(keepingDays: Int = 40, now: Date, calendar: Calendar = .current) {
         guard let cutoff = calendar.date(byAdding: .day, value: -keepingDays, to: now) else { return }

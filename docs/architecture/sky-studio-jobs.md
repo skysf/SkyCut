@@ -578,6 +578,20 @@ A reservation's check, booking and refund day are one moment, and the day key it
 So a reservation booked a second before midnight and refunded after it, or after the Mac's time zone changed, goes back to its own
 day, not the next one.
 
+Third check (Codex CXM3, 2026-11-26):
+
+- **The raise token.** It is bound to the limit's revision (`SkyStudioSpendStore.limitRevision`), so any change of the limit since
+  its question voids it, also a change back to the same value. A call that carries a token has it checked before anything in the
+  call is written. A token that was used, expired, not issued or issued for another change authorizes nothing: set_settings asks
+  again when the call changes the mode or the limit, and otherwise writes nothing and says to repeat the call without the token.
+- **Reservations without a day key.** A voice library order from an older SkyCut has none. It refunds or settles only into a day
+  the ledger proves holds it: of the two or three days its moment falls on around the world (`DailySpendLedger.possibleDayKeys`),
+  the only one that still holds that much. Otherwise the books stay as they are, counting more rather than less, and the log says
+  so. A day worked out in today's time zone once took the next day's 80 down to 20.
+- **One write per settlement** (`SkyStudioSpendStore.settle`). Written as a refund and then a booking, a kill between the two left
+  the refund without the charge. A voice library order is still deleted before the books change: a kill in between can only count
+  more. Deleting the order after the write would let a restart follow the order again and settle it twice.
+
 **What a balance refusal says** (the same day, its twin). Sky Studio's `insufficient_credits` (402 at `/jobs`; `/quote` does not check
 the balance) is said by `SkyStudioBalanceRefusal` in every paid job: generate_media, upscale_clip, add_voiceover, change_voice, voice
 design and MiniMax versions, manage_characters. The AI gets:
@@ -594,11 +608,19 @@ design and MiniMax versions, manage_characters. The AI gets:
     queries that original job and never submits it again. get_job on a failed voice change GETs that job and settles the books by
     its billing.
 
+A voice change's books move only by a final bill (`VoiceChangeBilling`, 2026-11-26):
+- a top-level `credits_charged` of 0 without a final bill is neither settled nor reported as the charge;
+- a refusal's final bill for the original job counts (a 402 billed 6.5);
+- a default change whose result lacks its background keeps its reservation until a bill comes.
+
 The task row shows the localized line with the numbers and the path to Add Credits (SkyCut → Settings → Sky Studio → Add Credits,
 or the pane when Sky Studio sent no address). Only `SkyStudioBalanceRefusal` names the code, apart from `SkyStudioJobAdmission`'s
 list (`checks/sky-studio-wiring/daily-limit.sh`). `BalanceRefusalChecks` checks the words and the line in every string table, and
 `scripts/check-voice-recovery.sh` (`VoiceChangeBalanceChecks`) runs change_voice into a plain 402 and into one with pending billing,
-using real App objects. `SpendChecks` covers the reservation across midnight.
+using real App objects. `SpendChecks` covers the reservation across midnight. `LimitTokenChecks` covers the token's revision and
+replays, and `SettleChecks` covers settling on the booking's day, keyless reservations and the one write. `VoiceChangeSettleChecks`
+(real App objects) covers the voice change's bills: a polled 402, a refusal's final bill, no final bill, and a result without its
+background.
 
 Manual regression for both (before a release; no automated check opens a real window or client):
 

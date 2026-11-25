@@ -159,15 +159,15 @@ private func gateChecks() {
 
     // The user's yes to that exact raise is the approval: set_settings with the token goes through without a second question.
     let other = try? AISettingsApproval.check(AIToolArguments(["daily_ai_credit_limit": 2_000, "confirm_token": .string(token)]), mode: nil,
-                                              limit: 2_000, access: access, currentLimit: spend.dailyLimit)
+                                              limit: 2_000, access: access, spend: spend)
     check(other?.payload["confirm_token_refused"] != nil, "another value with that token is asked as before (the token is left untouched)")
     do {
         let approved = try AISettingsApproval.check(AIToolArguments(["daily_ai_credit_limit": 1_500, "confirm_token": .string(token)]), mode: nil,
-                                                    limit: 1_500, access: access, currentLimit: spend.dailyLimit)
+                                                    limit: 1_500, access: access, spend: spend)
         check(approved == nil, "the exact raise with the refusal's token is approved without asking again")
     } catch { check(false, "the refusal's token: \(error)") }
     let reused = try? AISettingsApproval.check(AIToolArguments(["daily_ai_credit_limit": 1_500, "confirm_token": .string(token)]), mode: nil,
-                                               limit: 1_500, access: access, currentLimit: spend.dailyLimit)
+                                               limit: 1_500, access: access, spend: spend)
     checkEqual(reused?.payload["status"], "needs_confirmation", "the token is good for one call")
 
     // A late answer after the limit moved: the user set 2,000 themselves after a 1,000 → 1,500 offer. The token is void (it would
@@ -176,7 +176,7 @@ private func gateChecks() {
     let offered = offer["options"]?.arrayValue?.first?["confirm_token"]?.stringValue ?? ""
     spend.setDailyLimit(2_000)
     let late = try? AISettingsApproval.check(AIToolArguments(["daily_ai_credit_limit": 1_500, "confirm_token": .string(offered)]), mode: nil,
-                                             limit: 1_500, access: access, currentLimit: spend.dailyLimit)
+                                             limit: 1_500, access: access, spend: spend)
     checkEqual(late?.payload["status"], "needs_confirmation", "a late yes to 1,500 after the user set 2,000 is asked again, not written")
     check(late?.payload["confirm_token_refused"] != nil && late?.payload["question"]?.stringValue?.contains("2000 -> 1500") == true,
           "the question says it would now lower the limit from 2,000")
@@ -186,7 +186,7 @@ private func gateChecks() {
     // Without it, the raise asks first, in full access too, and the question names the limit plainly.
     access.setMode(.full)
     let raise = AIToolArguments(["daily_ai_credit_limit": 1_500])
-    let asked = try? AISettingsApproval.check(raise, mode: nil, limit: 1_500, access: access, currentLimit: spend.dailyLimit)
+    let asked = try? AISettingsApproval.check(raise, mode: nil, limit: 1_500, access: access, spend: spend)
     checkEqual(asked?.payload["status"], "needs_confirmation", "raising the limit to the suggested value asks the user, even in full access")
     let settingsQuestion = asked?.payload["question"]?.stringValue ?? ""
     for phrase in ["SkyCut's daily credit limit for AI", "not the Sky Studio balance", "1000 -> 1500 credits a day",
@@ -199,7 +199,7 @@ private func gateChecks() {
     check(!fullToken.isEmpty && fullToken != token, "in full access the refusal's token is bound to that mode")
     do {
         let full = try AISettingsApproval.check(AIToolArguments(["daily_ai_credit_limit": 1_500, "confirm_token": .string(fullToken)]),
-                                                mode: nil, limit: 1_500, access: access, currentLimit: spend.dailyLimit)
+                                                mode: nil, limit: 1_500, access: access, spend: spend)
         check(full == nil, "and the user's yes to it raises the limit in full access too")
     } catch { check(false, "the full-access refusal's token: \(error)") }
     checkEqual(spend.dailyLimit, 1_000, "nothing here wrote the store (set_settings writes after the approval)")

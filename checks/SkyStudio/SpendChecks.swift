@@ -108,7 +108,7 @@ private func timeZoneSwitchChecks() {
     NSTimeZone.default = TimeZone(identifier: "Asia/Tokyo")!
     var held = SkyStudioHeldCredits(yesterday, store: store)
     held.refund()
-    checkEqual(store.ledger.days[yesterday.dayKey], nil, "the refund goes back to the day key it was booked on")
+    check(yesterday.dayKey != nil && store.ledger.days[yesterday.dayKey ?? ""] == nil, "the refund goes back to the day key it was booked on")
     checkEqual(store.ledger.days.values.reduce(0, +), 80, "the next day's 80 is untouched after the time zone changed")
     NSTimeZone.default = TimeZone(identifier: "Asia/Shanghai")!
     checkEqual(store.decide(credits: 50, now: early), .overLimit(spent: 80, estimate: 50, limit: 100), "and its limit still holds")

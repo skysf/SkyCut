@@ -51,6 +51,8 @@
 #      gives the numbers, the reset and three options (the exact set_settings call with a friendly suggested value, which still
 #      asks the user; the settings path read from every real string table; waiting); the panels' line in every language.
 #      Its twin, Sky Studio's balance refusal (BalanceRefusalChecks): the account, not SkyCut's limit; the numbers; where to add credits.
+#      Tokens and settlements (Codex CXM3): a raise's token void after any change of the limit, checked before anything is written
+#      (LimitTokenChecks); a settlement on the booking's day key, in one ledger write, a keyless one only on a proven day (SettleChecks).
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写只有一份 KeychainSecret，真钥匙串在 scripts/check-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -241,6 +243,8 @@ xcrun swiftc \
   checks/SkyStudio/AccessChecks.swift \
   checks/SkyStudio/DailyLimitChecks.swift \
   checks/SkyStudio/BalanceRefusalChecks.swift \
+  checks/SkyStudio/LimitTokenChecks.swift \
+  checks/SkyStudio/SettleChecks.swift \
   checks/SkyStudio/VoiceChecks.swift \
   checks/SkyStudio/VoiceTimingChecks.swift \
   checks/SkyStudio/VoiceSplitChecks.swift \
