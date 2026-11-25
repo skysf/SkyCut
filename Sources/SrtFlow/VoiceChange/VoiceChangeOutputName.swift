@@ -7,6 +7,9 @@ import SrtFlowCore
 // 照界面语言写），放在原素材所在的文件夹；写不进去（只读盘、相机卡、没授权）退到工程的家、再退到下载（同 upscale，
 // UpscaleOutputName.folder）；撞名加编号（ExportFileName.unoccupied，全 App 一个规矩，不覆盖）。扩展名照服务器报的类型
 // （人声是 WAV；背景不是 WAV 时服务器另报 `background_content_type`），认不出来看成品地址的扩展名，再不行按 WAV。
+// Each cloud job's own names (`claim`): a name another running change chose counts as taken until that one has written its files or
+// given them up (two jobs for the same clip and voice once chose the same two paths, and cancelling one deleted the other's files on
+// the timeline, CXD3 on PR #554).
 // 不管什么：文件内容（VoiceChangeJob 下载）。
 
 enum VoiceChangeOutputName {
@@ -29,6 +32,25 @@ enum VoiceChangeOutputName {
             let fromURL = url.pathExtension.lowercased()
             return ["wav", "mp3", "flac", "m4a"].contains(fromURL) ? fromURL : "wav"
         }
+    }
+
+    /// Names a running voice change chose and has not finished with.
+    @MainActor private static var claimed: Set<String> = []
+
+    /// `destinations` for one cloud job, the names other running changes chose counted as taken; `release` them once its files are
+    /// written or given up.
+    @MainActor static func claim(
+        original: URL, voiceName: String, backgroundLabel: String, voiceExtension: String, backgroundExtension: String, fallbacks: [URL]
+    ) -> (voice: URL, background: URL) {
+        let places = destinations(original: original, voiceName: voiceName, backgroundLabel: backgroundLabel, voiceExtension: voiceExtension,
+                                  backgroundExtension: backgroundExtension, fallbacks: fallbacks,
+                                  exists: { FileManager.default.fileExists(atPath: $0.path) || claimed.contains($0.standardizedFileURL.path) })
+        claimed.formUnion([places.voice.standardizedFileURL.path, places.background.standardizedFileURL.path])
+        return places
+    }
+
+    @MainActor static func release(_ places: (voice: URL, background: URL)) {
+        claimed.subtract([places.voice.standardizedFileURL.path, places.background.standardizedFileURL.path])
     }
 
     /// 不撞名的两个完整路径：都放在同一个文件夹（原素材的，写不进去照 `fallbacks` 退）。

@@ -34,11 +34,13 @@ final class UploadServer: @unchecked Sendable {
     /// whose head declares 64 KB, then 1 KB of it and the connection closed; `statusStall`: only its head, then nothing.
     /// `shortRange`: a resumed GET answered 206 with only that many bytes from where the Range starts (`bytes a-b/total`, b short of the
     /// end), the answer itself whole. `redirect`: a 302 to another result on this server. `gzipRange`: whatever was asked, a gzip 206
-    /// `bytes 29-57/58` whose body decodes to the result's first 1,000 bytes (the review of PR #554: it once overwrote a whole file).
-    /// `empty`: a 200 with no body.
+    /// with that Content-Range whose body decodes to the result's first `decoded` bytes (the reviews of PR #554: `bytes 29-52/53`
+    /// decoding to exactly 53 bytes once overwrote a whole file). `gzipWhole`: a 200 with the whole result gzip-encoded (its length
+    /// cannot be checked); `gzipCut`: the same, declaring its encoded length, cut halfway through it (FIN). `empty`: a 200 with no
+    /// body.
     enum GetReply: Sendable {
         case file, slow, cut(Int), cutReset(Int), status(Int), statusCut(Int), statusStall(Int), stall, shortRange(Int), redirect(String)
-        case gzipRange, empty
+        case gzipRange(decoded: Int, range: String), gzipWhole, gzipCut, empty
     }
     static let etag = "\"skycut-check-1\""
 
@@ -282,14 +284,19 @@ final class UploadServer: @unchecked Sendable {
         if case .empty = reply {
             return respond(client, status: "200 OK", body: "", extra: ["Content-Type: video/mp4"])
         }
-        if case .gzipRange = reply {
-            let packed = Self.gzip(body.prefix(1_000))
+        if case .gzipRange(let decoded, let range) = reply {
+            let packed = Self.gzip(body.prefix(decoded))
             let head = ["HTTP/1.1 206 Partial Content", "Content-Length: \(packed.count)", "Content-Type: video/mp4", "Content-Encoding: gzip",
-                        "Content-Range: bytes 29-57/58", "Connection: close"].joined(separator: "\r\n") + "\r\n\r\n"
+                        "Content-Range: \(range)", "Connection: close"].joined(separator: "\r\n") + "\r\n\r\n"
             write(client, Data(head.utf8) + packed)
             shutdown(client, SHUT_WR)
             close(client)
             return
+        }
+        if case .gzipWhole = reply { return serveGzip(client, Self.gzip(body), cutAfter: nil, validators: validators) }
+        if case .gzipCut = reply {
+            let packed = Self.gzip(body)
+            return serveGzip(client, packed, cutAfter: packed.count / 2, validators: validators)
         }
         var start = 0
         if validators, let range = headers["range"], range.hasPrefix("bytes="), headers["if-range"].map({ $0 == Self.etag }) ?? true,
@@ -326,9 +333,20 @@ final class UploadServer: @unchecked Sendable {
         case .stall:
             write(client, body.subdata(in: start..<min(body.count, start + 1_024)))
             hold(client)
-        case .status, .statusCut, .statusStall, .redirect, .gzipRange, .empty:
+        case .status, .statusCut, .statusStall, .redirect, .gzipRange, .gzipWhole, .gzipCut, .empty:
             break
         }
+    }
+
+    /// A 200 with a gzip body (its encoded length declared), whole or cut after `cutAfter` encoded bytes.
+    private func serveGzip(_ client: Int32, _ packed: Data, cutAfter: Int?, validators: Bool) {
+        var head = ["HTTP/1.1 200 OK", "Content-Length: \(packed.count)", "Content-Type: video/mp4", "Content-Encoding: gzip", "Connection: close"]
+        if validators { head += ["ETag: \(Self.etag)", "Accept-Ranges: bytes", "Last-Modified: Mon, 23 Nov 2026 07:00:00 GMT"] }
+        write(client, Data((head.joined(separator: "\r\n") + "\r\n\r\n").utf8))
+        write(client, packed.prefix(cutAfter ?? packed.count))
+        if cutAfter != nil { usleep(200_000) }   // the client takes in what arrived before the connection goes
+        shutdown(client, SHUT_WR)
+        close(client)
     }
 
     /// Keep the connection open without answering until the client closes it (a cancel) or the server stops.

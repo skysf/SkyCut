@@ -10,13 +10,15 @@ import SrtFlowMCPKit
 // - the day's books take Sky Studio's actual charge as soon as it is made, from whichever field it sent: the top-level
 //   `credits_charged` alone, or `billing.credits_charged` alone (72 of the 75 reserved either way; the billing one once stayed at 75);
 // - a first answer without any charge, then Download again's re-read with 72: the books and the saved upscale both say 72;
+// - a bill under review (`billing.credits_charged` 72 with `pending_review` / `review_required`): the 75 reserved stays (it once
+//   settled at 72 and reported it as charged, CXD3); Download again's re-read with the final bill settles at 72;
 // - Cancel while it downloads again keeps it listed, stopped, with Download again on its own row; that row's Download again reads the
 //   job first and saves it; one upload and one /jobs for each job.
 // upscale_clip asked again (project B, the same source) is PaidToolEntryChecks.
 
 final class UpscaleHTTP: URLProtocol {
-    /// Which of Sky Studio's charge fields a finished status carries.
-    enum Charge { case topLevel, billing, none }
+    /// Which of Sky Studio's charge fields a finished status carries (`reviewing`: the billing one, under review).
+    enum Charge { case topLevel, billing, reviewing, none }
     static let lock = NSLock()
     static var requests: [(method: String, path: String)] = []
     static var drops = 0
@@ -45,6 +47,7 @@ final class UpscaleHTTP: URLProtocol {
         switch charge {
         case .topLevel: fields = #""credits_charged": 72,"#
         case .billing: fields = #""billing": {"status": "charged", "credits_charged": 72},"#
+        case .reviewing: fields = #""billing": {"status": "pending_review", "review_required": true, "credits_charged": 72},"#
         case .none: fields = ""
         }
         return #"{"job_id": "job-up", "status": "done", "#
@@ -191,6 +194,17 @@ private func ledgerChecks(_ request: UpscaleRequest) async {
     books(spent, 72, "after the re-read")
     if let file = job.outcome?.file { try? FileManager.default.removeItem(at: file) }
     UpscaleActivity.shared.remove(job)
+
+    // A bill under review: the 75 reserved stays until the bill is final; the final bill on Download again's re-read settles at 72.
+    let (reviewed, reviewSpent) = await heldJob(request, charge: .reviewing, "a bill under review")
+    books(reviewSpent, 75, "a bill under review")
+    UpscaleHTTP.lock.withLock { UpscaleHTTP.rereadCharge = .billing }
+    UpscaleActivity.shared.downloadAgain(reviewed)
+    await upscaleEventually("the reviewed upscale to be saved") { reviewed.state == .done }
+    require(reviewed.outcome?.creditsCharged == 72, "the final bill's charge (72) once it is final: \(String(describing: reviewed.outcome?.creditsCharged))")
+    books(reviewSpent, 72, "once the bill is final")
+    if let file = reviewed.outcome?.file { try? FileManager.default.removeItem(at: file) }
+    UpscaleActivity.shared.remove(reviewed)
 }
 
 @MainActor

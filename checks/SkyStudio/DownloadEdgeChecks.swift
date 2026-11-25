@@ -5,6 +5,9 @@ import Foundation
 // - a resumed GET answered with a 206 that stops short: thrown away, never 100% before, the next GET fetches the whole result;
 // - a gzip 206 for the second half (`bytes 29-57/58`, 1,000 bytes decoded): never the result, and a file already at the destination
 //   stays as it was; followed by the whole answer it is the whole result;
+// - a gzip 206 `bytes 29-52/53` decoding to exactly 53 bytes (CXD3: it once overwrote a whole 2,000-byte file on the first GET): never
+//   the result, every GET after it starts without a Range; a whole gzip 200 (its length cannot be checked) never replaces a file already
+//   there, and is taken where nothing is in the way; a gzip 200 the network broke starts again without a Range;
 // - an empty 200: never the result; three of them end `download_incomplete` (a download failure the flows hold for Download again);
 // - an answer whose status the system held back (a stalled 403 or 500): at most one GET at the job's current address, never the same
 //   address again;
@@ -19,6 +22,7 @@ func runDownloadEdgeChecks(_ server: UploadServer, folder: URL, result: Data, ap
 }
 
 private func runShortAnswerChecks(_ server: UploadServer, folder: URL, result: Data, api: (UploadEvents, TimeInterval) -> SkyStudioAPI) async {
+    await runEncodedAnswerChecks(server, folder: folder, result: result, api: api)
     // A resumed GET answered with a 206 that stops short of the end: thrown away, and the next GET fetches the whole result.
     server.configureDownload(gets: [.cut(400_000), .shortRange(150_000), .file], result: result)
     let events = UploadEvents()
@@ -41,7 +45,7 @@ private func runShortAnswerChecks(_ server: UploadServer, folder: URL, result: D
     let kept = folder.appendingPathComponent("kept.mp4")
     let earlier = Data((0..<2_000).map { UInt8($0 % 241) })
     try? earlier.write(to: kept)
-    server.configureDownload(gets: [.gzipRange], result: result)
+    server.configureDownload(gets: [.gzipRange(decoded: 1_000, range: "bytes 29-57/58")], result: result)
     var failure = await downloadFailureOf {
         try await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), to: kept)
     }
@@ -49,7 +53,7 @@ private func runShortAnswerChecks(_ server: UploadServer, folder: URL, result: D
           "three gzip 206s: never the result, download_incomplete after three GETs: \(String(describing: failure))")
     check((try? Data(contentsOf: kept)) == earlier && leftovers(folder).isEmpty,
           "the 2,000-byte file at the destination is untouched (it was once overwritten with the 1,000 decoded bytes)")
-    server.configureDownload(gets: [.gzipRange, .file], result: result)
+    server.configureDownload(gets: [.gzipRange(decoded: 1_000, range: "bytes 29-57/58"), .file], result: result)
     do {
         try await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), to: kept)
     } catch {
@@ -74,6 +78,53 @@ private func runShortAnswerChecks(_ server: UploadServer, folder: URL, result: D
         check(false, "an empty 200 then the whole answer: the download works, got \(error)")
     }
     check((try? Data(contentsOf: empty)) == result && resultGets(server).count == 2, "an empty 200 then the whole result after two GETs")
+}
+
+/// Answers the system decoded (Content-Encoding gzip although identity was asked for): their length can never be checked.
+private func runEncodedAnswerChecks(_ server: UploadServer, folder: URL, result: Data, api: (UploadEvents, TimeInterval) -> SkyStudioAPI) async {
+    let earlier = Data((0..<2_000).map { UInt8($0 % 239) })
+    let kept = folder.appendingPathComponent("kept-encoded.mp4")
+    try? earlier.write(to: kept)
+
+    // A gzip 206 whose decoded body is exactly its Content-Range total: never the result, and never resumed.
+    server.configureDownload(gets: [.gzipRange(decoded: 53, range: "bytes 29-52/53")], result: result)
+    var failure = await downloadFailureOf { try await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), to: kept) }
+    check(failure?.kind == .incomplete && failure?.attempts == 3 && (try? Data(contentsOf: kept)) == earlier && leftovers(folder).isEmpty,
+          "three gzip 206s decoding to their whole total: download_incomplete, the 2,000-byte file untouched: \(String(describing: failure))")
+    check(resultGets(server).allSatisfy { $0.headers["range"] == nil }, "every GET after an encoded answer starts without a Range")
+
+    // A whole gzip 200: taken nowhere a file already is (three of them end download_incomplete), taken where nothing is in the way.
+    server.configureDownload(gets: [.gzipWhole], result: result)
+    failure = await downloadFailureOf { try await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), to: kept) }
+    check(failure?.kind == .incomplete && failure?.attempts == 3 && (try? Data(contentsOf: kept)) == earlier && leftovers(folder).isEmpty,
+          "a gzip 200 never replaces the file already at the destination: \(String(describing: failure))")
+    server.configureDownload(gets: [.gzipWhole, .file], result: result)
+    do {
+        try await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), to: kept)
+    } catch {
+        check(false, "a gzip 200 then the whole answer: the checked result replaces the file, got \(error)")
+    }
+    check((try? Data(contentsOf: kept)) == result && resultGets(server).count == 2, "a gzip 200, then the whole result checked against its length")
+    let fresh = folder.appendingPathComponent("fresh-encoded.mp4")
+    server.configureDownload(gets: [.gzipWhole], result: result)
+    do {
+        try await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), to: fresh)
+    } catch {
+        check(false, "a gzip 200 where nothing is in the way: taken, got \(error)")
+    }
+    check((try? Data(contentsOf: fresh)) == result && resultGets(server).count == 1, "a gzip 200 where nothing is in the way is taken")
+
+    // A gzip 200 the network broke: the next GET starts again from nothing, without a Range.
+    server.configureDownload(gets: [.gzipCut, .file], result: result)
+    let broken = folder.appendingPathComponent("broken-encoded.mp4")
+    do {
+        try await api(UploadEvents(), 600).download(server.resultURL("a.mp4"), to: broken)
+    } catch {
+        check(false, "a gzip 200 cut, then the whole answer: the download works, got \(error)")
+    }
+    let gets = resultGets(server)
+    check((try? Data(contentsOf: broken)) == result && gets.count == 2 && gets[1].headers["range"] == nil,
+          "a broken gzip 200 is never resumed: \(gets.map { $0.headers["range"] ?? "-" })")
 }
 
 private func runHeldBackChecks(_ server: UploadServer, folder: URL, result: Data, api: (UploadEvents, TimeInterval) -> SkyStudioAPI) async {

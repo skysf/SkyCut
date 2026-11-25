@@ -12,7 +12,8 @@ import SrtFlowMCPKit
 // that does not know the parameter; `omitBackground` a default result without its background.
 // Downloads (2026-11-24, VoiceChangeDownloadChecks): `fileDrops` loses the connection of that many result GETs; `expireVoiceFile`
 // answers the voice file's first GET 403, after which the job's result names a fresh address (`voice-fresh.wav`); `holdFiles` leaves
-// result GETs unanswered (a stop while downloading).
+// result GETs unanswered (a stop while downloading); `holdNext` leaves only the next GETs of one file unanswered (`voice.wav`: a job
+// stopped before its voice came; `background.wav`: after it came).
 
 final class VoiceChangeHTTP: URLProtocol {
     static let lock = NSLock()
@@ -50,6 +51,8 @@ final class VoiceChangeHTTP: URLProtocol {
     static var voiceRenamed = false
     /// Result GETs get no answer at all (until the task is cancelled).
     static var holdFiles = false
+    /// How many of the next GETs of a file (`voice.wav`, `background.wav`) get no answer until the task is cancelled.
+    static var holdNext: [String: Int] = [:]
 
     static let voiceID = "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d"
     static let session: URLSession = {
@@ -65,7 +68,7 @@ final class VoiceChangeHTTP: URLProtocol {
         libraryFailure = nil; quoteFailure = nil; submitNetworkFailure = false; holdJob = false; released = true; jobFails = false
         voiceExtraSeconds = 0.02; backgroundSeconds = nil; sourceSeconds = 4.0; charged = 7.5
         separationFails = false; quoteIgnoresSkip = false; omitBackground = false; jobDirect = false
-        fileDrops = 0; expireVoiceFile = false; voiceRenamed = false; holdFiles = false
+        fileDrops = 0; expireVoiceFile = false; voiceRenamed = false; holdFiles = false; holdNext = [:]
     }
 
     static var log: [(method: String, path: String, body: JSONValue)] { lock.lock(); defer { lock.unlock() }; return requests }
@@ -95,6 +98,8 @@ final class VoiceChangeHTTP: URLProtocol {
         Self.lock.lock()
         Self.requests.append((method, path, body))
         if Self.holdFiles, path.contains("/files/") { Self.lock.unlock(); return }   // no answer until the task is cancelled
+        let file = (path as NSString).lastPathComponent
+        if path.contains("/files/"), let left = Self.holdNext[file], left > 0 { Self.holdNext[file] = left - 1; Self.lock.unlock(); return }
         let answer = Self.answer(method, path, body, data)
         Self.lock.unlock()
         guard let (status, value, bytes) = answer else {

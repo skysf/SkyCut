@@ -435,7 +435,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             holdCaption(url, delivered: delivered, delivery: delivery)
             detail["caption_issue"] = .string("Video saved; the optional SRT did not download. To fetch it, call generate_media again with "
                 + "the same arguments and idempotency_key \"\(idempotencyKey)\": SkyCut then downloads only the SRT, under this job id, with "
-                + "no new generation and no new charge. A call without that idempotency_key is a new generation and is charged again.")
+                + "no new generation and no new charge. " + Self.otherCall(film: official != nil))
         case .tooLarge?:
             detail["caption_issue"] = "Video saved; the optional SRT is larger than the model's catalog allows, so it was not kept."
         case nil: break
@@ -509,12 +509,23 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         }
         // A paid result whose download gave up: this job's own key or row downloads it again at no charge; anything else is a new job.
         if let downloadFailure {
-            payload.merge(downloadFailure.fields(retry: "call generate_media again with the same " + (official == nil ? "" : "film ")
-                + "arguments and idempotency_key \"\(idempotencyKey)\": SkyCut then only downloads this result again under this job id. Or "
-                + SkyStudioDownloadFailure.taskListRetry + " A call without that idempotency_key, or with another one, is a new generation "
-                + "and is charged again.")) { _, download in download }
+            payload.merge(downloadFailure.fields(retry: Self.downloadRetry(key: idempotencyKey, film: official != nil))) { _, download in download }
         }
         AIJobs.shared.finish(job, status, message: message, detail: .object(payload))
+    }
+
+    /// The way back to a held result: this job's own key, or its row.
+    static func downloadRetry(key: String, film: Bool) -> String {
+        "call generate_media again with the same " + (film ? "film " : "") + "arguments and idempotency_key \"\(key)\": SkyCut then only "
+            + "downloads this result again under this job id. Or " + SkyStudioDownloadFailure.taskListRetry + " " + otherCall(film: film)
+    }
+
+    /// What a call without this job's own key does. A film submission without a key is refused before anything is sent, so it is never
+    /// said to be charged (CXD3 on PR #554).
+    static func otherCall(film: Bool) -> String {
+        film ? "A film call with another idempotency_key is a new generation and is charged again; one without an idempotency_key is refused "
+            + "before anything is sent."
+            : "A call without that idempotency_key, or with another one, is a new generation and is charged again."
     }
 
     private var refreshing = false

@@ -7,8 +7,9 @@ import SrtFlowMCPKit
 // What it covers (moved out of SkyStudioGenerationRun on 2026-11-24, when Download again began to run it again): the result downloaded
 // into the generation folder (SkyStudioAPI.download: resumed, retried, an expired address renewed from the original job), an image's
 // extension fixed by its bytes, an editing copy of a WebM, the optional SRT, the official receipt told, generated music measured.
-// A download that gives up, or is stopped, throws SkyStudioDownloadFailure before anything is saved: the run then holds the result for
-// Download again. An SRT that did not come down leaves the video saved and is reported as missing, so the job's own key can fetch only
+// A download that gives up, or is stopped, throws SkyStudioDownloadFailure before anything is saved, and so does an output folder that
+// cannot be made (`notSaved`: a file where it should be once ended the job and lost the way back, CXD3 on PR #554): the run then holds
+// the result for Download again. An SRT that did not come down leaves the video saved and is reported as missing, so the job's own key can fetch only
 // it.
 // What it does not cover: the job, its billing and ending, holding and Download again (SkyStudioGenerationRun).
 
@@ -51,7 +52,8 @@ struct SkyStudioGenerationDelivery {
         var destination = claim(pathExtension)
         var claimed = [destination.path]
         defer { for path in claimed { Self.claimedPaths.remove(path) } }
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        do { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+        catch { throw SkyStudioDownloadFailure.notSaved(error) }   // nothing came down yet: held for Download again
         advance(.downloading(fraction: nil))
         let current = current
         let advance = advance

@@ -67,11 +67,13 @@ struct UpscaleDelivery: Sendable {
     var offset: Double
     var started: Date
 
-    /// The actual charge a job's status reports, from whichever field Sky Studio sent: the top-level `credits_charged`, else
-    /// `billing.credits_charged` (a status with only the billing block once left 75 reserved on the day's books for 72 charged, the
-    /// review of PR #554). nil when neither says.
+    /// The final charge a job's status reports, from whichever field Sky Studio sent: the bill's net `credits_charged`, else the
+    /// top-level one (a status with only the billing block once left 75 reserved on the day's books for 72 charged, the review of PR
+    /// #554). nil while the bill is not final (under review, a refund pending, still reserved): the reservation stays on the day's books
+    /// until it is (a bill under review once settled at its 72 and was reported as charged, CXD3 on PR #554), and when neither says.
     static func charge(of status: SkyStudioJobStatus) -> Double? {
-        let charged = status.creditsCharged ?? status.billing?.json["credits_charged"]?.doubleValue
+        if let billing = status.billing, !billing.isFinal { return nil }
+        let charged = status.billing?.netCharged ?? status.creditsCharged
         guard let charged, charged.isFinite, charged >= 0 else { return nil }
         return charged
     }

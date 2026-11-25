@@ -363,40 +363,50 @@
   - `checks/sky-studio-wiring/upload-retry.sh` pins the single PUT, the answer read first, each job's wiring, the hook's `#if DEBUG`
     fence and the probe calls.
   - Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
-- Downloads of paid results (2026-11-24, narrowed 2026-11-25 after the reviews of PR #554): `scripts/check-sky-studio.sh` →
+- Downloads of paid results (2026-11-24, narrowed 2026-11-25, round 4 2026-11-26 after the reviews of PR #554): `scripts/check-sky-studio.sh` →
   `DownloadRetryChecks` and `DownloadEdgeChecks`, real GETs against the same local server (results served with an ETag and Range
   support).
   - One drop mid-body is resumed (Range, If-Range; every GET asks for identity bytes; progress never goes back; the file
     byte-identical); without validators the next GET starts again; three drops end as interrupted (`download_network`) after three
     GETs, with nothing left, and a later download gets the identical file.
-  - Only whole results: a short 206 is thrown away (never 100% before the whole result); three gzip 206s for the second half end
-    `download_incomplete` and leave the file at the destination untouched; three empty 200s end `download_incomplete`; each followed
-    by the whole answer is the whole result.
+  - Only whole results: a short 206 is thrown away (never 100% before the whole result); three gzip 206s for the second half, and
+    three decoding to exactly their total (`bytes 29-52/53`), end `download_incomplete` and leave the file at the destination
+    untouched; three whole gzip 200s never replace that file, one where nothing is in the way is taken, and one the network broke is
+    followed by a GET without a Range; three empty 200s end `download_incomplete`; each followed by the whole answer is the whole
+    result.
   - Answers: a 403 whose body stalls (status held back) goes to the job's fresh address at once; a 500 whose body stalls is one GET
     when the job gives the same address or none, two when the fresh one stalls too, never three; a redirect counts as a GET; a 403
     renewed once to a fresh address that works; a 404 without renewal, a 404 whose body broke, the same address again, a second
     refusal and a 500 end refused; a TLS failure ends as could not connect; a stop mid-body, during the pause or during the second GET
     stops promptly and says the GETs it sent.
-  - `HeldDownloadChecks`: the key is part of a request's identity (the key SkyCut made filled in); only that key's cached answer (or
+  - `HeldDownloadChecks`: the key is part of a request's identity (trimmed; the key SkyCut made filled in); only that key's cached answer (or
     an official key's) reaches the held job, which stays held while it downloads again; the same key with other arguments is refused
     and another key is a new request.
   - The download hook's checks run in the `-D DEBUG` binary (`checks/UploadFault/DownloadFaultChecks.swift`: one cut resumes, three
     end as interrupted, a body whole before the cut is still dropped, an HTTP answer stands, nothing spins); the probe's refusal of the
     debug build must name both hooks.
   - `scripts/check-voice-recovery.sh` (real App objects, fake Sky Studios): `PaidToolEntryChecks` goes through generate_media and
-    upscale_clip with POSTs counted (the returned key after the row was dismissed downloads the held file with no POST; key-less is one
-    new POST; 9:16 after 16:9 is a new job asking for 9:16; project B's upscale of A's held source is B's own job). The run checks:
+    upscale_clip with POSTs counted (the returned key after the row was dismissed downloads the held file with no POST; key-less and
+    another key are each one new POST; 9:16 after 16:9 is a new job asking for 9:16; a spaced key sent back as the receipt gives it is
+    the same job; a file where the output folder should be holds the result as `download_not_saved`, and the job's own key saves it
+    once the folder is fixed; project B's upscale of A's held source is B's own job). The run checks:
     `GenerationDownloadChecks` (held through a failed Download again, nothing started twice, the key path, a stop, empty answers, a
     missing SRT), `VoiceChangeDownloadChecks` (the same change and Chinese after English are new paid jobs; the held row's Download
-    again lands its files; a stop; an expired address), `UpscaleJobDownloadChecks` (books at 72 of 75 from each charge field alone
-    and from the re-read; Cancel while downloading again), `VoiceoverDownloadChecks` (the row's recovery, never twice after a resume,
-    a stop keeps the button), `OfficialRecoveryDownloadChecks` (held through a 503 while reading the job).
+    again lands its files; a stop; an expired address), `VoiceChangeOwnFilesChecks` (two running changes never choose the same
+    names; cancelling a new change while the held one's Download again lands leaves the held one's files on the timeline; a stop
+    during the background says both GETs and deletes only a voice it wrote that nothing uses), `UpscaleJobDownloadChecks` (books at
+    72 of 75 from each charge field alone and from the re-read; 75 kept while the bill is under review; Cancel while downloading
+    again), `VoiceoverDownloadChecks` (the row's recovery, never twice after a resume, a stop keeps the button),
+    `OfficialRecoveryDownloadChecks` (through generate_media with film arguments and the operation's key: held through a 503 while
+    reading the job, then saved by that key, nothing quoted or submitted).
   - `scripts/check-upscale.sh` → `DownloadChecks`: the charge (72 of 75 reserved, top-level or billing alone) is handed over before any
-    download; three drops hold the upscale; Download again saves it with no new upload or job; a stop holds it.
+    download, and only once the bill is final; three drops hold the upscale; Download again saves it with no new upload or job; a
+    stop holds it.
   - `checks/sky-studio-wiring/download-retry.sh` pins the single GET in the loop, identity bytes, the answer read first, the held-back
-    rule, the wholeness check, `renew:` on every paid download, holding until the result came down, the key in a request's identity, no
-    lookup of a held job by parameters and no Download again on the panels, tools or inspector, the rows, the hook's fence and the
-    probe. Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
+    rule, the wholeness check, no unchecked result over a file, `renew:` on every paid download, holding until the result came down
+    (an output folder that cannot be made too), the key in a request's identity as read, an upscale's final charge, a voice change's
+    own names and files, no lookup of a held job by parameters and no Download again on the panels, tools or inspector, the rows, the
+    hook's fence and the probe. Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
 - Reference-image fitting: `scripts/check-sky-studio.sh` → `ReferenceFitChecks` (which records allow fitting, also on Sky
   Studio's own records; the strictest limits of a chain, each limit met exactly / one over / one under, refusals naming the
   limit, the exact copy size inside the aspect range, the chain, the reference check, the refusal listing each model's limit,

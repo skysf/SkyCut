@@ -43,6 +43,16 @@ final class GenerationHTTP: URLProtocol {
         return data as Data
     }()
     static let caption = Data("1\n00:00:00,000 --> 00:00:01,000\nSnow.\n".utf8)
+    /// Sky Studio's `/me` for the official tool entry, which needs a verified account (checks/SkyStudio/Fixtures/me-pro-v1.json).
+    static let me = Data(#"""
+    {"account": {"id": "acct-check", "email": "check@example.com"}, "credits": {"balance": 1000}, "server_time": "2026-11-26T00:00:00Z",
+     "skycut": {"plan": "pro", "account_plan": "pro", "pro_source": "subscription", "trial_started_at": null, "trial_ends_at": null,
+      "trial_unavailable": null, "paid_until": "2026-12-26T00:00:00Z", "features": {"mcp": true, "watermark": false},
+      "valid_until": "2026-12-26T00:00:00Z", "min_version": "0.18.47", "max_running_jobs": 3,
+      "recharge_url": "https://skystudioai.com/app?credits=1", "upgrade_url": "https://skystudioai.com/app/skycut/pro",
+      "manage_machines_url": "https://skystudioai.com/app/skycut/machines", "plan_reason": null, "plan_message": null,
+      "auto_renews": true, "grace_until": null, "machines": {"limit": 2, "used": 1, "window_days": 30, "current_allowed": true}}}
+    """#.utf8)
     /// One image model, as Sky Studio's /models lists it (checks/SkyStudio/Fixtures/models-image-2026-11-07.json), for the tool entry.
     static let catalog: JSONValue = ["models": [[
         "id": "seedream5-flash", "kind": "image", "title": "Seedream 5.0 Flash",
@@ -84,6 +94,8 @@ final class GenerationHTTP: URLProtocol {
             if Self.captionDrops > 0 { Self.captionDrops -= 1 } else { answer = (200, Self.caption, "application/x-subrip") }
         } else if path.hasSuffix("/models") {
             answer = (200, (try? Self.catalog.encodedData()) ?? Data(), "application/json")
+        } else if path.hasSuffix("/me") {
+            answer = (200, Self.me, "application/json")
         } else if path.hasSuffix("/quote"), method == "POST" {
             answer = (200, Data(#"{"credits": 8, "typical_seconds": 10}"#.utf8), "application/json")
         } else if path.hasSuffix("/jobs"), method == "POST" {
@@ -265,7 +277,7 @@ private func missingCaption(_ folder: URL) async {
     let first = await finishedJob(job)
     let issue = first["caption_issue"]?.stringValue ?? ""
     require(first["status"] == "done" && first["caption_file"] == nil && issue.contains("idempotency_key \"\(key)\"")
-            && issue.contains("A call without that idempotency_key is a new generation and is charged again"),
+            && issue.contains("A call without that idempotency_key, or with another one, is a new generation and is charged again"),
             "the image is saved, and the missing SRT names this job's own key: \(first)")
     require(SkyStudioHeldDownloads.retry(job.id), "that key fetches the missing SRT")
     let second = await finishedJob(job)

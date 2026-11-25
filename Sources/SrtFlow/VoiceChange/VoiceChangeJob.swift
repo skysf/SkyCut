@@ -242,15 +242,18 @@ final class VoiceChangeJob {
     /// 下载两个文件到原素材旁边，量出各自多长。下到一半断了不留半个文件（SkyStudioAPI.download）；只下成一个就把它也删掉。
     /// A direct change downloads the voice alone (no background was made; one sent anyway is not what was asked for).
     /// SkyStudioAPI.download resumes or tries a broken GET again and renews an expired address from the original job (`jobID`).
+    /// The names are this job's own (VoiceChangeOutputName.claim); a failure or a stop deletes only the files this download wrote, and
+    /// only while no timeline uses them, and counts every GET it sent (CXD3 on PR #554: a stop once said 1 of the 2 the server saw).
     private func download(_ result: SkyStudioVoiceConversion, jobID: String) async throws -> VoiceChangeLanding.Files {
         let background = direct ? nil : result.backgroundURL
-        let places = VoiceChangeOutputName.destinations(
+        let places = VoiceChangeOutputName.claim(
             original: origin.sourceURL, voiceName: target.name, backgroundLabel: L10n("background (file name)"),
             voiceExtension: VoiceChangeOutputName.pathExtension(contentType: result.contentType, url: result.voiceURL),
             backgroundExtension: VoiceChangeOutputName.pathExtension(contentType: result.backgroundContentType ?? result.contentType,
                                                                      url: background ?? result.voiceURL),
             fallbacks: fallbackFolders
         )
+        defer { VoiceChangeOutputName.release(places) }
         let typical = quote.typicalSeconds
         let last = CloudPhaseBox()
         let report: @Sendable (Double) -> Void = { [weak self] fraction in
@@ -261,27 +264,37 @@ final class VoiceChangeJob {
         status.advance(to: .downloading(fraction: nil), typicalSeconds: typical)
         let voiceShare = background == nil ? 1.0 : 0.5
         var gets = 0
+        var wrote: [URL] = []
         do {
             gets += try await services.api.download(result.voiceURL, to: places.voice, renew: renewal(jobID) { $0.voiceURL }) {
                 report($0 * voiceShare)
             }
+            wrote.append(places.voice)
             if let background {
                 gets += try await services.api.download(background, to: places.background, renew: renewal(jobID) { $0.backgroundURL }) {
                     report(0.5 + $0 / 2)
                 }
+                wrote.append(places.background)
             }
             status.advance(to: .finishing, typicalSeconds: typical)
             var files = VoiceChangeLanding.Files(voice: places.voice, voiceSeconds: try await Self.seconds(of: places.voice))
             if background != nil { files.background = .init(file: places.background, seconds: try await Self.seconds(of: places.background)) }
             return files
         } catch {
-            try? FileManager.default.removeItem(at: places.voice)
-            if background != nil { try? FileManager.default.removeItem(at: places.background) }
+            for file in wrote where !Self.onAnyTimeline(file) { try? FileManager.default.removeItem(at: file) }
+            // A download that gave up or was stopped: with the GETs the files before it took.
+            if let failure = SkyStudioDownloadFailure.from(error) { throw failure.after(gets) }
             // Stopped after the files came down, before they were measured: a stop with the GETs that brought them.
-            if gets > 0, SkyStudioDownloadFailure.from(error) == nil, error is CancellationError || Task.isCancelled {
-                throw SkyStudioDownloadFailure.stopped(attempts: gets)
-            }
+            if gets > 0, error is CancellationError || Task.isCancelled { throw SkyStudioDownloadFailure.stopped(attempts: gets) }
             throw error
+        }
+    }
+
+    /// A clip on any open project's timeline plays `file` (or keeps it as an upscale's original).
+    private static func onAnyTimeline(_ file: URL) -> Bool {
+        let path = file.standardizedFileURL.path
+        return OpenProjects.shared.all.contains { project in
+            (project.state.mediaURLs + project.state.upscaleOriginalURLs).contains { $0.standardizedFileURL.path == path }
         }
     }
 

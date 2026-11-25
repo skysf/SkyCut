@@ -299,7 +299,11 @@ private func runDownloadFailureWordsChecks() {
     let stopped = SkyStudioDownloadFailure.stopped(attempts: 2)
     check(stopped.code == "download_stopped" && stopped.attempts == 2 && stopped.message.contains("was stopped"),
           "a stopped download: its own code and words, and the GETs it sent")
-    for failure in [interrupted, incomplete, unreachable, refused, stopped] {
+    let notSaved = SkyStudioDownloadFailure.notSaved(CocoaError(.fileWriteFileExists), attempts: 1)
+    check(notSaved.code == "download_not_saved" && notSaved.attempts == 1 && notSaved.message.contains("could not save it on this Mac")
+            && notSaved.after(2).attempts == 3 && notSaved.after(2).kind == .notSaved,
+          "this Mac could not keep it: its own code and words; GETs sent before it add up: \(notSaved.message)")
+    for failure in [interrupted, incomplete, unreachable, refused, stopped, notSaved] {
         // Billing is not asserted (it may be pending): the words say it was made and that nothing more was charged.
         check(!failure.message.contains("charged for it"), "\(failure.kind): the message never asserts the charge: \(failure.message)")
         check(failure.fields() == ["code": .string(failure.code), "download_attempts": .number(Double(failure.attempts)),
@@ -322,20 +326,33 @@ private func runDownloadFailureWordsChecks() {
 /// The pure rule that a result is whole before it is moved into place (the reviews of PR #554: a resumed 206 `bytes
 /// 100000-249999/1000000` once became a 250,000-byte result, a gzip 206 overwrote a whole file, an empty 200 was taken as an error).
 private func runWholenessChecks() {
-    func whole(_ status: Int, _ range: String?, _ length: Int64, _ size: Int) -> Bool {
-        SkyStudioDownloadRetry.incompleteness(status: status, contentRange: range, expectedLength: length, size: size) == nil
+    func verdict(_ status: Int, _ range: String?, _ length: Int64, _ size: Int, _ encoding: String? = nil) -> SkyStudioDownloadRetry.Wholeness {
+        SkyStudioDownloadRetry.wholeness(status: status, contentRange: range, expectedLength: length, size: size, encoding: encoding)
+    }
+    func whole(_ status: Int, _ range: String?, _ length: Int64, _ size: Int, _ encoding: String? = nil) -> Bool {
+        if case .incomplete = verdict(status, range, length, size, encoding) { return false }
+        return true
     }
     check(!whole(206, "bytes 100000-249999/1000000", 150_000, 250_000), "a resumed answer short of the last byte is not the result")
-    check(whole(206, "bytes 100000-999999/1000000", 900_000, 1_000_000), "a resumed answer to the last byte, with the whole length on disk, is the result")
+    check(verdict(206, "bytes 100000-999999/1000000", 900_000, 1_000_000) == .checked,
+          "a resumed answer to the last byte, with the whole length on disk, is the result, checked")
     check(!whole(206, "bytes 100000-999999/1000000", 900_000, 900_000), "the length on disk must be the whole result's")
     check(!whole(206, "bytes 29-57/58", 1_000, 1_000),
           "a 206 whose decoded body is not the whole length (a gzip answer: the system decodes it and reports the decoded size) is not taken")
+    check(!whole(206, "bytes 29-52/53", 53, 53, "gzip") && !whole(206, "bytes 0-52/53", 53, 53, " GZIP "),
+          "an encoded 206 is never taken, even when its decoded size is exactly its total (CXD3: it once overwrote a whole file)")
+    check(verdict(206, "bytes 0-52/53", 53, 53, "identity") == .checked, "Content-Encoding: identity is the bytes as they are")
     check(!whole(206, "bytes 0-99/*", 100, 100), "a resumed answer whose total is unknown cannot be checked: it is not taken")
     check(!whole(206, nil, 100, 100), "a resumed answer without a Content-Range is not taken")
     check(!whole(200, nil, 1_000, 999), "a whole answer must hold exactly its length")
     check(!whole(200, nil, 1_000, 1_001), "not more than its length either")
-    check(whole(200, nil, -1, 999), "a whole answer without a length is taken as it is")
-    check(!whole(200, nil, 0, 0) && !whole(200, nil, -1, 0) && !whole(204, nil, -1, 0) && !whole(206, "bytes 0-0/1", 0, 0),
+    check(verdict(200, nil, 1_000, 1_000) == .checked, "a whole answer holding its length is the result, checked")
+    if case .unchecked = verdict(200, nil, -1, 999) {} else { check(false, "a whole answer without a length is taken, unchecked") }
+    if case .unchecked = verdict(200, nil, 1_000, 1_000, "gzip") {} else {
+        check(false, "a gzip 200 is taken unchecked: its reported length is the decoded size, so it proves nothing")
+    }
+    check(!whole(200, nil, 0, 0) && !whole(200, nil, -1, 0) && !whole(204, nil, -1, 0) && !whole(206, "bytes 0-0/1", 0, 0)
+            && !whole(200, nil, -1, 0, "gzip"),
           "an empty body is never a result")
     check(SkyStudioDownloadRetry.parseContentRange("bytes 5-9/10").map { [$0.first, $0.last, $0.total ?? -1] } == [5, 9, 10]
             && SkyStudioDownloadRetry.parseContentRange("bytes 9-5/10") == nil && SkyStudioDownloadRetry.parseContentRange("items 0-1/2") == nil,

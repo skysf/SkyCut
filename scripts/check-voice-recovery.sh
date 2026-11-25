@@ -50,6 +50,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 \
   checks/VoiceRecovery/LibraryRestartChecks.swift \
   checks/VoiceRecovery/VoiceChangeFixture.swift checks/VoiceRecovery/VoiceChangeChecks.swift \
   checks/VoiceRecovery/VoiceChangeDirectChecks.swift checks/VoiceRecovery/VoiceChangeDownloadChecks.swift \
+  checks/VoiceRecovery/VoiceChangeOwnFilesChecks.swift \
   checks/VoiceRecovery/GenerationDownloadChecks.swift checks/VoiceRecovery/VoiceoverDownloadChecks.swift \
   checks/VoiceRecovery/UpscaleJobDownloadChecks.swift checks/VoiceRecovery/OfficialRecoveryDownloadChecks.swift \
   checks/VoiceRecovery/PaidToolEntryChecks.swift \

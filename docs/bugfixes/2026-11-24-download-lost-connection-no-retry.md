@@ -63,6 +63,26 @@ retries in #549; downloads did not.
    - The words still said a key-less repeat downloads the same result at no charge, which was not always true.
    - Why the checks stayed green: the re-ask checks called the lookup functions directly instead of the tool entries that submit
      orders, and the upscale ledger fixture always sent both charge fields.
+6. **The narrowed round (`36ad1d9e`) still lost data in two ways and settled a bill under review** (Codex's re-check CXD3, with
+   repros):
+   - A gzip 206 `bytes 29-52/53` (the server ignored identity) decoded to exactly 53 bytes, so the size comparison passed and it
+     overwrote an existing, complete 2,000-byte file on the first GET: an encoded answer's length can never be checked, and any
+     "whole" result replaced a file already at the destination.
+   - Two voice changes of the same clip and voice (a new Chinese one downloading, the held English one downloaded again) chose the
+     same two output paths, because each chose its names when its download began and neither had written yet. The English files
+     landed on the timeline; cancelling the Chinese change deleted both, since a failure deleted its chosen paths whether or not it
+     had written them.
+   - The upscale's charge came from `billing.credits_charged` even while the bill was `pending_review` / `review_required`: 72 was
+     settled and reported as charged, where the reservation (75) must stay until the bill is final.
+   - A file where generate_media's output folder should be made the folder fail before the download, as a plain error: the job ended
+     failed without a hold, the row lost Download again and the key only returned the old `started` (0 file GETs). A move into place
+     that failed was reported as a network failure and not held either.
+   - An explicit key with spaces was trimmed for the receipt but not in the identity, so the receipt's key, sent back, was refused as
+     other inputs. A voice change stopped during its background download said 1 GET where the server counted 2. A film's next step
+     said a key-less call is charged again, but its entry refuses a film submission without a key.
+   - Why the checks stayed green: the gzip fixture never decoded to its own total, no check had two voice changes downloading at once
+     or a file in the way of an output folder, the ledger fixture had no bill under review, and the official re-ask and the changed
+     key were checked through the registry, not the tool entries.
 
 ## Fix
 
@@ -154,12 +174,30 @@ so this PR keeps only what concerns the download of a job that was already paid 
   names this job's own key or row and says that a call without that key, upscale_clip or change_voice again is a new job, charged
   again.
 
+**Round 4 (2026-11-26), after CXD3:**
+
+- **Encoded answers and files in the way:** `SkyStudioDownloadRetry.wholeness` replaces `incompleteness`: an answer with any
+  Content-Encoding but identity is never taken as a 206 and never resumed (its next GET starts without a Range); an encoded 200, like
+  a 200 without a length, is whole but unchecked. `CloudResultDownload` replaces a file already at the destination only with a result
+  checked against its length; an unchecked one over a file is thrown away like a short one (three end `download_incomplete`).
+- **This Mac could not keep it:** a new kind, `notSaved` (`download_not_saved`, its own line in the three string tables): a move into
+  place that fails, and an output folder that cannot be made (generate_media's delivery, the official recovery), hold the result for
+  Download again like any download failure.
+- **Voice change files belong to their own job:** `VoiceChangeOutputName.claim` counts the names other running changes chose as
+  taken (released when the download is done with them); a failure or a stop deletes only the files that download wrote and that no
+  open project's timeline uses, and a download failure carries every GET the job sent (`SkyStudioDownloadFailure.after`).
+- **Upscale ledger:** `UpscaleDelivery.charge(of:)` hands over a charge only once the bill is final (`SkyStudioBilling.isFinal`),
+  the bill's net first, else the top-level one; under review, a refund pending or still reserved, the reservation stays.
+- **Key and words:** the identity holds the key as SkyCut reads it (trimmed); a film's next step says a film call with another key is
+  charged again and one without a key is refused (`SkyStudioGenerationRun.downloadRetry` / `otherCall`, shared with the SRT's line).
+
 Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift` (`download`), `CloudMedia/CloudResultDownload.swift`, `SkyStudioDownloadRetry.swift`,
 `SkyStudioDownloadFailure.swift`, `SkyStudioDownloadWords.swift`, `SkyStudioHeldDownloads.swift`, `SkyStudioGenerationRequests.swift`,
 `SkyStudioGenerationRun.swift`, `SkyStudioGenerationDelivery.swift`, `SkyStudioGenerateTool.swift`, `SkyStudioOfficialGenerateTool.swift`,
 `SkyStudioOfficialRecoveryRun.swift`, `SkyStudioMediaStatus.swift`, `SkyStudioVoiceCloudBatches.swift`, `SkyStudioVoiceoverRun.swift`,
 `SkyStudioVoiceRecovery.swift` (`reading`), `Upscale/UpscalePipeline.swift`, `Upscale/UpscaleJob.swift` (and `UpscaleActivity`),
-`Upscale/UpscaleJobStatusView.swift`, `AIUpscaleTool.swift`, `VoiceChange/VoiceChangeJob.swift`, `CloudMedia/CloudTransfer.swift`
+`Upscale/UpscaleJobStatusView.swift`, `AIUpscaleTool.swift`, `VoiceChange/VoiceChangeJob.swift`, `VoiceChange/VoiceChangeOutputName.swift`,
+`SkyStudioBilling.swift` (`isFinal`), `CloudMedia/CloudTransfer.swift`
 (`didResumeAtOffset`, the whole length, `answerStarted`), `CloudMedia/CloudTaskRows.swift`, `AIJobs.swift` (`reopen`),
 `CloudMedia/CloudDownloadFault.swift`.
 
@@ -271,6 +309,32 @@ Narrowed round (the local server now also answers a gzip 206 and an empty 200; t
   one (a lookup by parameters, a panel's Download again, the row releasing, no identity header, the key out of the identity, a
   held-back retry, a stop saying 0).
 
+- Round 4 (2026-11-26):
+  - `scripts/check-sky-studio.sh`: `DownloadEdgeChecks` against the local server: three gzip 206s `bytes 29-52/53` decoding to 53
+    bytes end `download_incomplete` with the 2,000-byte file untouched; three whole gzip 200s never replace it, a whole answer after
+    one does, and one where nothing is in the way is taken; a gzip 200 cut halfway is followed by a GET without a Range;
+    `DownloadRetryChecks`: the wholeness verdicts (encoded 206s never taken, `identity` counts as none, encoded and length-less 200s
+    unchecked) and the `download_not_saved` words; `HeldDownloadChecks`: a key sent with spaces binds as trimmed.
+  - `scripts/check-voice-recovery.sh`: `VoiceChangeOwnFilesChecks` (two claims of the same clip and voice are four paths, a released
+    name is free again; the CXD3 scenario: the held English change's Download again lands while a Chinese one downloads, cancelling
+    the Chinese one leaves the English files whole and on the timeline; a stop during the background says 2 GETs, keeps the voice a
+    timeline uses and someone else's file at its background's name, and deletes a voice nothing uses); `PaidToolEntryChecks` (another
+    key is exactly one more POST and the held job stays held; a spaced key sent back as the receipt gives it is the same job with no
+    POST; a file where the output folder should be holds the result as `download_not_saved` with no file GET, and once removed the
+    job's own key saves it with no POST); `OfficialRecoveryDownloadChecks` through `SkyStudioGenerateTool.generate` with film
+    arguments and the operation's key (held, held again through a 503 while reading the job, then saved by that key, nothing quoted
+    or submitted; the film's next step); `UpscaleJobDownloadChecks` (75 kept while the bill is under review, 72 once the re-read's
+    bill is final).
+  - `scripts/check-upscale.sh`: `UpscaleDelivery.charge(of:)` gives nothing under review, with a refund pending or still reserved
+    (the top-level field included), the bill's net first.
+  - Reverse-verified: check-sky-studio with the encoded-206 rule, the no-replace rule and the encoded resume all undone (each its own
+    FAIL: the 53-byte case, the gzip 200 over the file, the GET with `bytes=709238-`), and again with the key untrimmed in the
+    identity. check-voice-recovery in three runs: (1) claims ignored, GETs not added, the timeline test dropped, the old charge rule,
+    the folder error unwrapped, the key untrimmed, the film's ordinary words, the official entry returning its cached answer: each
+    its own FAIL; (2) the old deletion (claimed names ignored, both paths deleted) and a lookup by parameters: the CXD3 scenario, the
+    other key and 9:16 red; (3) both chosen paths deleted, timeline test kept: someone else's file red. check-upscale with the old
+    charge rule: five FAILs. The five new wiring pins, all undone at once: each its own ✗.
+
 ## Lessons
 
 - A download after payment is the most expensive step to lose: retry what a second try can fix, resume when the system kept the
@@ -285,8 +349,12 @@ Narrowed round (the local server now also answers a gzip 206 and an empty 200; t
   2026-11-25), and the way back must survive a dismissed row, a failed Download again and a failed read of the job.
 - Check the path that submits the order, not its helpers: count POSTs at the server through the tool entries (the round that only
   called the lookup functions stayed green while repeats still paid).
-- The system decodes a Content-Encoding even when identity was asked for: compare the bytes on disk with the whole length every time,
-  and treat an empty body as no result.
+- The system decodes a Content-Encoding even when identity was asked for and reports the decoded size, so an encoded answer proves
+  nothing about its length: never take an encoded range, never resume one, and never let an unchecked result replace a file that is
+  already there. Treat an empty body as no result.
+- A job deletes only what it wrote: two jobs that choose names before either writes can choose the same ones, so claim the names
+  while running, and on a failure delete only your own files that nothing uses.
+- A charge under review is not a charge: keep the reservation until the bill is final.
 - A fake server that only resumes the happy way proves little: give it the edges the real network gives (a short 206, a stalled
   error body, a redirect) before trusting the retry logic.
 - The long-term rules are in [Sky Studio jobs](../architecture/sky-studio-jobs.md), "Downloads that the network interrupts".

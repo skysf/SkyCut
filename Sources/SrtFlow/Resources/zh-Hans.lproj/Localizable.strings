@@ -1571,6 +1571,7 @@
 "The result is ready on Sky Studio, but its download could not connect. Nothing more was charged. Check your network connection, then use Download again on this task in the generation task list." = "成品已在 Sky Studio 上做好，但下载时无法建立连接。没有再扣积分。请检查网络连接，然后在生成任务列表里这一项上点「重新下载」。";
 "The result is ready on Sky Studio, but its storage refused the download (HTTP %d). Nothing more was charged. To try the same result again, use Download again on this task in the generation task list." = "成品已在 Sky Studio 上做好，但存储拒绝了下载（HTTP %d）。没有再扣积分。要再试同一份成品，请在生成任务列表里这一项上点「重新下载」。";
 "The result is ready on Sky Studio, but its download was stopped. Nothing more was charged. To get the same result, use Download again on this task in the generation task list." = "成品已在 Sky Studio 上做好，但下载被停下了。没有再扣积分。要拿到同一份成品，请在生成任务列表里这一项上点「重新下载」。";
+"The result is ready on Sky Studio, but SkyCut could not save it on this Mac. Nothing more was charged. Free some disk space or check the output folder, then use Download again on this task in the generation task list." = "成品已在 Sky Studio 上做好，但 SkyCut 没能把它存到这台 Mac 上。没有再扣积分。请先腾出磁盘空间或检查输出文件夹，再在生成任务列表里这一项上点「重新下载」。";
 "Download again" = "重新下载";
 "Download the finished result again; nothing more is charged" = "重新下载已经做好的成品，不会再扣积分";
 "This clip has no sound to change." = "这一段没有声音，变不了声。";

@@ -31,11 +31,12 @@ import SrtFlowMCPKit
             try await runVoiceChangeChecks(root)
             try await runVoiceChangeDirectChecks(root)
             try await runVoiceChangeDownloadChecks(root)
+            try await runVoiceChangeOwnFilesChecks(root)
             try await runGenerationDownloadChecks(root)
             try await runVoiceoverDownloadChecks(root)
             try await runUpscaleJobDownloadChecks(root)
-            try await runOfficialRecoveryDownloadChecks(root)
             try await runPaidToolEntryChecks(root)   // last: it marks a key on the account
+            try await runOfficialRecoveryDownloadChecks(root)   // after it: the account verified against the fake /me
         } catch {
             VoiceCheckLog.failures += 1
             print("FAIL: production voice recovery checks: \(error)")
@@ -75,9 +76,12 @@ import SrtFlowMCPKit
             + "; a generation held after three drops stays held through a failed Download again, its own key downloads it after the row "
             + "was dismissed, a stop and empty answers keep it, a missing SRT is fetched alone; a voiceover row's Download again runs its "
             + "recovery once, never after a resume landed it, and survives a stop; an upscale's books at the charge from either field, "
-            + "Cancel while downloading again keeps it on its row; an official recovery held through a 503 then downloaded by its key"
+            + "Cancel while downloading again keeps it on its row, its bill under review keeps the reservation; an official recovery held "
+            + "through a 503 then downloaded by its key through generate_media; a voice change's files are its own (claimed names, a "
+            + "cancel deletes only what it wrote and no timeline uses, every GET counted)"
             + "; through the tools: generate_media's own key downloads the held job with no POST, key-less and 9:16 are new jobs, "
-            + "upscale_clip from project B is B's own new job")
+            + "another key is a new job, a spaced key sent back is the same job, a blocked output folder holds the result; upscale_clip "
+            + "from project B is B's own new job")
         exit(0)
     }
 

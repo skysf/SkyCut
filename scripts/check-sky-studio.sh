@@ -48,8 +48,9 @@
 #      and refuses the debug build (the control); the hook's own checks (checks/UploadFault/main.swift) run in a second binary built
 #      with -D DEBUG.
 #      Downloads of paid results (2026-11-24; DownloadRetryChecks and DownloadEdgeChecks, the same server): every GET asks for
-#      identity bytes; a GET cut mid-body is resumed (Range) or started again, three GETs in all, then `download_network`; only the
-#      whole result is kept (a short or gzip 206, an empty 200: `download_incomplete`); a 403 / 404 / 410, or an answer whose status
+#      identity bytes; a GET cut mid-body is resumed (Range; never an encoded answer) or started again, three GETs in all, then
+#      `download_network`; only the whole result is kept (a short or encoded 206, an empty 200: `download_incomplete`), and only one
+#      checked against its length replaces a file already there (an encoded 200 does not); a 403 / 404 / 410, or an answer whose status
 #      was held back, asks once for a fresh address, never the same GET again; another answer and a TLS failure end it; a stop says
 #      the GETs it sent. HeldDownloadChecks: a request's key is part of what it is bound to, and only its own job is downloaded again.
 #      The debug-only hook SRTFLOW_TEST_DOWNLOAD_DROPS (CloudDownloadFault) is refused by the same probe; its checks

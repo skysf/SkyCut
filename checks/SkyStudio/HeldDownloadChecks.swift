@@ -3,7 +3,8 @@ import SrtFlowMCPKit
 
 // generate_media's way back to a paid result held for Download again (2026-11-24 / 25, the reviews of PR #554;
 // docs/bugfixes/2026-11-24-download-lost-connection-no-retry.md), pure: the idempotency_key is part of what a request is bound to, as
-// before the PR, with the key SkyCut made filled in, so the key it returned names that same request; only that key's own cached answer
+// before the PR, as SkyCut reads it (trimmed, or the key SkyCut made), so the key it returned names that same request (a key sent with
+// spaces and sent back without them was once refused as other inputs, CXD3); only that key's own cached answer
 // (its job id) reaches the held job, and the job stays held until a download of it succeeds. Another key, or none (which makes a new
 // one), is a new request (user, 2026-11-25: an identical paid request sent again is a deliberate new version). The same through the
 // tool entry, with POSTs counted at a fake server: PaidToolEntryChecks in scripts/check-voice-recovery.sh.
@@ -22,6 +23,12 @@ func runHeldDownloadChecks() async {
     checkEqual(identity(arguments, minted), identity(.object(named), minted),
                "the key SkyCut made names the same request when it comes back with the same arguments (a confirm token is not part)")
     check(identity(arguments, "k-1") != identity(arguments, "k-2"), "the key is part of what a request is bound to")
+    var spaced = arguments.objectValue ?? [:]
+    spaced["idempotency_key"] = "  k-1\n"
+    var copied = arguments.objectValue ?? [:]
+    copied["idempotency_key"] = "k-1"
+    checkEqual(identity(.object(spaced), "k-1"), identity(.object(copied), "k-1"),
+               "the key as SkyCut reads it (trimmed): sent with spaces, then as the receipt gives it, the same request")
     check(identity(["kind": "image", "prompt": "a lake"], minted) != identity(arguments, minted), "the arguments are part of it")
 
     // A first call without a key: SkyCut made the key and started the job, whose download then gave up.

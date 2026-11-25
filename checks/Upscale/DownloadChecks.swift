@@ -8,7 +8,9 @@ import SrtFlowMCPKit
 //   day's books there, whatever happens to the download);
 // - Download again (UpscalePipeline.deliver) saves the same result with no new upload and no new job;
 // - a stop before its first GET keeps the result held (stopped, 0 GETs);
-// - a finished status with only `billing.credits_charged` hands over that same actual charge.
+// - a finished status with only `billing.credits_charged` hands over that same actual charge;
+// - a charge counts only once its bill is final: under review, a refund pending or still reserved, none is handed over (the reservation
+//   stays), whichever field carries it (CXD3 on PR #554: a bill under review once settled at its 72 and was reported as charged).
 // UpscaleJob's glue (settling at `onMade`, holding, the row) runs with real App objects in scripts/check-voice-recovery.sh
 // (UpscaleJobDownloadChecks) and is pinned by checks/sky-studio-wiring/download-retry.sh.
 
@@ -93,6 +95,26 @@ func runUpscaleDownloadChecks(_ request: UpscaleRequest, base: String, bucket: S
                                        onMade: { madeFromBilling.add($0) }) { _ in }
     check(madeFromBilling.all.count == 1 && madeFromBilling.all.first?.creditsCharged == 72,
           "with only billing.credits_charged, Sky Studio's actual charge (72) is handed over before any download")
+    runFinalChargeChecks()
+}
+
+/// UpscaleDelivery.charge(of:): the charge only once the bill is final, from whichever field carries it.
+private func runFinalChargeChecks() {
+    func charge(_ fields: String) -> Double? {
+        (try? JSONValue.decode(Data(#"{"job_id": "job-up", "status": "done", \#(fields)}"#.utf8)))
+            .flatMap(SkyStudioJobStatus.init(json:)).flatMap(UpscaleDelivery.charge(of:))
+    }
+    checkEqual(charge(#""billing": {"status": "pending_review", "review_required": true, "credits_charged": 72}"#), nil,
+               "a bill under review hands over no charge (the 75 reserved stays)")
+    checkEqual(charge(#""credits_charged": 72, "billing": {"status": "charged", "review_required": true, "credits_charged": 72}"#), nil,
+               "nor does the top-level field while the bill is under review")
+    checkEqual(charge(#""billing": {"status": "refund_pending", "credits_charged": 72}"#), nil, "a refund pending hands over no charge")
+    checkEqual(charge(#""credits_charged": 72, "billing": {"status": "reserved", "credits_reserved": 75}"#), nil,
+               "a bill still reserved hands over no charge")
+    checkEqual(charge(#""billing": {"status": "charged", "credits_charged": 72}"#), 72, "a final bill's charge")
+    checkEqual(charge(#""credits_charged": 75, "billing": {"status": "refunded", "credits_charged": 40}"#), 40, "a final bill's net charge first")
+    checkEqual(charge(#""billing": {"status": "charged"}, "credits_charged": 72"#), 72, "a final bill without an amount: the top-level one")
+    checkEqual(charge(#""credits_charged": 72"#), 72, "no bill: the top-level charge")
 }
 
 /// How many of the next result GETs lose their connection (the stub answers on URLSession's threads).

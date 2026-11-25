@@ -7,8 +7,12 @@ import SrtFlowMCPKit
 // download-lost-connection-no-retry.md; user, 2026-11-25: an identical paid request sent again is a deliberate new version), through
 // the tool entries that submit orders, with POSTs counted at the fake servers (the round before only called its lookup functions):
 // - generate_media: after a held failure at 16:9, the canvas turned to 9:16 without the key is a new job asking for 9:16, never the
-//   held result; the key SkyCut returned, with the same arguments and the row dismissed, sends no POST and saves the held job's
-//   identical file; the same arguments without the key are exactly one new POST and a new job;
+//   held result; the same arguments with another key are exactly one new POST and a new job, the held one still held; the key SkyCut
+//   returned, with the same arguments and the row dismissed, sends no POST and saves the held job's identical file; the same arguments
+//   without the key are exactly one new POST and a new job;
+// - generate_media with a key sent with spaces: the receipt's key (trimmed), sent back, is that same request (it was once refused as
+//   other inputs, CXD3); an output folder a file stands in for: held (download_not_saved, the row's Download again, no file GET), and
+//   once the folder is fixed the job's own key downloads it with no new POST (it once lost the way back);
 // - upscale_clip: project B asking for project A's source after A's upscale was held is a new job for B: B's clip replaced, A's left
 //   as it was, A's result still held on its own row.
 // Both tools need a key on the account (SkyStudioAccount.hasKey), so these run last: the account marks the key as present the way the
@@ -23,6 +27,7 @@ func runPaidToolEntryChecks(_ root: URL) async throws {
     defer { AIAccessStore.shared.setMode(mode) }
     SkyStudioSpendStore.shared.setDailyLimit(100_000)
     try await generateMediaEntryChecks(root.appendingPathComponent("paid-generate", isDirectory: true))
+    try await generateMediaKeyAndFolderChecks(root.appendingPathComponent("paid-generate-key", isDirectory: true))
     try await upscaleClipEntryChecks(root.appendingPathComponent("paid-upscale", isDirectory: true))
 }
 
@@ -58,6 +63,17 @@ private func generateMediaEntryChecks(_ folder: URL) async throws {
                     + "\(posts().map { $0["params"] ?? .null })")
         project.setCanvasRatio(.wide16x9)
 
+        // The same arguments with another key: exactly one new POST and a new job; the held one stays held.
+        var otherKey = args.objectValue ?? [:]
+        otherKey["idempotency_key"] = .string("other-\(UUID().uuidString.prefix(8))")
+        let other = try await SkyStudioGenerateTool.generate(AIToolArguments(.object(otherKey)), project)
+        let otherID = other.payload["job_id"]?.stringValue
+        if let otherJob = otherID.flatMap({ AIJobs.shared.job($0) }) { _ = await finishedJob(otherJob) }
+        require(other.payload["status"] == "started" && otherID != nil && otherID != id && otherID != tallID && posts().count == 3
+                && SkyStudioHeldDownloads.isHeld(id),
+                "another key with the same arguments is a new paid job, exactly one more POST (\(posts().count)); the held one stays held: "
+                    + "\(other.payload)")
+
         // The key SkyCut returned, with the same arguments, the row dismissed: no POST, the held job's identical file.
         if let row = SkyStudioGenerationActivity.shared.runs.first(where: { $0.aiJobID == id }) { SkyStudioGenerationActivity.shared.dismiss(row) }
         var withKey = args.objectValue ?? [:]
@@ -71,14 +87,77 @@ private func generateMediaEntryChecks(_ folder: URL) async throws {
         let file = done["file"]?.stringValue.map { AIWorkspace.shared.resolve($0) }
         require(done["status"] == "done" && file.flatMap { try? Data(contentsOf: $0) } == GenerationHTTP.image,
                 "the held job's identical file is saved under its own job id: \(done)")
-        require(posts().count == 2 && GenerationHTTP.bodies("POST", "/quote").count == quotes, "no POST /jobs and no quote for it")
+        require(posts().count == 3 && GenerationHTTP.bodies("POST", "/quote").count == quotes, "no POST /jobs and no quote for it")
 
         // The same arguments without the key: exactly one new POST and a new job.
         let keyless = try await SkyStudioGenerateTool.generate(AIToolArguments(args), project)
         let keylessID = keyless.payload["job_id"]?.stringValue
         if let keylessJob = keylessID.flatMap({ AIJobs.shared.job($0) }) { _ = await finishedJob(keylessJob) }
-        require(keyless.payload["status"] == "started" && keylessID != nil && keylessID != id && keylessID != tallID && posts().count == 3,
+        require(keyless.payload["status"] == "started" && keylessID != nil && keylessID != id && keylessID != tallID && posts().count == 4,
                 "the same arguments without the key are a new paid job: exactly one more POST /jobs (\(posts().count)): \(keyless.payload)")
+    }
+}
+
+/// A key sent with spaces, and an output folder a file stands in for.
+@MainActor
+private func generateMediaKeyAndFolderChecks(_ folder: URL) async throws {
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    guard let project = OpenProjects.shared.newProject(savingAs: folder.appendingPathComponent("Key.skycut"), placement: .background) else {
+        return require(false, "a project for generate_media's key and folder")
+    }
+    try await withGenerationHTTP {
+        let posts = { GenerationHTTP.count("POST", "/generation-check/api/skycut/v1/jobs") }
+        let args: [String: JSONValue] = ["kind": "image", "prompt": "a lighthouse at dusk"]
+
+        // A key sent with spaces: the receipt says it trimmed, and that key sent back is the same request (no POST, the same job).
+        let trimmed = "spaced-\(UUID().uuidString.prefix(8))"
+        var spaced = args
+        spaced["idempotency_key"] = .string("  \(trimmed) \n")
+        let first = try await SkyStudioGenerateTool.generate(AIToolArguments(.object(spaced)), project)
+        guard let firstID = first.payload["job_id"]?.stringValue, let firstJob = AIJobs.shared.job(firstID) else {
+            return require(false, "generate_media with a spaced key starts a job: \(first.payload)")
+        }
+        _ = await finishedJob(firstJob)
+        var copied = args
+        copied["idempotency_key"] = .string(trimmed)
+        let jobs = posts()
+        do {
+            let again = try await SkyStudioGenerateTool.generate(AIToolArguments(.object(copied)), project)
+            require(first.payload["idempotency_key"]?.stringValue == trimmed && again.payload["job_id"]?.stringValue == firstID && posts() == jobs,
+                    "the receipt's key, sent back, is the same request: \(first.payload["idempotency_key"] ?? .null), \(again.payload)")
+        } catch {
+            require(false, "the receipt's key, sent back, is the same request, got \(error)")
+        }
+
+        // An output folder a file stands in for: held, with Download again on its row; nothing came down.
+        let generated = AIWorkspace.shared.outputFolder(.generated, project: project)
+        try FileManager.default.createDirectory(at: generated.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(at: generated)
+        try Data("a file where the folder should be".utf8).write(to: generated)
+        let files = GenerationHTTP.count("GET", "/generation-check/files/")
+        let blocked = try await SkyStudioGenerateTool.generate(AIToolArguments(.object(args)), project)
+        guard let id = blocked.payload["job_id"]?.stringValue, let key = blocked.payload["idempotency_key"]?.stringValue,
+              let job = AIJobs.shared.job(id) else { return require(false, "generate_media starts a job: \(blocked.payload)") }
+        let failed = await finishedJob(job)
+        let row = SkyStudioGenerationActivity.shared.runs.first { $0.aiJobID == id }
+        require(failed["status"] == "failed" && failed["code"] == "download_not_saved" && row?.retryDownload != nil
+                && SkyStudioHeldDownloads.isHeld(id) && GenerationHTTP.count("GET", "/generation-check/files/") == files
+                && (failed["next_step"]?.stringValue ?? "").contains(key),
+                "an output folder that cannot be made holds the paid result for Download again: \(failed)")
+
+        // The folder fixed, the job's own key: downloaded under the same job id, no new POST.
+        try FileManager.default.removeItem(at: generated)
+        let made = posts()
+        var withKey = args
+        withKey["idempotency_key"] = .string(key)
+        let again = try await SkyStudioGenerateTool.generate(AIToolArguments(.object(withKey)), project)
+        require(again.payload["status"] == "downloading_again" && again.payload["job_id"]?.stringValue == id,
+                "the job's own key downloads it again: \(again.payload)")
+        let done = await finishedJob(job)
+        let file = done["file"]?.stringValue.map { AIWorkspace.shared.resolve($0) }
+        require(done["status"] == "done" && file.flatMap { try? Data(contentsOf: $0) } == GenerationHTTP.image && posts() == made
+                && !SkyStudioHeldDownloads.isHeld(id),
+                "once the folder is fixed the same result is saved, with no new POST: \(done)")
     }
 }
 

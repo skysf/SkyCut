@@ -5,10 +5,12 @@ import Foundation
 // What it covers (2026-11-24, backlog B40 and the reviews of PR #554): one result downloaded into a partial file beside its destination
 // and moved over only when it is whole.
 // - Every GET asks for the bytes as they are (`Accept-Encoding: identity`). A GET the network broke is resumed from the system's own
-//   resume data, or started again; three GETs in all, redirects included (the system never follows one by itself here, so every GET
-//   is counted).
-// - What arrived must be the whole result (SkyStudioDownloadRetry.incompleteness: never empty, a 206 to the last byte with the whole
-//   length on disk, a 200 holding its length); anything else is thrown away and the result started again from nothing.
+//   resume data (never an encoded answer's), or started again; three GETs in all, redirects included (the system never follows one by
+//   itself here, so every GET is counted).
+// - What arrived must be the whole result (SkyStudioDownloadRetry.wholeness: never empty, a 206 to the last byte with the whole length
+//   on disk and never encoded, a 200 holding its length); anything else is thrown away and the result started again from nothing. A
+//   file already at the destination is replaced only by a result checked against its length (an encoded or length-less 200 is not).
+// - This Mac could not keep it (moving it into place, the disk): `notSaved`, not tried again.
 // - A 403 / 404 / 410 asks the original job once for its current address (`renew`, only a read). An answer that began but whose
 //   status the system held back counts as an answer too: at most that one GET at the job's current address, never the same address
 //   again. Any other answer, a cancel and a connection that does not work end it.
@@ -62,12 +64,21 @@ struct CloudResultDownload {
                 try Task.checkCancellation()   // a GET is counted only once it is really sent
                 gets += 1
                 switch try await fetch(address, resuming: resumeData, into: partial, onProgress: onProgress) {
-                case .done:
+                case .done(let unchecked):
+                    // Never over a file already there with a result not checked whole: thrown away, the next GET starts it again.
+                    if let unchecked, FileManager.default.fileExists(atPath: destination.path) {
+                        (lastError, lastKind) = ("\(unchecked), would have replaced the file already at the destination", .incomplete)
+                        resumeData = nil
+                        onProgress(0)
+                        pausesFirst = true
+                        continue
+                    }
                     do {
-                        try? FileManager.default.removeItem(at: destination)
+                        if unchecked == nil { try? FileManager.default.removeItem(at: destination) }
                         try FileManager.default.moveItem(at: partial, to: destination)
                     } catch {
-                        throw SkyStudioFailure.network(error.localizedDescription)
+                        lastError = error.localizedDescription
+                        throw failed(.notSaved)
                     }
                     onProgress(1)
                     return gets
@@ -100,6 +111,9 @@ struct CloudResultDownload {
                 case .unreachable(let detail):
                     lastError = detail
                     throw failed(.unreachable)
+                case .notSaved(let detail):
+                    lastError = detail
+                    throw failed(.notSaved)
                 }
             }
             try Task.checkCancellation()
@@ -135,7 +149,9 @@ struct CloudResultDownload {
             let detail = SkyStudioUploadRetry.describe(error)
             guard SkyStudioUploadRetry.isTransient(error) else { return .unreachable(detail: detail) }
             if answer == nil && delegate.answerStarted { return .heldBack(detail: detail) }
-            let kept = (error as NSError).userInfo[NSURLSessionDownloadTaskResumeData] as? Data
+            // An encoded answer is started again without a Range: a range of it could never be checked (SkyStudioDownloadRetry.wholeness).
+            let encoded = SkyStudioDownloadRetry.isEncoded(answer?.value(forHTTPHeaderField: "Content-Encoding"))
+            let kept = encoded ? nil : (error as NSError).userInfo[NSURLSessionDownloadTaskResumeData] as? Data
             return .broken(detail: detail, resumeData: kept)
         }
         let answer = task.response as? HTTPURLResponse
@@ -145,12 +161,14 @@ struct CloudResultDownload {
         }
         guard (200..<300).contains(status) else { return .answered(status: status) }
         // This Mac could not keep the file the system downloaded (the disk): not the network's doing, so it is not tried again.
-        if let local = delegate.downloadMoveError { throw SkyStudioFailure.network(local.localizedDescription) }
+        if let local = delegate.downloadMoveError { return .notSaved(detail: local.localizedDescription) }
         let size = delegate.downloadedFile.flatMap { (try? FileManager.default.attributesOfItem(atPath: $0.path))?[.size] as? Int } ?? 0
-        if let problem = SkyStudioDownloadRetry.incompleteness(status: status, contentRange: answer?.value(forHTTPHeaderField: "Content-Range"),
-                                                               expectedLength: answer?.expectedContentLength ?? -1, size: size) {
-            return .incomplete(detail: problem)   // thrown away: the next try starts the result from nothing
+        switch SkyStudioDownloadRetry.wholeness(status: status, contentRange: answer?.value(forHTTPHeaderField: "Content-Range"),
+                                                expectedLength: answer?.expectedContentLength ?? -1, size: size,
+                                                encoding: answer?.value(forHTTPHeaderField: "Content-Encoding")) {
+        case .checked: return .done(unchecked: nil)
+        case .unchecked(let why): return .done(unchecked: why)
+        case .incomplete(let problem): return .incomplete(detail: problem)   // thrown away: the next try starts the result from nothing
         }
-        return .done
     }
 }

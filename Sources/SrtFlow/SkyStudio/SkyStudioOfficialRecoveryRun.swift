@@ -61,7 +61,10 @@ final class SkyStudioOfficialRecoveryRun {
                 throw AIToolError("The original operation has no recoverable output yet.")
             }
             let value = recovery.value
-            try FileManager.default.createDirectory(at: value.folder, withIntermediateDirectories: true)
+            do { try FileManager.default.createDirectory(at: value.folder, withIntermediateDirectories: true) } catch {
+                downloading = result   // its folder cannot be made (a file in the way): held for Download again, as a download would be
+                throw SkyStudioDownloadFailure.notSaved(error)
+            }
             let pathExtension = SkyStudioGeneration.fileExtension(contentType: result.contentType, url: result.url, kind: kind)
             let original = value.savedOriginal ?? value.savedFile
                 ?? ExportFileName.unoccupied(in: value.folder, stem: value.stem, pathExtension: pathExtension) { FileManager.default.fileExists(atPath: $0.path) }

@@ -410,7 +410,10 @@
    on its own). Whatever keeps the files from landing (the download gave up or was stopped, a file could not be saved) keeps the
    result for Download again on the job's own task row (no new charge; the result stays on Sky Studio for 60 days). change_voice
    or the panel asked again, even for the same clip, voice and language, is a new paid change (user, 2026-11-25; [Sky Studio
-   jobs](sky-studio-jobs.md), "Downloads that the network interrupts").
+   jobs](sky-studio-jobs.md), "Downloads that the network interrupts"). Since 2026-11-26 the files belong to their own cloud job:
+   a change writes under names it claimed (`VoiceChangeOutputName.claim`; a name another running change chose counts as taken), and
+   a failure or a stop deletes only the files that download wrote and that no open project's timeline uses (two changes of one clip
+   and voice once chose the same two names, and cancelling the new one deleted the old one's files on the timeline).
 10. **界面**（方案 5.5）：时间线上的块右键「换成我的声音…」**只往 `VoiceChangeActivity` 写一个目标**（块不读工程、不做 IO）；面板由挂在检查器底下的
     `VoiceChangePresenter` 摆（`Equatable` + `.equatable()`，同 `UpscalePresenter`；只在那一段所在的工程窗口里摆）。面板用共用的声音选择器
     （`VoicePickerView`：我的声音、设计的声音、预设排最后——预设的样音只有几秒，当变声目标没验证过）。默认选谁（`defaultSelection`）：我的声音只有一个
