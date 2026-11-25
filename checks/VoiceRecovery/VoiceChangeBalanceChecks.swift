@@ -44,6 +44,20 @@ func voiceChangeBalanceChecks(_ root: URL) async throws {
             && !pendingNext.contains("call change_voice again"),
             "a possibly billed balance refusal sends the AI to the original job, never to a redo: \(pending)")
     require(abs(SkyStudioSpendStore.shared.spentToday() - books - 9) < 0.0001, "and its reservation stays on the books")
+    // get_job asks that original job (GET only) and settles the books by its billing (MSG1 review): Sky Studio refunded it.
+    VoiceChangeHTTP.lock.withLock {
+        VoiceChangeHTTP.originalJobs["convert-402"] = ["job_id": "convert-402", "kind": "voice_convert", "status": "failed",
+            "error": ["code": "insufficient_credits", "message": "You need 9 credits; you have 2."],
+            "billing": ["status": "refunded", "credits_charged": 0, "credits_refunded": 9]]
+    }
+    if let id = pending["job_id"]?.stringValue, let job = AIJobs.shared.job(id) {
+        let gets = VoiceChangeHTTP.calls("GET", "/jobs/convert-402").count
+        await job.refresh?()
+        let asked = AIJobs.shared.json(job)
+        require(VoiceChangeHTTP.calls("GET", "/jobs/convert-402").count == gets + 1 && VoiceChangeHTTP.calls("POST", "/jobs").count == 1
+                && asked["skystudio_status"] == "failed" && asked["billing"]?["status"] == "refunded",
+                "get_job asks the original job once and reports its billing, never submitting again (GET \(VoiceChangeHTTP.calls("GET", "/jobs/convert-402").count), POST \(VoiceChangeHTTP.calls("POST", "/jobs").count)): \(asked)")
+        require(abs(SkyStudioSpendStore.shared.spentToday() - books) < 0.0001, "and the refunded reservation leaves the books")
+    } else { require(false, "the billed change has a job") }
     for row in SkyStudioGenerationActivity.shared.runs where row.issue != nil { SkyStudioGenerationActivity.shared.dismiss(row) }
-    SkyStudioSpendStore.shared.refund(9, on: Date())
 }

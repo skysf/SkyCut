@@ -12,21 +12,26 @@ import SrtFlowMCPKit
 enum AISettingsApproval {
     static func check(_ args: AIToolArguments, mode: AIAccessMode?, limit: Double?, fullAccess: SkyStudioVoiceStandingNotice? = nil,
                       access: AIAccessStore? = nil, currentLimit: Double? = nil) throws -> AIToolResult? {
-        _ = try args.string("confirm_token")
+        let token = try args.string("confirm_token")
         let access = access ?? .shared
         let beforeLimit = currentLimit ?? SkyStudioSpendStore.shared.dailyLimit
-        guard mode.map({ $0 != access.mode }) == true || limit.map({ $0 > beforeLimit }) == true else { return nil }
+        let asks = mode.map({ $0 != access.mode }) == true || limit.map({ $0 > beforeLimit }) == true
+        // A token answers the change from the limit and mode it was asked with. Once the limit moved (the user set 2,000 after a
+        // 1,000 → 1,500 offer), its late answer would set the limit back: it is void, and the change is asked again even though
+        // it now lowers the limit (MSG1 review, 2026-11-25).
+        let late = token != nil && limit.map({ $0 != beforeLimit }) == true
+        guard asks || late else { return nil }
         var fields = args.raw.objectValue ?? [:]
         fields["confirm_token"] = nil
         let turningOn = mode == .full && access.mode != .full
         let identity = identity(changes: fields, from: access.mode, limit: beforeLimit,
                                 standingVersion: turningOn ? fullAccess?.statement.version : nil)
-        let redemption = AIConfirmations.shared.redeem(try args.string("confirm_token"), for: identity)
+        let redemption = AIConfirmations.shared.redeem(token, for: identity)
         guard redemption != .accepted else { return nil }
         var changes: [String] = []
         if let mode, mode != access.mode { changes.append("permission mode: \(access.mode.title) -> \(mode.title)") }
         // Named as the user finds it (MSG1): SkyCut's own setting, not the Sky Studio balance; whole credits, not "1000.0".
-        if let limit, limit > beforeLimit {
+        if let limit, limit != beforeLimit {
             changes.append("SkyCut's daily credit limit for AI (a SkyCut setting at \(SkyCutDailyLimit.settingsPath { $0 }), not the "
                 + "Sky Studio balance): \(SkyStudioCredits.text(beforeLimit)) -> \(SkyStudioCredits.text(limit)) credits a day")
         }

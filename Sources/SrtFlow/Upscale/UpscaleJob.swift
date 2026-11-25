@@ -140,7 +140,7 @@ final class UpscaleJob: ObservableObject, Identifiable {
             case .failed, .request, .badAnswer, .timedOut, .notSubmitted:
                 // 交上之前出的错没花钱；交上之后断了的，活在服务器上照做、做完进作品库。
                 // The Sky Studio balance is said in the app's language, with the numbers and where to add credits.
-                balanceRefusal = SkyStudioBalanceRefusal.refusal(of: error)
+                balanceRefusal = SkyStudioBalanceRefusal.refusal(of: error, accepted: submitted.jobID != nil)
                 end(.failed(balanceRefusal.map(SkyStudioBalanceRefusal.shown) ?? error.message),
                     refunding: error.canRefund(beforeAccepted: !submitted.value))
             }

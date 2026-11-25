@@ -40,6 +40,8 @@ final class VoiceChangeJob {
     private var held: SkyStudioHeldCredits
     private let status: SkyStudioMediaStatus
     private var serverID: String?
+    /// The job id a refusal came with when Sky Studio had not given one before (a 402 with pending billing): get_job asks it.
+    private var originalID: String?
     private var task: Task<Void, Never>?
     private var job: AIJobs.Job?
     /// A direct change: read from the draft that was quoted and is sent, so the job can never disagree with the quote.
@@ -69,6 +71,9 @@ final class VoiceChangeJob {
         let job = AIJobs.shared.start(.voiceChange, progress: { nil }, liveDetail: { [weak self] in self?.live() ?? [:] },
                                       cancel: { [weak self] in self?.task?.cancel() })
         self.job = job
+        // Strong, like SkyStudioGenerationRun: the job outlives its task and get_job may ask Sky Studio after it ended (the
+        // project is held weakly, so a closed project is not kept).
+        job.refresh = { [self] in await refreshOriginal() }
         status.aiJobID = job.id
         status.onCancel = { [weak self] in self?.task?.cancel() }
         SkyStudioGenerationActivity.shared.add(status)
@@ -88,9 +93,10 @@ final class VoiceChangeJob {
         do {
             done = try await convert()
         } catch let error as SkyStudioJobError {
+            if serverID == nil { originalID = error.failure?.jobID }
             settle(failed: error)
             if error.failure?.code == SkyStudioVoiceCodes.separationFailed { return separationFailed(error) }
-            if !Task.isCancelled, let balance = SkyStudioBalanceRefusal.refusal(of: error) {
+            if !Task.isCancelled, let balance = SkyStudioBalanceRefusal.refusal(of: error, accepted: serverID != nil) {
                 // The Sky Studio balance, not SkyCut's daily limit: the numbers and where only the user adds credits (MSG1).
                 var fields = SkyStudioBalanceRefusal.fields(balance, retry: "call change_voice again")
                 fields["failure"] = balance.failure.json
@@ -190,6 +196,24 @@ final class VoiceChangeJob {
     }
 
     private func remember(_ id: String) { if serverID == nil { serverID = id } }
+
+    private var refreshing = false
+    /// get_job on a change that ended without Sky Studio's last word (a 402 that came with a job id and pending billing, a failure
+    /// after acceptance): GET that original job, never a new submission, and settle the books by its billing. Before, get_job told the
+    /// AI to query the original job but never asked it (MSG1 review, 2026-11-25).
+    private func refreshOriginal() async {
+        guard !refreshing, let job, job.status == .failed || job.status == .cancelled, let id = serverID ?? originalID else { return }
+        refreshing = true
+        defer { refreshing = false }
+        guard let server = try? await services.api.job(id, key: key) else { return }
+        if let billing = server.billing {
+            if billing.returnedAll { held.refund() } else if let charged = billing.netCharged, charged > 0 { held.settle(charged: charged) }
+        }
+        var detail = charges(server)
+        if let state = server.state { detail["skystudio_status"] = .string(state.rawValue) }
+        if let billing = server.billing { detail["billing_note"] = .string(billing.message) }
+        AIJobs.shared.updateDetail(job, detail)
+    }
 
     /// 下载两个文件到原素材旁边，量出各自多长。下到一半断了不留半个文件（SkyStudioAPI.download）；只下成一个就把它也删掉。
     /// A direct change downloads the voice alone (no background was made; one sent anyway is not what was asked for).

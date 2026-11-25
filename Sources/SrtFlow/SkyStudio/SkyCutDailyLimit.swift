@@ -28,11 +28,11 @@ enum SkyCutDailyLimit {
         /// Credits still allowed today (never below 0: a refund can leave the day above a lowered limit).
         var left: Double { max(0, limit - spent) }
 
-        /// The first moment of the ledger's next day (DailySpendLedger.dayKey: the calendar day). The start of tomorrow's day,
-        /// not today's start plus a day: on a day that skips its midnight (America/Santiago, 2026-09-06 starts at 01:00) the
-        /// next day still starts at 00:00.
+        /// The first moment of the ledger's next day (DailySpendLedger.dayKey: the calendar day): the end of today's calendar day.
+        /// Not today's start plus a day (America/Santiago 2026-09-06 starts at 01:00, the 7th at 00:00), and not "this time
+        /// tomorrow" rounded down (America/Nuuk at 2026-03-27 23:30: tomorrow has no 23:30, so that gave the 29th, not the 28th).
         var resetsAt: Date {
-            calendar.startOfDay(for: calendar.date(byAdding: .day, value: 1, to: now) ?? now.addingTimeInterval(86_400))
+            calendar.dateInterval(of: .day, for: now)?.end ?? now.addingTimeInterval(86_400)
         }
 
         var minutesToReset: Int { max(1, Int((resetsAt.timeIntervalSince(now) / 60).rounded(.up))) }
@@ -163,8 +163,9 @@ enum SkyCutDailyLimit {
     static func userLine(_ numbers: Numbers, localized: (String) -> String, locale: Locale) -> String {
         let path = settingsPath(localized)
         guard numbers.fitsAfterReset else {
-            return String(format: localized("SkyCut's own daily credit limit stops this, not your Sky Studio balance: it allows %1$@ credits a day and this needs %2$@, so waiting does not help. Raise it in %3$@."),
-                          SkyStudioCredits.text(numbers.limit), SkyStudioCredits.text(numbers.needed), path)
+            return String(format: localized("SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@, more than a whole day allows, so waiting does not help. Raise it in %5$@."),
+                          SkyStudioCredits.text(numbers.spent), SkyStudioCredits.text(numbers.limit), SkyStudioCredits.text(numbers.left),
+                          SkyStudioCredits.text(numbers.needed), path)
         }
         return String(format: localized("SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@. Raise it in %5$@, or wait until %6$@, when it resets."),
                       SkyStudioCredits.text(numbers.spent), SkyStudioCredits.text(numbers.limit), SkyStudioCredits.text(numbers.left),

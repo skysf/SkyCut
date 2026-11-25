@@ -336,7 +336,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             }
         } catch let error as SkyStudioJobError {
             lastFailure = error.failure
-            lastBalance = SkyStudioBalanceRefusal.refusal(of: error)
+            lastBalance = SkyStudioBalanceRefusal.refusal(of: error, accepted: submitted.jobID != nil)
             if let billing = lastFailure?.billing { settle(billing) }
             if let id = error.failure?.jobID { submitted.mark(id) }
             throw error

@@ -113,12 +113,20 @@ private func resetBoundaryChecks() {
     // 2026-09-06 skips 00:00 (it starts at 01:00); 2026-09-07 starts at 00:00 again.
     let noonSixth = SkyCutDailyLimit.Numbers(limit: 100, spent: 90, needed: 36, now: at(6, 12), calendar: santiago)
     checkEqual(SkyCutDailyLimit.resetText(noonSixth), "2026-09-07T00:00:00-03:00", "after a skipped midnight the next day still starts at 00:00")
-    for now in [at(5, 23, 30), at(6, 1, 30), at(6, 12), at(6, 23, 59), at(7, 0, 1)] {
-        let reset = SkyCutDailyLimit.Numbers(limit: 100, spent: 90, needed: 36, now: now, calendar: santiago).resetsAt
-        let today = DailySpendLedger.dayKey(for: now, calendar: santiago)
-        check(reset > now && DailySpendLedger.dayKey(for: reset, calendar: santiago) != today
-              && DailySpendLedger.dayKey(for: reset.addingTimeInterval(-1), calendar: santiago) == today,
-              "the reset is the first moment of the ledger's next day (from \(DailySpendLedger.dayKey(for: now, calendar: santiago)))")
+    var nuuk = Calendar(identifier: .gregorian)
+    nuuk.timeZone = TimeZone(identifier: "America/Nuuk")!
+    // 2026-03-28 skips 23:00–24:00 in Nuuk: "this time tomorrow" from 03-27 23:30 does not exist (the review's case gave the 29th).
+    let lateNuuk = nuuk.date(from: DateComponents(year: 2026, month: 3, day: 27, hour: 23, minute: 30))!
+    checkEqual(SkyCutDailyLimit.resetText(.init(limit: 100, spent: 90, needed: 36, now: lateNuuk, calendar: nuuk)), "2026-03-28T00:00:00-02:00",
+               "the reset is the end of today's calendar day, also when tomorrow lacks this time of day")
+    let cases = [(santiago, at(5, 23, 30)), (santiago, at(6, 1, 30)), (santiago, at(6, 12)), (santiago, at(6, 23, 59)), (santiago, at(7, 0, 1)),
+                 (nuuk, lateNuuk), (nuuk, lateNuuk.addingTimeInterval(23 * 3_600))]
+    for (calendar, now) in cases {
+        let reset = SkyCutDailyLimit.Numbers(limit: 100, spent: 90, needed: 36, now: now, calendar: calendar).resetsAt
+        let today = DailySpendLedger.dayKey(for: now, calendar: calendar)
+        check(reset > now && DailySpendLedger.dayKey(for: reset, calendar: calendar) != today
+              && DailySpendLedger.dayKey(for: reset.addingTimeInterval(-1), calendar: calendar) == today,
+              "the reset is the first moment of the ledger's next day (\(calendar.timeZone.identifier), from \(today))")
     }
 }
 
@@ -162,6 +170,19 @@ private func gateChecks() {
                                                limit: 1_500, access: access, currentLimit: spend.dailyLimit)
     checkEqual(reused?.payload["status"], "needs_confirmation", "the token is good for one call")
 
+    // A late answer after the limit moved: the user set 2,000 themselves after a 1,000 → 1,500 offer. The token is void (it would
+    // set the limit back to 1,500), and the change is asked again from 2,000 (MSG1 review, 2026-11-25).
+    let offer = SkyStudioJobGate.budgetBlocked(credits: 36, store: spend, access: access).payload
+    let offered = offer["options"]?.arrayValue?.first?["confirm_token"]?.stringValue ?? ""
+    spend.setDailyLimit(2_000)
+    let late = try? AISettingsApproval.check(AIToolArguments(["daily_ai_credit_limit": 1_500, "confirm_token": .string(offered)]), mode: nil,
+                                             limit: 1_500, access: access, currentLimit: spend.dailyLimit)
+    checkEqual(late?.payload["status"], "needs_confirmation", "a late yes to 1,500 after the user set 2,000 is asked again, not written")
+    check(late?.payload["confirm_token_refused"] != nil && late?.payload["question"]?.stringValue?.contains("2000 -> 1500") == true,
+          "the question says it would now lower the limit from 2,000")
+    checkEqual(spend.dailyLimit, 2_000, "and the user's own 2,000 stays")
+    spend.setDailyLimit(1_000)
+
     // Without it, the raise asks first, in full access too, and the question names the limit plainly.
     access.setMode(.full)
     let raise = AIToolArguments(["daily_ai_credit_limit": 1_500])
@@ -190,12 +211,12 @@ private func settingsPathChecks() {
                     "zh-Hans": "SkyCut → 设置 → Sky Studio → AI 每日上限",
                     "es": "SkyCut → Ajustes → Sky Studio → Límite diario para la IA"]
     let fits = "SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@. Raise it in %5$@, or wait until %6$@, when it resets."
-    let never = "SkyCut's own daily credit limit stops this, not your Sky Studio balance: it allows %1$@ credits a day and this needs %2$@, so waiting does not help. Raise it in %3$@."
+    let never = "SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@, more than a whole day allows, so waiting does not help. Raise it in %5$@."
     var shanghai = Calendar(identifier: .gregorian)
     shanghai.timeZone = TimeZone(identifier: "Asia/Shanghai")!
     let afternoon = Date(timeIntervalSince1970: 1_795_510_140)
     let numbers = SkyCutDailyLimit.Numbers(limit: 1_000, spent: 988, needed: 36, now: afternoon, calendar: shanghai)
-    let paused = SkyCutDailyLimit.Numbers(limit: 20, spent: 0, needed: 36, now: afternoon, calendar: shanghai)
+    let paused = SkyCutDailyLimit.Numbers(limit: 20, spent: 7, needed: 36, now: afternoon, calendar: shanghai)
     let folders = (try? FileManager.default.contentsOfDirectory(atPath: "Sources/SrtFlow/Resources"))?.filter { $0.hasSuffix(".lproj") } ?? []
     check(folders.count >= 3, "the string tables are found (\(folders.count))")
     for folder in folders.sorted() {
@@ -216,7 +237,7 @@ private func settingsPathChecks() {
         check(!shown.contains("%") && ["988", "1000", "12", "36", time, SkyCutDailyLimit.settingsPath(lookup)].allSatisfy(shown.contains),
               "the panels' line in \(code) fills used, the limit, left, needed, the path and the reset time (\(time)): \(shown)")
         let shownNever = SkyCutDailyLimit.userLine(paused, localized: lookup, locale: locale)
-        check(!shownNever.contains("%") && shownNever.contains("20") && shownNever.contains("36") && !shownNever.contains(time),
-              "a request a whole day cannot cover gives no reset time in \(code): \(shownNever)")
+        check(!shownNever.contains("%") && ["7", "20", "13", "36"].allSatisfy(shownNever.contains) && !shownNever.contains(time),
+              "a request a whole day cannot cover still gives used and left, and no reset time, in \(code): \(shownNever)")
     }
 }

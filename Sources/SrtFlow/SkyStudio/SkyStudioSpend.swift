@@ -51,18 +51,31 @@ final class SkyStudioSpendStore: ObservableObject {
         DailySpendPolicy.decide(estimate: credits, spentToday: spentToday(now: now), dailyLimit: dailyLimit)
     }
 
-    /// 记上一笔（交活之前按报价记）。
-    func record(_ credits: Double, now: Date = Date()) {
+    /// 记上一笔（交活之前按报价记）。Returns the ledger's day key it was booked on, which a refund reuses.
+    @discardableResult
+    func record(_ credits: Double, now: Date = Date()) -> String {
+        let key = DailySpendLedger.dayKey(for: now)
+        record(credits, dayKey: key, now: now)
+        return key
+    }
+
+    /// Books on a day key worked out at booking (a settlement of a reservation).
+    func record(_ credits: Double, dayKey: String, now: Date = Date()) {
         var next = ledger
-        next.add(credits, on: now)
+        next.add(credits, dayKey: dayKey)
         next.prune(now: now)
         save(next)
     }
 
     /// 退回一笔（按记上的那一天）。
     func refund(_ credits: Double, on day: Date) {
+        refund(credits, dayKey: DailySpendLedger.dayKey(for: day))
+    }
+
+    /// Refunds on the day key recorded at booking, whatever the time zone is now.
+    func refund(_ credits: Double, dayKey: String) {
         var next = ledger
-        next.refund(credits, on: day)
+        next.refund(credits, dayKey: dayKey)
         save(next)
     }
 

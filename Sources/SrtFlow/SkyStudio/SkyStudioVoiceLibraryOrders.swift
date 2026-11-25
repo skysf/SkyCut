@@ -31,9 +31,14 @@ enum SkyStudioVoiceLibraryOrders {
         var request: SkyStudioJobRequest
         var reservedCredits: Double
         var reservedDay: Date
+        /// The ledger's day key the reservation was booked on (MSG1 review); nil in records saved before.
+        var reservedDayKey: String?
         /// Sky Studio 受理了（回了任务号）才有。
         var jobID: String?
         var nextStep: String
+        /// What to tell the AI when the order fails after a restart, when its caller had its own way on (a MiniMax version for a
+        /// narration that stopped part-way resumes from that narration's recovery file: MSG1 review); nil in records saved before.
+        var failureStep: String?
     }
 
     /// 此刻盘上的全部记录（每次现读：重启之后的新对象读到的就是这一份）。
@@ -69,6 +74,7 @@ enum SkyStudioVoiceLibraryOrders {
             all[earlier.key] = nil
             all[order]?.reservedCredits = earlier.value.reservedCredits
             all[order]?.reservedDay = earlier.value.reservedDay
+            all[order]?.reservedDayKey = earlier.value.reservedDayKey
         }
         write(all)
         return earlier?.value

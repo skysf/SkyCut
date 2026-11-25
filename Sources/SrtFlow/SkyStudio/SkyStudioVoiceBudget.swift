@@ -18,7 +18,7 @@ struct SkyStudioVoiceBudget {
         guard !credits.isEmpty, credits.allSatisfy({ $0.isFinite && $0 >= 0 }),
               let reservation = SkyStudioJobGate.reserveWithoutAsking(credits: total, store: store, now: now) else { return nil }
         return SkyStudioVoiceBudget(held: credits.map {
-            SkyStudioHeldCredits(.init(credits: $0, day: reservation.day), store: store)
+            SkyStudioHeldCredits(.init(credits: $0, day: reservation.day, dayKey: reservation.dayKey), store: store)
         }, credits: credits)
     }
 

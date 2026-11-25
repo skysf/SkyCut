@@ -84,4 +84,32 @@ private func acrossMidnightChecks() {
         checkEqual(asked.day, late, "the AI's reservation is booked and remembered on the same moment")
         checkEqual(store.spentToday(now: late), 10, "on that moment's day")
     } else { check(false, "a draft within the limit is reserved") }
+    timeZoneSwitchChecks()
+}
+
+/// A refund reuses the day key recorded at booking (MSG1 review, 2026-11-25): book 60 a second before Shanghai's midnight and 80 a
+/// second after, switch the Mac to Tokyo (an hour ahead), refund the 60. It goes back to its own day; before, the refund worked the
+/// day out again in Tokyo time, cut the next day's 80 to 20 and let 50 more through under a limit of 100.
+@MainActor
+private func timeZoneSwitchChecks() {
+    let scratch = ScratchDefaults("spend-time-zone-checks")
+    let original = NSTimeZone.default
+    defer { NSTimeZone.default = original; scratch.remove() }
+    NSTimeZone.default = TimeZone(identifier: "Asia/Shanghai")!
+    let store = SkyStudioSpendStore(defaults: scratch.defaults)
+    store.setDailyLimit(100)
+    let calendar = Calendar.current
+    let midnight = calendar.startOfDay(for: calendar.date(byAdding: .day, value: 1, to: moment())!)
+    let late = midnight.addingTimeInterval(-1), early = midnight.addingTimeInterval(1)
+    guard let yesterday = SkyStudioJobGate.reserveWithoutAsking(credits: 60, store: store, now: late),
+          SkyStudioJobGate.reserveWithoutAsking(credits: 80, store: store, now: early) != nil else {
+        check(false, "both reservations fit their own day"); return
+    }
+    NSTimeZone.default = TimeZone(identifier: "Asia/Tokyo")!
+    var held = SkyStudioHeldCredits(yesterday, store: store)
+    held.refund()
+    checkEqual(store.ledger.days[yesterday.dayKey], nil, "the refund goes back to the day key it was booked on")
+    checkEqual(store.ledger.days.values.reduce(0, +), 80, "the next day's 80 is untouched after the time zone changed")
+    NSTimeZone.default = TimeZone(identifier: "Asia/Shanghai")!
+    checkEqual(store.decide(credits: 50, now: early), .overLimit(spent: 80, estimate: 50, limit: 100), "and its limit still holds")
 }

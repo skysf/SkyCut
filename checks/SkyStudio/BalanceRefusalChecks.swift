@@ -10,15 +10,19 @@ import SrtFlowMCPKit
 func runBalanceRefusalChecks() {
     let refusal = SkyStudioServerError(status: 402, code: "insufficient_credits", message: "You need 455 credits; you have 30.",
                                        fields: ["balance": 30, "needed": 455, "recharge_url": "https://skystudioai.com/app?credits=1"])
-    let found = SkyStudioBalanceRefusal.refusal(of: SkyStudioJobError.request(.server(refusal)))
+    let found = SkyStudioBalanceRefusal.refusal(of: SkyStudioJobError.request(.server(refusal)), accepted: false)
     checkEqual(found?.failure.balance, 30, "the refusal inside a request error, with Sky Studio's balance")
     checkEqual(found?.failure.needed, 455, "and what the request needs")
     checkEqual(found?.beforeAdmission, true, "a plain 402 was refused before Sky Studio accepted anything")
-    let ended = SkyStudioBalanceRefusal.refusal(of: SkyStudioJobError.failed(SkyStudioJobFailure(message: "short", fields: ["code": "insufficient_credits"])))
+    let ended = SkyStudioBalanceRefusal.refusal(of: SkyStudioJobError.failed(SkyStudioJobFailure(message: "short", fields: ["code": "insufficient_credits"])),
+                                                accepted: false)
     checkEqual(ended?.beforeAdmission, false, "a job that ended for the balance counts, as accepted")
     let other = SkyStudioServerError(status: 409, code: "price_changed", message: "Price changed.", fields: ["credits": 20])
-    check(SkyStudioBalanceRefusal.refusal(of: SkyStudioJobError.request(.server(other))) == nil, "other refusals are not the balance")
-    check(SkyStudioBalanceRefusal.refusal(of: CancellationError()) == nil, "nor are errors that are not Sky Studio's")
+    check(SkyStudioBalanceRefusal.refusal(of: SkyStudioJobError.request(.server(other)), accepted: false) == nil, "other refusals are not the balance")
+    check(SkyStudioBalanceRefusal.refusal(of: CancellationError(), accepted: false) == nil, "nor are errors that are not Sky Studio's")
+    // A balance error while polling a job Sky Studio already accepted carries no billing, yet the job may have been charged.
+    checkEqual(SkyStudioBalanceRefusal.refusal(of: SkyStudioJobError.request(.server(refusal)), accepted: true)?.beforeAdmission, false,
+               "a balance error for an accepted job is not before admission")
 
     guard let found else { return }
     let account = URL(string: "https://skystudioai.com/app?account=1")
@@ -48,7 +52,7 @@ func runBalanceRefusalChecks() {
     // A 402 that carries a job id and pending billing may have been charged: query that job, never "not charged", never a redo.
     let billed = SkyStudioServerError(status: 402, code: "insufficient_credits", message: "You need 9 credits; you have 2.",
                                       fields: ["balance": 2, "needed": 9, "job_id": "job-402", "billing": ["status": "pending_review"]])
-    if let pending = SkyStudioBalanceRefusal.refusal(of: SkyStudioJobError.request(.server(billed))) {
+    if let pending = SkyStudioBalanceRefusal.refusal(of: SkyStudioJobError.request(.server(billed)), accepted: false) {
         checkEqual(pending.beforeAdmission, false, "a refusal with a job id and billing is not before admission")
         let next = JSONValue.object(SkyStudioBalanceRefusal.fields(pending, recharge: account, retry: "call change_voice again"))["next_step"]?.stringValue ?? ""
         check(next.contains("Query this original job with get_job") && next.contains("never submit it again") && !next.contains("not charged")

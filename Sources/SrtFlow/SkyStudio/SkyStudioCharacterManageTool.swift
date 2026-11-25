@@ -49,7 +49,10 @@ enum SkyStudioCharacterManageTool {
         else { saved = nil }
         var plan = try SkyStudioCharacterPlan.make(args, capabilities: capabilities, saved: saved, files: files)
         let workflow = SkyStudioCharacterWorkflow(api: SkyStudioAPI(), key: key)
-        if isJob { plan = try await workflow.quote(plan) }
+        if isJob {
+            // The free price check: a refusal here left no order or bill to look at (MSG1 review, 2026-11-25).
+            do { plan = try await workflow.quote(plan) } catch { throw SkyStudioCharacterError.tool(error, beforeSubmission: true) }
+        }
         guard SkyStudioCharacterAccess.stamp(key) == stamp, try SkyStudioCharacterJobs.account() == account else { throw SkyStudioCharacterError.changed }
         if quoteOnly {
             return .ok(["status": "quoted", "credits": .number(plan.quote!.credits), "model_id": plan.quote!.model.map(JSONValue.string) ?? .null,

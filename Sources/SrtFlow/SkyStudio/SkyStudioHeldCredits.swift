@@ -25,14 +25,14 @@ struct SkyStudioHeldCredits {
     /// 面板起的：开跑时记上报价。
     /// One moment for the booking and the refund's day, like SkyStudioJobGate (MSG1 review, 2026-11-25).
     static func recording(_ credits: Double, now: Date = Date()) -> SkyStudioHeldCredits {
-        SkyStudioSpendStore.shared.record(credits, now: now)
-        return SkyStudioHeldCredits(SkyStudioJobGate.Reservation(credits: credits, day: now))
+        let key = SkyStudioSpendStore.shared.record(credits, now: now)
+        return SkyStudioHeldCredits(SkyStudioJobGate.Reservation(credits: credits, day: now, dayKey: key))
     }
 
     /// 没花出去：退回（只退一次）。
     mutating func refund() {
         guard let held else { return }
-        store.refund(held.credits, on: held.day)
+        store.refund(held.credits, dayKey: held.dayKey)
         self.held = nil
     }
 
@@ -40,8 +40,8 @@ struct SkyStudioHeldCredits {
     /// 跨了零点（SkyCut 重启之后第二天才接着跟完的声音库收费单）也不挪到今天的额度上。
     mutating func settle(charged: Double) {
         guard let held, abs(held.credits - charged) > 0.0001 else { return }
-        store.refund(held.credits, on: held.day)
-        store.record(charged, now: held.day)
-        self.held = SkyStudioJobGate.Reservation(credits: charged, day: held.day)
+        store.refund(held.credits, dayKey: held.dayKey)
+        store.record(charged, dayKey: held.dayKey)
+        self.held = SkyStudioJobGate.Reservation(credits: charged, day: held.day, dayKey: held.dayKey)
     }
 }

@@ -169,6 +169,12 @@ final class SkyStudioVoiceoverRun {
         }
     }
 
+    /// Sky Studio had given the failing batch a job id (a balance error for it may come with a charge: SkyStudioBalanceRefusal).
+    private var batchAccepted: Bool {
+        guard let batches = recovery?.value.batches, batches.indices.contains(batchIndex) else { return false }
+        return batches[batchIndex].serverID != nil
+    }
+
     private func fail(_ error: Error) async {
         let cancelled = Self.isCancellation(error)
         let failureStage = (error as? SkyStudioVoiceProcessingError)?.stage ?? stage
@@ -195,7 +201,7 @@ final class SkyStudioVoiceoverRun {
         }
         if let failure = (error as? SkyStudioJobError)?.failure {
             extra["failure"] = failure.json
-            if let balance = SkyStudioBalanceRefusal.refusal(of: error) {
+            if let balance = SkyStudioBalanceRefusal.refusal(of: error, accepted: batchAccepted) {
                 // The Sky Studio balance, not SkyCut's daily limit: the numbers and where only the user adds credits (MSG1).
                 extra.merge(SkyStudioBalanceRefusal.fields(balance, retry: recovery == nil ? "retry the original add_voiceover call"
                     : "resume with add_voiceover resume=recovery_file generate_missing=true")) { _, new in new }
@@ -226,7 +232,7 @@ final class SkyStudioVoiceoverRun {
         finish(cancelled ? .cancelled : .failed, text)
         // The task card says which limit or balance stopped it, in the app's language, with the numbers and where to act.
         if let budget { status.issue = SkyCutDailyLimit.userLine(budget.numbers) }
-        if !cancelled, let balance = SkyStudioBalanceRefusal.refusal(of: error) { status.issue = SkyStudioBalanceRefusal.shown(balance) }
+        if !cancelled, let balance = SkyStudioBalanceRefusal.refusal(of: error, accepted: batchAccepted) { status.issue = SkyStudioBalanceRefusal.shown(balance) }
     }
 
     /// 回任务号时说好要先装本机转写模型的：交第一批之前装（状态行「准备本机转写」，get_job 的 local_step）。装不上就当这台 Mac

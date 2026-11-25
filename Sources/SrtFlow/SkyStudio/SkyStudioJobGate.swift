@@ -16,6 +16,15 @@ enum SkyStudioJobGate {
     struct Reservation: Equatable {
         let credits: Double
         let day: Date
+        /// The ledger's day key it was booked on: its refund and settlement go back to exactly this day, even when the time
+        /// zone changed since (MSG1 review, 2026-11-25). Without one (a record saved before), it is worked out from `day`.
+        let dayKey: String
+
+        init(credits: Double, day: Date, dayKey: String? = nil) {
+            self.credits = credits
+            self.day = day
+            self.dayKey = dayKey ?? DailySpendLedger.dayKey(for: day)
+        }
     }
 
     enum Decision {
@@ -189,8 +198,8 @@ enum SkyStudioJobGate {
 
     /// Books on `now`'s day and remembers that same moment for the refund (one timestamp: MSG1 review, 2026-11-25).
     private static func record(_ store: SkyStudioSpendStore, _ credits: Double, now: Date) -> Reservation {
-        store.record(credits, now: now)
-        return Reservation(credits: credits, day: now)
+        let key = store.record(credits, now: now)
+        return Reservation(credits: credits, day: now, dayKey: key)
     }
 
 }

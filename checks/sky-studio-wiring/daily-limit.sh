@@ -78,3 +78,28 @@ for row in Sources/SrtFlow/SkyStudio/SkyStudioGenerationRun.swift Sources/SrtFlo
            Sources/SrtFlow/SkyStudio/SkyStudioCharacterRun.swift Sources/SrtFlow/Upscale/UpscaleJob.swift; do
   grep -qF 'SkyStudioBalanceRefusal.shown' "${row}" || fail "${row}: a balance refusal shows the user SkyStudioBalanceRefusal.shown in the task row"
 done
+
+# Second review round (2026-11-25), pinned where the behaviour lives in App-only code:
+# - a refused free price check goes through the real entries with beforeSubmission (generate_media, manage_characters);
+for entry in Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift Sources/SrtFlow/SkyStudio/SkyStudioCharacterManageTool.swift; do
+  grep -qF 'SkyStudioCharacterError.tool(error, beforeSubmission: true)' "${entry}" \
+    || fail "${entry}: a refused price check says nothing was submitted (SkyStudioCharacterError.tool(error, beforeSubmission: true))"
+done
+# - every paid job says whether Sky Studio had accepted it before a balance refusal (a polled 402 may come with a charge);
+for job in Sources/SrtFlow/SkyStudio/SkyStudioGenerationRun.swift Sources/SrtFlow/SkyStudio/SkyStudioVoiceoverRun.swift \
+           Sources/SrtFlow/VoiceChange/VoiceChangeJob.swift Sources/SrtFlow/SkyStudio/SkyStudioVoiceLibraryJob.swift \
+           Sources/SrtFlow/SkyStudio/SkyStudioCharacterRun.swift Sources/SrtFlow/Upscale/UpscaleJob.swift; do
+  grep -qF 'SkyStudioBalanceRefusal.refusal(of: error, accepted:' "${job}" \
+    || fail "${job}: a balance refusal says whether Sky Studio had accepted the job (SkyStudioBalanceRefusal.refusal(of:accepted:))"
+done
+# - get_job asks a failed voice change's original job (GET only) and settles by its billing;
+grep -qF 'job.refresh = { [self] in await refreshOriginal() }' Sources/SrtFlow/VoiceChange/VoiceChangeJob.swift \
+  && grep -qF 'services.api.job(id, key: key)' Sources/SrtFlow/VoiceChange/VoiceChangeJob.swift \
+  || fail "Sources/SrtFlow/VoiceChange/VoiceChangeJob.swift: get_job asks the original job a refusal named"
+# - a refund and a settlement go back to the day key recorded at booking;
+grep -qF 'store.refund(held.credits, dayKey: held.dayKey)' Sources/SrtFlow/SkyStudio/SkyStudioHeldCredits.swift \
+  || fail "Sources/SrtFlow/SkyStudio/SkyStudioHeldCredits.swift: a refund goes back to the day key recorded at booking"
+# - a mid-voiceover MiniMax version keeps its own failure step across a restart, and the fee step knows full access;
+grep -qF 'failureStep: "The MiniMax version was not built. Resume the narration from its recovery file' Sources/SrtFlow/SkyStudio/SkyStudioVoiceFallbackFee.swift \
+  && grep -qF 'credits: credits, standing: ask == .standing))' Sources/SrtFlow/SkyStudio/SkyStudioVoiceFallbackFee.swift \
+  || fail "Sources/SrtFlow/SkyStudio/SkyStudioVoiceFallbackFee.swift: the fee's failure resumes from the recovery file; full access is said"

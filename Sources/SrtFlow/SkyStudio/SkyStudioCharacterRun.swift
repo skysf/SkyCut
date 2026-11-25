@@ -109,7 +109,7 @@ final class SkyStudioCharacterRun {
                 receipt.rejectionCode = code
             }
             await saveFailureEvidence()
-            balanceRefusal = Task.isCancelled ? nil : SkyStudioBalanceRefusal.refusal(of: error)
+            balanceRefusal = Task.isCancelled ? nil : SkyStudioBalanceRefusal.refusal(of: error, accepted: receipt.jobID != nil)
             finish(Task.isCancelled ? .cancelled : .failed, error.message)
         } catch {
             if !receipt.submissionAttempted {

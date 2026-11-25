@@ -47,6 +47,19 @@ task row whatever the app's language. On upscale and change voice the AI got onl
      film's retry lacked its new quote and seam review, and a MiniMax version mid-voiceover was told it could send its lines again.
    - Three inventory items needed fixing: a fee over the limit mid-voiceover offered only the skip; a reference total over its limit
      gave neither the total nor (for all files) the limit; a refused price check pointed at orders and bills that did not exist.
+6. **Found in the re-check (Codex, 2026-11-25, on the second version):**
+   - A late yes to the refusal's 1,000 → 1,500 after the user set 2,000 themselves skipped the token check: a value below the current
+     limit never asked, so it would have set the limit back to 1,500.
+   - "Today's start plus a day" was replaced by "tomorrow at this time, rounded down", which fails when tomorrow lacks this time: America/Nuuk at
+     2026-03-27 23:30 reported the 29th.
+   - **A refund worked its day out again from the stored moment, in the time zone of the refund.** After the Mac's time zone changed
+     between booking and refund, a 60 refund cut the next day's 80 to 20 and a limit of 100 let 50 more through.
+   - When a whole day was not enough, the panel line dropped used and left.
+   - get_job told the AI to query the original voice change job but never asked Sky Studio. A balance error while polling an accepted
+     job (no billing in it) was still called "not charged". A MiniMax version mid-voiceover, failing after a restart, was told to
+     send its lines again.
+   - The fee step promised another question in full access with the standing consent, where resuming builds directly. The character
+     tool's refused price check still pointed at an order. Reverting the generation's price-check entry kept the guard green.
 
 ## Fix
 
@@ -102,6 +115,21 @@ task row whatever the app's language. On upscale and change voice the AI got onl
     pointing at orders.
 - **The guide's paid topic** says the limit is SkyCut's own, that `next_step` has the numbers and the options (the first carries
   SkyCut's question and a confirm_token, used only after the user's yes), and that a low balance is the user's account.
+
+- **Re-check fixes:**
+  - A token is void once the limit moved: a late yes is asked again, even when it would now lower the limit
+    (`AISettingsApproval.check`). The set_settings description says a raise needs the user's yes and a token, from
+    needs_confirmation or the refusal.
+  - The reset is the end of today's calendar day (`dateInterval(of: .day)`).
+  - A reservation carries the day key it was booked on (`Reservation.dayKey`, persisted as `reservedDayKey` in voice library
+    orders), and refunds and settlements use it.
+  - The panel line keeps used and left when a whole day is not enough.
+  - Balance refusals:
+    - every paid job says whether Sky Studio had accepted the job (`refusal(of:accepted:)`);
+    - get_job on a failed voice change GETs the original job and settles by its billing;
+    - a voice library order keeps its caller's failure step across a restart (`failureStep`).
+  - The fee step words full access with the standing consent.
+  - The character tool's price check goes through `beforeSubmission`, and the guard pins both real entries.
 
 ## Similar refusals
 
@@ -185,6 +213,22 @@ numbers, and what the user can do? The review re-judged three items.
       - the old fee step;
       - the balance refusal ignoring admission;
       - the problem's numbers changed.
+- Re-check (2026-11-25):
+  - New checks:
+    - America/Nuuk's reset;
+    - a late token after the user set 2,000 (asked again, 2,000 stays);
+    - a refund after a switch from Shanghai to Tokyo (`SpendChecks`);
+    - the line with used and left;
+    - a balance error for an accepted job;
+    - get_job GETs the billed voice change's original job once and the refunded reservation leaves the books
+      (`VoiceChangeBalanceChecks`);
+    - guard lines for the price-check entries, the accepted flag, the refresh, the refund key and the fee's steps.
+  - Reverse checks, each red and restored exactly:
+    - in `check-sky-studio.sh` (10 failures): the round-2 reset arithmetic; refunds by date; the late-token rule removed; the line
+      without used and left; the accepted flag ignored;
+    - in `check-voice-recovery.sh` (2 failures): the refresh removed;
+    - in the wiring part: the two price-check entries reverted; the full-access wording dropped. One guard pattern was made specific,
+      because the old one matched a second, unrelated line.
 - Not verified in a real window: the popover, the panels' layout and the reset time in each language. These are on the manual list
   ([Sky Studio jobs](../architecture/sky-studio-jobs.md) section 11).
 

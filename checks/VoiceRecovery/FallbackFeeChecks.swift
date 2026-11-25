@@ -148,7 +148,7 @@ private func limitBlockedChecks(_ root: URL, _ lines: [String]) async throws {
     let (_, failed) = try await failedNarration(root, "fallback-fee-limit", lines, dailyLimit: (start + 300).rounded(.up))
     let next = failed["next_step"]?.stringValue ?? ""
     require(failed["code"] == "daily_budget_exceeded" && failed["blocked_by"] == "skycut_daily_credit_limit"
-            && next.contains("377.6") && next.contains("raise the limit") && next.contains("to be asked about the fee")
+            && next.contains("377.6") && next.contains("raise the limit") && next.contains("which asks about the fee")
             && next.contains("skip_one_time=true") && next.contains("Never send the original lines again"),
             "a fee over the daily limit offers raising the limit or skipping the fee: \(next)")
     require(VoiceRecoveryHTTP.enrolls.isEmpty, "and builds nothing (each fixture starts with an empty log)")

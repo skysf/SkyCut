@@ -25,10 +25,11 @@ enum SkyStudioBalanceRefusal {
         var beforeAdmission: Bool
     }
 
-    /// The refusal inside an error, when it is the balance.
-    static func refusal(of error: Error) -> Refusal? {
+    /// The refusal inside an error, when it is the balance. `accepted`: Sky Studio had already given this job an id (a balance
+    /// error while polling an accepted job carries no billing, yet the job may have been charged: MSG1 review, 2026-11-25).
+    static func refusal(of error: Error, accepted: Bool) -> Refusal? {
         guard let job = error as? SkyStudioJobError, let failure = job.failure, failure.code == code else { return nil }
-        return Refusal(failure: failure, beforeAdmission: job.rejectedBeforeAdmissionCode == code)
+        return Refusal(failure: failure, beforeAdmission: !accepted && job.rejectedBeforeAdmissionCode == code)
     }
 
     /// The labels on the way to Add Credits (keys of the string tables; SkyStudioSettingsSection shows the link when Sky Studio

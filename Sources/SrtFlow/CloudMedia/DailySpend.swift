@@ -40,15 +40,24 @@ struct DailySpendLedger: Codable, Equatable, Sendable {
     }
 
     mutating func add(_ amount: Double, on date: Date, calendar: Calendar = .current) {
+        add(amount, dayKey: Self.dayKey(for: date, calendar: calendar))
+    }
+
+    /// Books on a day key already worked out (a settlement goes on the day its reservation was booked on).
+    mutating func add(_ amount: Double, dayKey key: String) {
         guard amount > 0 else { return }
-        days[Self.dayKey(for: date, calendar: calendar), default: 0] += amount
+        days[key, default: 0] += amount
     }
 
     /// 退回一笔（生成失败 / 取消了、服务器没收钱）：不会退到负数。
     mutating func refund(_ amount: Double, on date: Date, calendar: Calendar = .current) {
-        guard amount > 0 else { return }
-        let key = Self.dayKey(for: date, calendar: calendar)
-        guard let current = days[key] else { return }
+        refund(amount, dayKey: Self.dayKey(for: date, calendar: calendar))
+    }
+
+    /// Refunds on the day key recorded at booking: a time zone changed since then (traveling, a system setting) must not move
+    /// the refund to another day (MSG1 review, 2026-11-25: a 60 refund cut the next day's 80 to 20).
+    mutating func refund(_ amount: Double, dayKey key: String) {
+        guard amount > 0, let current = days[key] else { return }
         let left = max(0, current - amount)
         if left == 0 { days[key] = nil } else { days[key] = left }
     }

@@ -130,7 +130,8 @@ enum SkyStudioVoiceFallbackFee {
         case .needsConfirmation(let result):
             guard case .object(var value) = result.payload else { return .asked(result) }
             value["one_time"] = .array([fee.json])
-            value["next_step"] = .string(nextStep(asking: value["status"] == "needs_confirmation", file: recovery.file.path, credits: credits))
+            let asking = value["status"] == "needs_confirmation"
+            value["next_step"] = .string(nextStep(asking: asking, file: recovery.file.path, credits: credits, standing: ask == .standing))
             var asked = result
             asked.payload = .object(value)
             return .asked(asked)
@@ -142,6 +143,9 @@ enum SkyStudioVoiceFallbackFee {
                 modelTitle: catalog?.models.first { $0.id == model }?.title ?? "MiniMax", project: project,
                 nextStep: "The voice's MiniMax version is ready. Call add_voiceover resume=\(file.path) generate_missing=true to read "
                     + "the missing parts; the fallback can be used now. Never send the original lines again.",
+                failureStep: "The MiniMax version was not built. Resume the narration from its recovery file: add_voiceover "
+                    + "resume=\(file.path) asks about the fee again with the current price, or resume=\(file.path) skip_one_time=true "
+                    + "retries the missing parts with the same model. Never send the original lines again.",
                 api: services.api
             )
             // 这一笔的问题留到 Sky Studio 受理了建的那一单才清：受理之前就没做成（改了价、断网、等不到槽）预留退了，问题还在，
@@ -212,14 +216,16 @@ enum SkyStudioVoiceFallbackFee {
             + "\(SkyStudioCredits.text(credits)) credits."
     }
 
-    private static func nextStep(asking: Bool, file: String, credits: Double) -> String {
+    private static func nextStep(asking: Bool, file: String, credits: Double, standing: Bool) -> String {
         let retry = "or retry the missing parts with the same model (add_voiceover resume=\(file) skip_one_time=true, the same as generate_missing=true)"
         guard asking else {
             // The daily limit stopped the fee: both real ways on, not only the skip (MSG1 review, 2026-11-25).
             return "One part failed and its fallback first needs a one-time fee of \(SkyStudioCredits.text(credits)) credits, which SkyCut's "
                 + "own daily credit limit stops (not the Sky Studio balance; this result has the numbers and the limit's options). Nothing "
                 + "was charged and the other parts are kept. Offer the user both: raise the limit (its options), then call add_voiceover "
-                + "resume=\(file) to be asked about the fee; " + retry + ". Never send the original lines again."
+                + "resume=\(file), which " + (standing
+                    ? "in full access, with the standing consent on record, builds the voice's MiniMax version without asking again"
+                    : "asks about the fee") + "; " + retry + ". Never send the original lines again."
         }
         return "One part failed on Sky Studio and its fallback first needs a one-time fee (one_time); nothing was charged for it and the "
             + "other parts are kept. Ask the user in their language: build the voice's MiniMax version (add_voiceover resume=\(file) with "
