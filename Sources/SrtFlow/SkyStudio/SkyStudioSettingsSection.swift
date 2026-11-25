@@ -182,7 +182,8 @@ private struct SkyStudioAccountRows: View {
 
 /// SkyCut's daily credit limit for AI (SkyStudioSpendStore, 1,000 by default): a hard limit for the AI and the paid panels alike;
 /// only the user raises it, here or by approving set_settings in the chat (it always asks).
-private struct SkyStudioCreditLimitRow: View {
+/// Also the Change Limit… popover of the paid panels (DailyCreditLimitNote): the same row, edited in place.
+struct SkyStudioCreditLimitRow: View {
     @ObservedObject private var spend = SkyStudioSpendStore.shared
     @State private var limitText = ""
 

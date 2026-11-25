@@ -195,9 +195,9 @@ final class SkyStudioVoiceoverRun {
         }
         if let failure = (error as? SkyStudioJobError)?.failure {
             extra["failure"] = failure.json
-            if failure.code == SkyStudioBalanceRefusal.code {
+            if let balance = SkyStudioBalanceRefusal.refusal(of: error) {
                 // The Sky Studio balance, not SkyCut's daily limit: the numbers and where only the user adds credits (MSG1).
-                extra.merge(SkyStudioBalanceRefusal.fields(failure, retry: recovery == nil ? "retry the original add_voiceover call"
+                extra.merge(SkyStudioBalanceRefusal.fields(balance, retry: recovery == nil ? "retry the original add_voiceover call"
                     : "resume with add_voiceover resume=recovery_file generate_missing=true")) { _, new in new }
             }
             if failure.code == SkyStudioVoiceCodes.fallbackNeedsOneTime, let recovery {
@@ -218,15 +218,15 @@ final class SkyStudioVoiceoverRun {
         let budget = cancelled ? nil : error as? SkyStudioVoiceBudgetProblem
         if let budget {
             // Which limit, the numbers and the options (MSG1); the retry is this voiceover's own and finished batches are kept.
-            extra.merge(SkyStudioJobGate.budgetBlocked(credits: budget.credits, store: .shared,
+            extra.merge(SkyStudioJobGate.budgetBlocked(budget.numbers,
                 outcome: recovery == nil ? "Nothing was started or charged." : "Finished batches are kept; the missing ones were not started or charged.",
                 retry: recovery == nil ? "retry the original add_voiceover call" : "resume with add_voiceover resume=recovery_file generate_missing=true"
             ).payload.objectValue ?? [:]) { _, new in new }
         }
         finish(cancelled ? .cancelled : .failed, text)
         // The task card says which limit or balance stopped it, in the app's language, with the numbers and where to act.
-        if let budget { status.issue = SkyCutDailyLimit.userLine(needed: budget.credits, store: .shared, localized: L10n) }
-        if !cancelled, let balance = SkyStudioBalanceRefusal.failure(of: error) { status.issue = SkyStudioBalanceRefusal.shown(balance) }
+        if let budget { status.issue = SkyCutDailyLimit.userLine(budget.numbers) }
+        if !cancelled, let balance = SkyStudioBalanceRefusal.refusal(of: error) { status.issue = SkyStudioBalanceRefusal.shown(balance) }
     }
 
     /// 回任务号时说好要先装本机转写模型的：交第一批之前装（状态行「准备本机转写」，get_job 的 local_step）。装不上就当这台 Mac
@@ -260,9 +260,10 @@ final class SkyStudioVoiceoverRun {
         prepared?.budget.refundUnused()
         // 先记下为什么换了（get_job 的 voice.note）：新的预留留不下、之后哪一步没做成，AI 都看得到整段换了读法。
         input.choice.note = [input.choice.note, replanned.note].compactMap { $0 }.joined(separator: " ")
-        guard let budget = SkyStudioVoiceBudget.reserve(replanned.plan.batchCredits) else {
+        let budget: SkyStudioVoiceBudget
+        do { budget = try SkyStudioVoiceBudgetProblem.reserve(replanned.plan.batchCredits) } catch {
             prepared = nil
-            throw SkyStudioVoiceBudgetProblem(credits: replanned.plan.batchCredits.reduce(0, +))
+            throw error
         }
         prepared?.plan = replanned.plan
         prepared?.quote = replanned.quote

@@ -22,7 +22,7 @@
 ## 唯一设置窗口
 
 SwiftUI `Settings` 场景只装 `SettingsWindowView().appLanguage()`；工具栏用 `SettingsLink`，与 SkyCut → 设置及 ⌘, 打开同一窗口。不得另做语言浮层或另一份设置数据。
-A button elsewhere that needs one pane (the paid panels' Change Limit…, 2026-11-24) opens the same window with SwiftUI's `openSettings` through `SettingsNavigator`, which the window follows when it appears or while it is open; no second window or copy of a pane.
+The paid panels' Change Limit… (2026-11-24) edits the limit's own row in a popover, in place. It never switches this window's pane: Design a Voice is a sheet of the Editing pane, and switching away would close it and lose its draft (MSG1 review, 2026-11-25).
 
 | 稳定分类 id | 分类 | 复用组件与数据 |
 | --- | --- | --- |
@@ -44,7 +44,7 @@ A button elsewhere that needs one pane (the paid panels' Change Limit…, 2026-1
 - `set_settings` 只认明确白名单：`language`（system / en / zh-Hans / es）、`theme`（forest / classic）、`optimized_media_cache_gb`（设置原有十进制档位）、`clear_optimized_media_cache`、`daily_ai_credit_limit`（原 Store 的整数范围，0 暂停收费）、`ai_access_mode`、`confirm_token`。省略 / null 不动，至少一项有效改动。
 - **全部参数先读完、验完再写任何 Store**，错误整次不做。缓存仍由 `OptimizedMediaCacheSettings` 执行，不能绕过它直接删目录 / 写 defaults。清空可能异步完成，用 `get_settings section=cache` 的 `clearing` 核对，不把开始清空说成已完成。
 - 2026-10-31 的每日额度「询问阈值」规则已被 2026-11-01 用户决策取代：每日额度是硬预算，两种模式均不可绕过；0 暂停收费任务。余额不足提供服务器充值链接，日预算不足提供设置入口，不循环索要一次性越额批准。MCP 提高硬预算需明确同意和确认码。
-  Since 2026-11-24 a daily-limit refusal names it as SkyCut's own setting (not the Sky Studio balance) with the numbers, the reset and three options, the first being the exact `set_settings` call with a suggested value; that call asks like any raise ([Sky Studio jobs](sky-studio-jobs.md) section 11).
+  Since 2026-11-24 a daily-limit refusal names it as SkyCut's own setting (not the Sky Studio balance), with the numbers, the reset and its options. The first is the exact `set_settings` call with a suggested value, plus SkyCut's question and a token for exactly that raise (the user's 「只问一次」, 2026-11-25). Any other value asks like any raise ([Sky Studio jobs](sky-studio-jobs.md) section 11).
 - 剪辑风格沿用 recipes / save_recipe，声音安装沿用 add_voiceover download_voices=true / get_job。账号密钥与客户端连接 / 断开仍从设置操作；新读权限仍走现有确认，不能借设置绕过。
 - 工具清单、总说明目录都列出新工具；旧小程序通过现有 MCPCatalogSync 获得 App 的新清单。
 

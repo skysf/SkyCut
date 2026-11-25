@@ -217,7 +217,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `manage_files` 把它删进废纸篓（会问）。 This holds when the file is written, not only when the folder was listed:
      export_video reserves its name and both export tools claim names atomically ([export settings](export-settings.md) §5 item 6).
    - `generate_media`、`upscale_clip` 超了每日积分硬上限：当场回 `daily_budget_exceeded`，不发越额确认码。
-     The result names the limit as SkyCut's own setting with the numbers and three options, the first the exact `set_settings` call, which still asks (item 68).
+     The result names the limit as SkyCut's own setting with the numbers and options. The first is the exact `set_settings` call with SkyCut's question and a token for exactly that raise: the user's yes to it is the approval (「只问一次」, 2026-11-25); any other value still asks (item 68).
      预算内的草稿越档按批准模式在 `SkyStudioJobGate.decide` 发码；全部权限也不跳过硬上限。都不在提示条上问。
      改这几条（什么时候问、硬上限、草稿怎么挑）时，同一次改动里一起改剪辑风格共用规矩第 11、13 条（中文稿和英文资源，第 32 条），
      它教 AI 的就是这一套（[案例](../bugfixes/2026-11-13-recipe-rules-teach-budget-bypass.md)：11-01 改了这里，那条还教了 AI 十几天用确认码越过每日预算）。
@@ -1422,7 +1422,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     says what the user can do: who, where (the path in the app's own words, or the URL Sky Studio sent) and what the AI may do for
     them, with the exact call when there is one (SkyCut still asks where it asks). The user's own line says the same in the app's
     language. The AI fills a gap with the most common meaning: told "only 12 credits left today", a user read SkyCut's daily limit as
-    the Sky Studio balance. Models: the daily limit (`SkyCutDailyLimit`, `blocked_by: skycut_daily_credit_limit`, three `options`) and
+    the Sky Studio balance. Models: the daily limit (`SkyCutDailyLimit`, `blocked_by: skycut_daily_credit_limit`, its `options`) and
     Sky Studio's balance (`SkyStudioBalanceRefusal`, `blocked_by: sky_studio_balance`, in every paid job), both in
     [Sky Studio jobs](sky-studio-jobs.md) section 11; the plan's refusals (`SkyCutGates`) already followed it. Keep it short.
 

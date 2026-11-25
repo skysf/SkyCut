@@ -12,12 +12,12 @@ extension SkyStudioBalanceRefusal {
     private static var accountRecharge: URL? { SkyStudioAccount.shared.stored?.me.skycut.rechargeURL }
 
     /// The AI's fields, with the account's recharge address when the refusal carried none.
-    static func fields(_ failure: SkyStudioJobFailure, retry: String) -> [String: JSONValue] {
-        fields(failure, recharge: accountRecharge, retry: retry)
+    static func fields(_ refusal: Refusal, retry: String) -> [String: JSONValue] {
+        fields(refusal, recharge: accountRecharge, retry: retry)
     }
 
     /// The user's line in the app's language.
-    static func shown(_ failure: SkyStudioJobFailure) -> String {
-        userLine(failure, addCredits: accountRecharge != nil, localized: L10n)
+    static func shown(_ refusal: Refusal) -> String {
+        userLine(refusal, addCredits: accountRecharge != nil, localized: L10n)
     }
 }

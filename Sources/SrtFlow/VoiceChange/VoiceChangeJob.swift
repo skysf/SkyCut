@@ -90,10 +90,10 @@ final class VoiceChangeJob {
         } catch let error as SkyStudioJobError {
             settle(failed: error)
             if error.failure?.code == SkyStudioVoiceCodes.separationFailed { return separationFailed(error) }
-            if !Task.isCancelled, let balance = SkyStudioBalanceRefusal.failure(of: error) {
+            if !Task.isCancelled, let balance = SkyStudioBalanceRefusal.refusal(of: error) {
                 // The Sky Studio balance, not SkyCut's daily limit: the numbers and where only the user adds credits (MSG1).
                 var fields = SkyStudioBalanceRefusal.fields(balance, retry: "call change_voice again")
-                fields["failure"] = balance.json
+                fields["failure"] = balance.failure.json
                 fields["code"] = .string(SkyStudioBalanceRefusal.code)
                 return finish(.failed, SkyStudioVoiceLibraryErrors.message(error), detail: fields, shown: SkyStudioBalanceRefusal.shown(balance))
             }

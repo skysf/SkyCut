@@ -5,6 +5,9 @@ import SrtFlowMCPKit
 // 令牌绑定改前值与这次所有参数；未批准时整个 set_settings 不写任何 Store。
 // 打开全部权限：问句后面接那段说明（SkyStudioVoiceStandingNotice：不再先问的事、声音的一次性费用价目、每日额度、打开即记下的长期授权那句），
 // 令牌另绑那一句的版本（点过头记的就是用户看到的那一版，SkyCut 声音方案 5.6）。
+// A daily-limit refusal asks its suggested raise in advance (limitRaise, the user's 「只问一次」, 2026-11-25): the same identity as
+// check() computes for set_settings {daily_ai_credit_limit: value} from this limit and mode, so the user's yes to the refusal's
+// question is the approval; any other change is asked here as before.
 @MainActor
 enum AISettingsApproval {
     static func check(_ args: AIToolArguments, mode: AIAccessMode?, limit: Double?, fullAccess: SkyStudioVoiceStandingNotice? = nil,
@@ -15,10 +18,9 @@ enum AISettingsApproval {
         guard mode.map({ $0 != access.mode }) == true || limit.map({ $0 > beforeLimit }) == true else { return nil }
         var fields = args.raw.objectValue ?? [:]
         fields["confirm_token"] = nil
-        var value: [String: JSONValue] = ["from_mode": .string(access.mode.rawValue), "from_limit": .number(beforeLimit), "changes": .object(fields)]
         let turningOn = mode == .full && access.mode != .full
-        if turningOn, let fullAccess { value["standing_statement_version"] = .string(fullAccess.statement.version) }
-        let identity = "ai-settings:" + JSONValue.object(value).encodedString()
+        let identity = identity(changes: fields, from: access.mode, limit: beforeLimit,
+                                standingVersion: turningOn ? fullAccess?.statement.version : nil)
         let redemption = AIConfirmations.shared.redeem(try args.string("confirm_token"), for: identity)
         guard redemption != .accepted else { return nil }
         var changes: [String] = []
@@ -37,5 +39,25 @@ enum AISettingsApproval {
             result.payload = .object(value)
         }
         return result
+    }
+
+    /// A daily-limit refusal's option (a): SkyCut's question and a token for exactly set_settings {daily_ai_credit_limit: `to`}
+    /// from `currentLimit` in the current permission mode. Asking again before the answer returns the same token.
+    static func limitRaise(to limit: Double, currentLimit: Double, access: AIAccessStore? = nil) -> SkyCutDailyLimit.RaiseQuestion? {
+        let access = access ?? .shared
+        guard limit > currentLimit else { return nil }
+        let identity = identity(changes: ["daily_ai_credit_limit": .number(limit)], from: access.mode, limit: currentLimit, standingVersion: nil)
+        let question = SkyCutDailyLimit.raiseQuestion(from: currentLimit, to: limit)
+        let asked = AIConfirmations.shared.ask(question, action: identity, refused: nil)
+        guard let token = asked.payload["confirm_token"]?.stringValue else { return nil }
+        return .init(question: question, token: token, validMinutes: Int(AIConfirmations.lifetime / 60))
+    }
+
+    /// What a settings token is bound to: the change as sent (confirm_token removed), the mode and limit it starts from, and the
+    /// full-access statement's version when it turns full access on.
+    private static func identity(changes: [String: JSONValue], from mode: AIAccessMode, limit: Double, standingVersion: String?) -> String {
+        var value: [String: JSONValue] = ["from_mode": .string(mode.rawValue), "from_limit": .number(limit), "changes": .object(changes)]
+        if let standingVersion { value["standing_statement_version"] = .string(standingVersion) }
+        return "ai-settings:" + JSONValue.object(value).encodedString()
     }
 }

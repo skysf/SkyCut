@@ -105,8 +105,9 @@ enum MCPGuideSharedTopics {
 
         The daily budget. SkyCut's own daily credit limit (a SkyCut setting, not the Sky Studio balance) applies in every mode: over \
         it, the result is status blocked with daily_budget_exceeded and nothing starts. Tell the user plainly; next_step has the \
-        numbers and their options (raise it with set_settings, which asks them; change it in Settings; wait for midnight). Never \
-        split or reshape a request to get under it. A low Sky Studio balance is the user's account instead: the job fails with \
+        numbers and their options (raise it: the first option carries SkyCut's question and a confirm_token for set_settings, used \
+        only after their yes; change it in Settings; wait for the reset when that helps). Never split or reshape a request to get \
+        under it. A low Sky Studio balance is the user's account instead: the job fails with \
         recharge_url, and only the user can add credits.
 
         Jobs. Paid calls return job_id; wait with get_job, which reports the phase, queue position, credits_charged and refunds. Only \

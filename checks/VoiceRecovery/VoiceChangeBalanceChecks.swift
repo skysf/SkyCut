@@ -28,4 +28,22 @@ func voiceChangeBalanceChecks(_ root: URL) async throws {
     let poorRow = SkyStudioGenerationActivity.shared.runs.first { $0.issue?.contains("Not enough Sky Studio credits: your balance is 2 and this needs 9") == true }
     require(poorRow != nil, "the row shows the user's line, not Sky Studio's English: \(SkyStudioGenerationActivity.shared.runs.map { $0.issue ?? "" })")
     for row in SkyStudioGenerationActivity.shared.runs where row.issue != nil { SkyStudioGenerationActivity.shared.dismiss(row) }
+
+    // A 402 that carries a job id and pending billing may have been charged (MSG1 review): the reservation stays on the books and
+    // the AI queries that job instead of being told "not charged" and to change the voice again.
+    let billed = try VoiceChangeFixture(folder: root.appendingPathComponent("change-balance-billed"))
+    let clip = billed.placeClip(try billed.stereoSource())
+    let books = SkyStudioSpendStore.shared.spentToday()
+    VoiceChangeHTTP.lock.withLock {
+        VoiceChangeHTTP.submitRefusal = (402, ["error": ["code": "insufficient_credits", "message": "You need 9 credits; you have 2.",
+                                                         "balance": 2, "needed": 9, "job_id": "convert-402", "billing": ["status": "pending_review"]]])
+    }
+    let pending = try await billed.wait(try await billed.change(["clip_id": .string(billed.short(clip)), "voice": .string(VoiceChangeHTTP.voiceID), "language": "en"]))
+    let pendingNext = pending["next_step"]?.stringValue ?? ""
+    require(pending["status"] == "failed" && pendingNext.contains("Query this original job with get_job") && !pendingNext.contains("not charged")
+            && !pendingNext.contains("call change_voice again"),
+            "a possibly billed balance refusal sends the AI to the original job, never to a redo: \(pending)")
+    require(abs(SkyStudioSpendStore.shared.spentToday() - books - 9) < 0.0001, "and its reservation stays on the books")
+    for row in SkyStudioGenerationActivity.shared.runs where row.issue != nil { SkyStudioGenerationActivity.shared.dismiss(row) }
+    SkyStudioSpendStore.shared.refund(9, on: Date())
 }

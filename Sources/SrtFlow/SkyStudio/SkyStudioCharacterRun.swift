@@ -19,7 +19,7 @@ final class SkyStudioCharacterRun {
     /// A photo's upload did not happen: nothing was submitted (the task row and get_job say so).
     private var uploadFailure: SkyStudioUploadFailure?
     /// Sky Studio refused it for the balance (MSG1): the row shows the user's line, the AI gets the fields.
-    private var balanceFailure: SkyStudioJobFailure?
+    private var balanceRefusal: SkyStudioBalanceRefusal.Refusal?
 
     init(receipt: SkyStudioCharacterReceipt, key: String, project: VideoEditProject?, plan: SkyStudioCharacterPlan? = nil,
          approvedFiles: [JSONValue] = [], reservation: SkyStudioJobGate.Reservation? = nil, retryFreeImport: Bool = false) {
@@ -109,7 +109,7 @@ final class SkyStudioCharacterRun {
                 receipt.rejectionCode = code
             }
             await saveFailureEvidence()
-            balanceFailure = Task.isCancelled ? nil : SkyStudioBalanceRefusal.failure(of: error)
+            balanceRefusal = Task.isCancelled ? nil : SkyStudioBalanceRefusal.refusal(of: error)
             finish(Task.isCancelled ? .cancelled : .failed, error.message)
         } catch {
             if !receipt.submissionAttempted {
@@ -201,13 +201,13 @@ final class SkyStudioCharacterRun {
     private func finish(_ status: AIJobs.Status, _ message: String) {
         guard let job else { return }
         if status != .done { activity?.issue = uploadFailure.map(SkyStudioUploadWords.shown) ?? message }
-        if status != .done, let balanceFailure { activity?.issue = SkyStudioBalanceRefusal.shown(balanceFailure) }
+        if status != .done, let balanceRefusal { activity?.issue = SkyStudioBalanceRefusal.shown(balanceRefusal) }
         var detail = payload()
         if let uploadFailure {
             detail.merge(uploadFailure.fields(retry: "call manage_characters again with a new idempotency_key.")) { _, upload in upload }
         }
-        if let balanceFailure {
-            detail.merge(SkyStudioBalanceRefusal.fields(balanceFailure, retry: "call manage_characters again with a new idempotency_key")) { _, new in new }
+        if let balanceRefusal {
+            detail.merge(SkyStudioBalanceRefusal.fields(balanceRefusal, retry: "call manage_characters again with a new idempotency_key")) { _, new in new }
         }
         AIJobs.shared.finish(job, status, message: message, detail: .object(detail))
     }

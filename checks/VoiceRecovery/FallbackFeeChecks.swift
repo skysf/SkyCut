@@ -17,6 +17,7 @@ func runVoiceFallbackFeeChecks(_ root: URL) async throws {
     try await skipChecks(root, lines)
     try await buildChecks(root, lines)
     try await repricedChecks(root, lines)
+    try await limitBlockedChecks(root, lines)
 }
 
 private let libraryVoice = "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d"
@@ -133,4 +134,22 @@ private func repricedChecks(_ root: URL, _ lines: [String]) async throws {
     require(try SkyStudioVoiceRecoveryStore.read(record).fallbackFee == nil, "and only then is the question answered")
     let finished = try await fixture.wait(try await resume(fixture, ["resume": .string(file), "generate_missing": true]))
     require(finished["status"] == "done" && fixture.project.state.audioTracks.flatMap(\.clips).count == lines.count, "every line lands once")
+}
+
+/// The fee over SkyCut's daily limit (MSG1 review, 2026-11-25): nothing is built, and the next step gives both real ways on, raising
+/// the limit to be asked about the fee or skipping it, instead of only the skip.
+@MainActor
+private func limitBlockedChecks(_ root: URL, _ lines: [String]) async throws {
+    let start = SkyStudioSpendStore.shared.spentToday()
+    defer {
+        SkyStudioSpendStore.shared.refund(SkyStudioSpendStore.shared.spentToday() - start, on: Date())
+        SkyStudioSpendStore.shared.setDailyLimit(1_000)
+    }
+    let (_, failed) = try await failedNarration(root, "fallback-fee-limit", lines, dailyLimit: (start + 300).rounded(.up))
+    let next = failed["next_step"]?.stringValue ?? ""
+    require(failed["code"] == "daily_budget_exceeded" && failed["blocked_by"] == "skycut_daily_credit_limit"
+            && next.contains("377.6") && next.contains("raise the limit") && next.contains("to be asked about the fee")
+            && next.contains("skip_one_time=true") && next.contains("Never send the original lines again"),
+            "a fee over the daily limit offers raising the limit or skipping the fee: \(next)")
+    require(VoiceRecoveryHTTP.enrolls.isEmpty, "and builds nothing (each fixture starts with an empty log)")
 }

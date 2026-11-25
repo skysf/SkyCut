@@ -23,9 +23,10 @@ struct SkyStudioHeldCredits {
     }
 
     /// 面板起的：开跑时记上报价。
-    static func recording(_ credits: Double) -> SkyStudioHeldCredits {
-        SkyStudioSpendStore.shared.record(credits)
-        return SkyStudioHeldCredits(SkyStudioJobGate.Reservation(credits: credits, day: Date()))
+    /// One moment for the booking and the refund's day, like SkyStudioJobGate (MSG1 review, 2026-11-25).
+    static func recording(_ credits: Double, now: Date = Date()) -> SkyStudioHeldCredits {
+        SkyStudioSpendStore.shared.record(credits, now: now)
+        return SkyStudioHeldCredits(SkyStudioJobGate.Reservation(credits: credits, day: now))
     }
 
     /// 没花出去：退回（只退一次）。

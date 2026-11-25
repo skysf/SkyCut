@@ -521,8 +521,9 @@ private func panelChecks(_ root: URL) async throws {
     let spent = SkyStudioSpendStore.shared.spentToday()
     SkyStudioSpendStore.shared.setDailyLimit(spent + 5)
     require(model.overLimit(spend: SkyStudioSpendStore.shared), "a price over the daily limit is flagged")
-    require(!model.start() && model.problem != nil && VoiceChangeHTTP.calls("POST", "/jobs").isEmpty
-            && SkyStudioSpendStore.shared.spentToday() == spent, "over the daily limit the button starts nothing and records nothing")
+    require(!model.start() && model.problem == nil && VoiceChangeHTTP.calls("POST", "/jobs").isEmpty
+            && SkyStudioSpendStore.shared.spentToday() == spent,
+            "over the daily limit the button starts nothing and records nothing; the note says why, no second line in problem (MSG1)")
     SkyStudioSpendStore.shared.setDailyLimit(100_000)
 
     // 按下「开始」就是确认：记账、起同一个任务、做完自动落地、提示条说一句；记住上次用的声音。

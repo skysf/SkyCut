@@ -542,45 +542,61 @@ Manual regression before a release (the checks cannot cut a real uplink):
 
 AI 权限与设置确认合同见 [统一设置](workbench-and-settings.md#ai-操作权限与草稿2026-11-01)。`SkyStudioJobGate` 先检查每日硬预算，再检查草稿越档审批；全部权限和旧确认码均不能让日预算超额。`reserveReplacement` 同样遵守预算。配音超预算现在暂停并提示设置，不再悄悄退到本机音色；手动 upscale 按钮与任务开跑时都核对硬预算。余额不足保留服务器 `balance/needed/recharge_url` 并给出充值入口。未知结果只查原单；本次不改变服务端退款政策。
 
-**What a daily-limit refusal says** (2026-11-24, MSG1, [case](../bugfixes/2026-11-24-daily-limit-refusal-unclear.md)). Every refusal
-by the daily limit is built from `SkyCutDailyLimit` only: the AI's `daily_budget_exceeded` (`SkyStudioJobGate.budgetBlocked`, all
-paid tools), the paid panels' line (`DailyCreditLimitNote`: Upscale, Design a Voice, Change Voice) and a panel's job that loses the
-race to the limit (`SkyCutDailyLimit.userLine`). It must:
+**What a daily-limit refusal says** (2026-11-24, MSG1, [case](../bugfixes/2026-11-24-daily-limit-refusal-unclear.md); reviewed
+2026-11-25). Every refusal by the daily limit is built from `SkyCutDailyLimit` only: the AI's `daily_budget_exceeded`
+(`SkyStudioJobGate.budgetBlocked`, all paid tools), the paid panels' line (`DailyCreditLimitNote`: Upscale, Design a Voice, Change
+Voice) and an upscale that loses the race to the limit (`SkyCutDailyLimit.userLine` in its task row). It must:
 
 1. name the limit as SkyCut's own setting, not the Sky Studio balance (`blocked_by: skycut_daily_credit_limit`);
-2. give the numbers: the limit, used today, left, this request's estimate, and the local midnight it resets at (`resets_at` with
-   its offset, the ledger's day);
-3. offer three ways on: (a) raise it now: `options[0]` is the exact `set_settings` call with a friendly suggested value
-   (`suggested_daily_limit_credits`, enough for this request rounded up: 988 used + 36 needed suggests 1,500), and that call still
-   asks the user in every permission mode (`AISettingsApproval`: the question names the limit and its path in whole credits);
-   (b) change it at the path the app shows in its own language (`settings_path`, labels read from the string tables, plus
-   `settings_path_english` when the app is not in English; the panels' Change Limit… opens Settings at Sky Studio through
-   `SettingsNavigator`); (c) wait for the reset.
+2. give the numbers as they were when the request was refused (a voiceover's missing batches carry them in
+   `SkyStudioVoiceBudgetProblem`, read at the refusal and not when the result is built): the limit, used today, left, this
+   request's estimate, and when the ledger's next day starts (`resets_at`: the first moment of tomorrow's calendar day, which is
+   00:00 even after a day that skipped its midnight, America/Santiago 2026-09-06);
+3. offer the ways on:
+   - (a) raise it now: `options[0]` is the exact `set_settings` call with a friendly suggested value
+     (`suggested_daily_limit_credits`, enough for this request rounded up: 988 used + 36 needed suggests 1,500). It carries SkyCut's
+     question and a confirm_token for exactly that raise from this limit and permission mode (`AISettingsApproval.limitRaise`, the
+     same identity `check()` computes). The user decided on 2026-11-25 to be asked once (「只问一次」): their yes to that question
+     is the approval. Any other value is asked by set_settings as before, in every mode. The token raises the limit only, never
+     admits the refused request, and is good for one call;
+   - (b) change it at the path the app shows in its own language (`settings_path`, labels read from the string tables, plus
+     `settings_path_english` when the app is not in English). The panels' Change Limit… edits that same row in a popover, in
+     place: it never switches the Settings pane, because Design a Voice is a sheet of the Editing pane and leaving the pane would
+     close it and lose its draft;
+   - (c) wait for the reset, offered only when a whole day's limit covers the request (a limit of 0 or 20 never fits 36).
 
-The result never carries a confirm token and nothing raises the limit by itself. A voiceover's missing batches keep their own
-outcome and retry (finished batches stay; resume with `generate_missing`). `checks/sky-studio-wiring/daily-limit.sh` keeps every
-refusal on this one builder, and `scripts/check-sky-studio.sh` (DailyLimitChecks) checks the fields, the options, the suggested
-value, the question it leads to, and the path and the panels' line in every string table.
+A panel that loses the race redraws from the store: its note says it, with no second line left over once the limit is raised. A
+reservation's check, booking and refund day are one moment (`SkyStudioJobGate` passes `now` through): a reservation booked a
+second before midnight and refunded after it goes back to its own day, not the next one.
 
 **What a balance refusal says** (the same day, its twin). Sky Studio's `insufficient_credits` (402 at `/jobs`; `/quote` does not check
 the balance) is said by `SkyStudioBalanceRefusal` in every paid job: generate_media, upscale_clip, add_voiceover, change_voice, voice
-design and MiniMax versions, manage_characters. The AI gets `blocked_by: sky_studio_balance` (the user's Sky Studio account, not
-SkyCut's daily limit), `balance_credits` and `needed_credits` when Sky Studio sent them, `recharge_url` (Sky Studio's, else the
-account's), and a next step with the job's own retry. Only the user adds credits, and the AI does not retry before they say they
-have. The task row shows the localized line with the numbers and the path to Add Credits (SkyCut → Settings → Sky Studio → Add
-Credits, or the pane when Sky Studio sent no address). Only `SkyStudioBalanceRefusal` names the code, apart from
-`SkyStudioJobAdmission`'s list (`checks/sky-studio-wiring/daily-limit.sh`). BalanceRefusalChecks checks the words and the line in
-every string table; `scripts/check-voice-recovery.sh` (`VoiceChangeBalanceChecks`) runs change_voice into a 402 with real App
-objects.
+design and MiniMax versions, manage_characters. The AI gets:
+
+- `blocked_by: sky_studio_balance` (the user's Sky Studio account, not SkyCut's daily limit);
+- `balance_credits` and `needed_credits` when Sky Studio sent them;
+- `recharge_url` (Sky Studio's, else the account's);
+- a next step that depends on admission. A plain refusal was not charged: once the user says they added credits, it follows the
+  job's own retry. That is a new quote, seam review and key for an official film, and the caller's own step for a voice library
+  job: a MiniMax version mid-voiceover resumes from its recovery file. A refusal that came with a job id or billing (`billing.status:
+  pending_review`) may have been charged: the AI queries that original job and never submits it again
+  (`SkyStudioJobError.rejectedBeforeAdmissionCode`).
+
+The task row shows the localized line with the numbers and the path to Add Credits (SkyCut → Settings → Sky Studio → Add Credits,
+or the pane when Sky Studio sent no address). Only `SkyStudioBalanceRefusal` names the code, apart from `SkyStudioJobAdmission`'s
+list (`checks/sky-studio-wiring/daily-limit.sh`). `BalanceRefusalChecks` checks the words and the line in every string table, and
+`scripts/check-voice-recovery.sh` (`VoiceChangeBalanceChecks`) runs change_voice into a plain 402 and into one with pending billing,
+using real App objects. `SpendChecks` covers the reservation across midnight.
 
 Manual regression for both (before a release; no automated check opens a real window or client):
 
 - [ ] With the daily limit below a quote, open Upscale, Design a Voice and Change Voice in English, 简体中文 and Español at the default
-      window size: the red line names SkyCut's limit, the numbers and the path, and is not cut off. Change Limit… opens Settings at
-      Sky Studio, also when Settings was already open on another pane. Raising the limit there enables the panel's button without
-      reopening the panel.
+      window size: the red line names SkyCut's limit, the numbers, the path and the reset time, and is not cut off. Change Limit…
+      opens a popover with the limit's row. Raising it there (Return or clicking away) enables the panel's button without reopening
+      the panel, and a Design a Voice draft is still there.
 - [ ] In a real MCP client, a request over the limit: the AI says it is SkyCut's limit (not the balance), with the numbers, and
-      offers the three options. Choosing (a) leads to SkyCut's approval question, and nothing changes before the user agrees.
+      offers the options with SkyCut's question. A yes to that exact value raises the limit with no second question; another value is
+      asked first; nothing changes before the user agrees.
 
 ## 十二、图片目录、换机位与图片放大（2026-11-07 客户端合同）
 

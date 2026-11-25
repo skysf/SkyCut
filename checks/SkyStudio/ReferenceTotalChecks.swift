@@ -98,6 +98,13 @@ private func runReferenceTotalLimitChecks() {
     check(twoBig.problem(model: totalRecord(total: 9_000_000, fit: false))?.contains("total image size limit (9000000 bytes)") == true,
           "without fit_images a set over the total is refused before upload, like the other limits")
     check(twoBig.problem(model: totalRecord(total: 10_000_000, fit: false)) == nil, "exactly at that total: taken")
+    // The actual total beside the limit (MSG1 review, 2026-11-25): how much to drop.
+    check(twoBig.problem(model: totalRecord(total: 9_000_000, fit: false))?.contains("The reference images total 10000000 bytes") == true,
+          "the images' refusal gives their actual total")
+    let allFiles = fitRecord("model", title: "Model", ["max_images": 4, "max_total_files": 4, "image_mime_types": fitFormats,
+                                                       "max_image_bytes": 50_000_000, "max_total_bytes": 9_000_000, "image_dimensions": ["min_side": 15]], fit: false)
+    checkEqual(twoBig.problem(model: allFiles), "The reference files total 10000000 bytes, over Model's total size limit (9000000 bytes).",
+               "the files' total refusal gives the actual total and the limit")
 
     // What the AI is told before delivery.
     var three = SkyStudioReferencePlan(mode: "images", files: ["a", "b", "c"].map { fitImage(3000, 2000, name: "\($0).jpg", bytes: 3_000_000) })

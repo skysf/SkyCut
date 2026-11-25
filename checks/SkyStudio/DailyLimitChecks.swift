@@ -2,9 +2,10 @@ import Foundation
 import SrtFlowMCPKit
 
 // When SkyCut's own daily credit limit stops a paid request (MSG1, 2026-11-24; SkyCutDailyLimit, SkyStudioJobGate.budgetBlocked):
-// the AI's result names the limit as SkyCut's setting, not the Sky Studio balance, with the numbers, the reset and three options:
-// the exact set_settings call with a friendly suggested value (which SkyCut then asks the user to approve, in every mode), the
-// settings path in the app's own words (read from the real string tables) and waiting; the panels' line says the same.
+// the AI's result names the limit as SkyCut's setting, not the Sky Studio balance, with the numbers and the reset (the ledger's
+// own next day, also across a skipped midnight); option (a) carries SkyCut's question and a set_settings token for exactly the
+// suggested raise (the user's 「只问一次」, 2026-11-25), (b) the settings path in the app's own words (read from the real string
+// tables), (c) waiting only when a whole day's limit covers the request. The panels' line says the same.
 // docs/bugfixes/2026-11-24-daily-limit-refusal-unclear.md
 
 @MainActor
@@ -17,6 +18,7 @@ func runDailyLimitChecks() {
     checkEqual(numbers.left, 12, "credits left today")
     checkEqual(SkyCutDailyLimit.resetText(numbers), "2026-11-25T00:00:00+08:00", "the limit resets at the next local midnight, with its offset")
     checkEqual(numbers.minutesToReset, 431, "minutes until the reset")
+    resetBoundaryChecks()
 
     // The suggested higher limit: enough for this request, rounded up to a friendly number, always above the current limit.
     func suggested(limit: Double, spent: Double, needed: Double) -> Double? {
@@ -37,7 +39,8 @@ func runDailyLimitChecks() {
     // The AI's result.
     let appPath = "SkyCut → 设置 → Sky Studio → AI 每日上限"
     let englishPath = "SkyCut → Settings → Sky Studio → Daily limit for AI"
-    let result = JSONValue.object(SkyCutDailyLimit.aiResult(numbers, appPath: appPath, englishPath: englishPath))
+    let raise = SkyCutDailyLimit.RaiseQuestion(question: "Raise it?", token: "tok3n", validMinutes: 30)
+    let result = JSONValue.object(SkyCutDailyLimit.aiResult(numbers, appPath: appPath, englishPath: englishPath, raise: raise))
     checkEqual(result["status"], "blocked", "status stays blocked")
     checkEqual(result["code"], "daily_budget_exceeded", "the code stays daily_budget_exceeded")
     checkEqual(result["blocked_by"], "skycut_daily_credit_limit", "which system stopped it: SkyCut's own setting")
@@ -61,22 +64,37 @@ func runDailyLimitChecks() {
     checkEqual(options.compactMap { $0["id"]?.stringValue }, ["raise_limit", "change_in_settings", "wait_for_reset"], "three options, in order")
     checkEqual(options.first?["tool"], "set_settings", "raising goes through set_settings")
     checkEqual(options.first?["arguments"], ["daily_ai_credit_limit": 1_500], "the exact set_settings arguments")
-    check(options.first?["approval"]?.stringValue?.contains("asks the user to approve") == true, "the raise option says SkyCut asks the user")
+    checkEqual(options.first?["question"], "Raise it?", "option (a) carries SkyCut's question")
+    checkEqual(options.first?["confirm_token"], "tok3n", "and the set_settings token for exactly that raise")
+    checkEqual(options.first?["valid_for_minutes"], 30, "and how long it is good for")
     checkEqual(options.dropFirst().first?["path"], .string(appPath), "the settings option carries the path")
     checkEqual(options.last?["resets_at"], "2026-11-25T00:00:00+08:00", "the wait option carries the reset")
     let next = result["next_step"]?.stringValue ?? ""
-    for phrase in ["SkyCut's own daily credit limit", "not their Sky Studio balance", "set_settings", "raise_limit", "settings_path",
-                   "resets_at", "Never raise it without the user's yes", "never split or shrink", "full access obeys the same limit"] {
+    for phrase in ["SkyCut's own daily credit limit", "not their Sky Studio balance", "ask the raise_limit option's question",
+                   "Only if they agree to exactly that", "plus its confirm_token", "SkyCut does not ask again",
+                   "For another value, call set_settings with that value: SkyCut asks first", "settings_path", "resets_at",
+                   "Never raise it without the user's yes", "never split or shrink", "full access obeys the same limit"] {
         check(next.contains(phrase), "next_step says \"\(phrase)\"")
     }
-    check(result["confirm_token"] == nil, "a budget block never carries a confirm token")
-    let english = JSONValue.object(SkyCutDailyLimit.aiResult(numbers, appPath: englishPath, englishPath: englishPath))
+    check(result["confirm_token"] == nil, "no token for the refused request itself")
+    let english = JSONValue.object(SkyCutDailyLimit.aiResult(numbers, appPath: englishPath, englishPath: englishPath, raise: nil))
     check(english["settings_path_english"] == nil, "no second path when the app is in English")
+    check(english["options"]?.arrayValue?.first?["confirm_token"] == nil, "no token when none was issued")
+    check(english["next_step"]?.stringValue?.contains("SkyCut asks them first") == true, "and then set_settings asks as before")
+    for (limit, why) in [(0.0, "a paused limit (0)"), (20.0, "a limit of 20")] {
+        let short = JSONValue.object(SkyCutDailyLimit.aiResult(.init(limit: limit, spent: 0, needed: 36, now: afternoon, calendar: shanghai),
+                                                               appPath: englishPath, englishPath: englishPath, raise: raise))
+        checkEqual(short["options"]?.arrayValue?.compactMap { $0["id"]?.stringValue }, ["raise_limit", "change_in_settings"],
+                   "\(why) below a 36-credit request offers no waiting")
+        check(short["next_step"]?.stringValue?.contains("Waiting does not help") == true && short["next_step"]?.stringValue?.contains("(c)") == false,
+              "\(why): the next step says waiting does not help")
+        check(short["message"]?.stringValue?.contains("Even a whole day's limit is below it.") == true, "\(why): the message says so too")
+    }
     let paused = JSONValue.object(SkyCutDailyLimit.aiResult(.init(limit: 0, spent: 0, needed: 36, now: afternoon, calendar: shanghai),
-                                                            appPath: englishPath, englishPath: englishPath))
+                                                            appPath: englishPath, englishPath: englishPath, raise: nil))
     check(paused["message"]?.stringValue?.contains("set to 0, which pauses paid work") == true, "a limit of 0 is said as paused paid work")
     let tooBig = JSONValue.object(SkyCutDailyLimit.aiResult(.init(limit: 1_000, spent: 999_990, needed: 36, now: afternoon, calendar: shanghai),
-                                                            appPath: englishPath, englishPath: englishPath))
+                                                            appPath: englishPath, englishPath: englishPath, raise: nil))
     checkEqual(tooBig["options"]?.arrayValue?.compactMap { $0["id"]?.stringValue }, ["change_in_settings", "wait_for_reset"],
                "no raise option when even the highest limit is too low")
     check(tooBig["next_step"]?.stringValue?.contains("(a) is not possible") == true, "and the next step says so")
@@ -85,7 +103,26 @@ func runDailyLimitChecks() {
     settingsPathChecks()
 }
 
-/// The production builder (SkyStudioJobGate.budgetBlocked) and the set_settings question the raise option leads to.
+/// The reset is where the ledger's next day starts (DailySpendLedger.dayKey), also on a day that skips its midnight.
+private func resetBoundaryChecks() {
+    var santiago = Calendar(identifier: .gregorian)
+    santiago.timeZone = TimeZone(identifier: "America/Santiago")!
+    func at(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+        santiago.date(from: DateComponents(year: 2026, month: 9, day: day, hour: hour, minute: minute))!
+    }
+    // 2026-09-06 skips 00:00 (it starts at 01:00); 2026-09-07 starts at 00:00 again.
+    let noonSixth = SkyCutDailyLimit.Numbers(limit: 100, spent: 90, needed: 36, now: at(6, 12), calendar: santiago)
+    checkEqual(SkyCutDailyLimit.resetText(noonSixth), "2026-09-07T00:00:00-03:00", "after a skipped midnight the next day still starts at 00:00")
+    for now in [at(5, 23, 30), at(6, 1, 30), at(6, 12), at(6, 23, 59), at(7, 0, 1)] {
+        let reset = SkyCutDailyLimit.Numbers(limit: 100, spent: 90, needed: 36, now: now, calendar: santiago).resetsAt
+        let today = DailySpendLedger.dayKey(for: now, calendar: santiago)
+        check(reset > now && DailySpendLedger.dayKey(for: reset, calendar: santiago) != today
+              && DailySpendLedger.dayKey(for: reset.addingTimeInterval(-1), calendar: santiago) == today,
+              "the reset is the first moment of the ledger's next day (from \(DailySpendLedger.dayKey(for: now, calendar: santiago)))")
+    }
+}
+
+/// The production builder (SkyStudioJobGate.budgetBlocked) and the question its option (a) asks in advance.
 @MainActor
 private func gateChecks() {
     let scratch = ScratchDefaults("daily-limit-check")
@@ -93,29 +130,58 @@ private func gateChecks() {
     let spend = SkyStudioSpendStore(defaults: scratch.defaults)
     let access = AIAccessStore(defaults: scratch.defaults)
     spend.record(988)
-    let blocked = SkyStudioJobGate.budgetBlocked(credits: 36, store: spend).payload
+    let blocked = SkyStudioJobGate.budgetBlocked(credits: 36, store: spend, access: access).payload
     checkEqual(blocked["code"], "daily_budget_exceeded", "budgetBlocked keeps the code")
     checkEqual(blocked["suggested_daily_limit_credits"], 1_500, "budgetBlocked suggests a raise from the store's numbers")
     checkEqual(blocked["left_today_credits"], 12, "budgetBlocked reports what is left")
+    let option = blocked["options"]?.arrayValue?.first
+    let token = option?["confirm_token"]?.stringValue ?? ""
+    check(!token.isEmpty, "option (a) carries a set_settings token")
+    let question = option?["question"]?.stringValue ?? ""
+    for phrase in ["SkyCut's own daily credit limit for AI", "not the Sky Studio balance", "from 1000 to 1500 credits a day"] {
+        check(question.contains(phrase), "the question names the limit and the raise: \(question)")
+    }
+    check(blocked["confirm_token"] == nil, "no token for the refused request itself")
     if case .needsConfirmation(let result)? = try? SkyStudioJobGate.decide(credits: 36, summary: "Talking head", identity: "daily-limit",
         args: AIToolArguments([:]), store: spend, access: access) {
         checkEqual(result.payload["blocked_by"], "skycut_daily_credit_limit", "decide over the limit returns the same result")
-        check(result.payload["options"] != nil, "with its options")
+        checkEqual(result.payload["options"]?.arrayValue?.first?["confirm_token"]?.stringValue, token, "asking again gives the same token")
     } else { check(false, "decide over the limit is blocked") }
     checkEqual(spend.spentToday(), 988, "a blocked request reserves nothing")
 
-    // Option (a): set_settings with the suggested value asks first, in full access too, and its question names the limit plainly.
+    // The user's yes to that exact raise is the approval: set_settings with the token goes through without a second question.
+    let other = try? AISettingsApproval.check(AIToolArguments(["daily_ai_credit_limit": 2_000, "confirm_token": .string(token)]), mode: nil,
+                                              limit: 2_000, access: access, currentLimit: spend.dailyLimit)
+    check(other?.payload["confirm_token_refused"] != nil, "another value with that token is asked as before (the token is left untouched)")
+    do {
+        let approved = try AISettingsApproval.check(AIToolArguments(["daily_ai_credit_limit": 1_500, "confirm_token": .string(token)]), mode: nil,
+                                                    limit: 1_500, access: access, currentLimit: spend.dailyLimit)
+        check(approved == nil, "the exact raise with the refusal's token is approved without asking again")
+    } catch { check(false, "the refusal's token: \(error)") }
+    let reused = try? AISettingsApproval.check(AIToolArguments(["daily_ai_credit_limit": 1_500, "confirm_token": .string(token)]), mode: nil,
+                                               limit: 1_500, access: access, currentLimit: spend.dailyLimit)
+    checkEqual(reused?.payload["status"], "needs_confirmation", "the token is good for one call")
+
+    // Without it, the raise asks first, in full access too, and the question names the limit plainly.
     access.setMode(.full)
     let raise = AIToolArguments(["daily_ai_credit_limit": 1_500])
     let asked = try? AISettingsApproval.check(raise, mode: nil, limit: 1_500, access: access, currentLimit: spend.dailyLimit)
     checkEqual(asked?.payload["status"], "needs_confirmation", "raising the limit to the suggested value asks the user, even in full access")
-    let question = asked?.payload["question"]?.stringValue ?? ""
+    let settingsQuestion = asked?.payload["question"]?.stringValue ?? ""
     for phrase in ["SkyCut's daily credit limit for AI", "not the Sky Studio balance", "1000 -> 1500 credits a day",
                    "SkyCut → Settings → Sky Studio → Daily limit for AI"] {
-        check(question.contains(phrase), "the approval question says \"\(phrase)\": \(question)")
+        check(settingsQuestion.contains(phrase), "the approval question says \"\(phrase)\": \(settingsQuestion)")
     }
-    check(!question.contains("1000.0"), "credits are whole numbers in the question")
-    checkEqual(spend.dailyLimit, 1_000, "asking changes nothing")
+    check(!settingsQuestion.contains("1000.0"), "credits are whole numbers in the question")
+    let fullBlocked = SkyStudioJobGate.budgetBlocked(credits: 36, store: spend, access: access).payload
+    let fullToken = fullBlocked["options"]?.arrayValue?.first?["confirm_token"]?.stringValue ?? ""
+    check(!fullToken.isEmpty && fullToken != token, "in full access the refusal's token is bound to that mode")
+    do {
+        let full = try AISettingsApproval.check(AIToolArguments(["daily_ai_credit_limit": 1_500, "confirm_token": .string(fullToken)]),
+                                                mode: nil, limit: 1_500, access: access, currentLimit: spend.dailyLimit)
+        check(full == nil, "and the user's yes to it raises the limit in full access too")
+    } catch { check(false, "the full-access refusal's token: \(error)") }
+    checkEqual(spend.dailyLimit, 1_000, "nothing here wrote the store (set_settings writes after the approval)")
 }
 
 /// The path is the app's own words: every label is a key of every string table, read from the real tables.
@@ -123,8 +189,13 @@ private func settingsPathChecks() {
     let expected = ["en": "SkyCut → Settings → Sky Studio → Daily limit for AI",
                     "zh-Hans": "SkyCut → 设置 → Sky Studio → AI 每日上限",
                     "es": "SkyCut → Ajustes → Sky Studio → Límite diario para la IA"]
-    let line = "SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, and this needs %3$@. Raise it in %4$@, or wait until midnight, when it resets."
-    let numbers = SkyCutDailyLimit.Numbers(limit: 1_000, spent: 988, needed: 36)
+    let fits = "SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@. Raise it in %5$@, or wait until %6$@, when it resets."
+    let never = "SkyCut's own daily credit limit stops this, not your Sky Studio balance: it allows %1$@ credits a day and this needs %2$@, so waiting does not help. Raise it in %3$@."
+    var shanghai = Calendar(identifier: .gregorian)
+    shanghai.timeZone = TimeZone(identifier: "Asia/Shanghai")!
+    let afternoon = Date(timeIntervalSince1970: 1_795_510_140)
+    let numbers = SkyCutDailyLimit.Numbers(limit: 1_000, spent: 988, needed: 36, now: afternoon, calendar: shanghai)
+    let paused = SkyCutDailyLimit.Numbers(limit: 20, spent: 0, needed: 36, now: afternoon, calendar: shanghai)
     let folders = (try? FileManager.default.contentsOfDirectory(atPath: "Sources/SrtFlow/Resources"))?.filter { $0.hasSuffix(".lproj") } ?? []
     check(folders.count >= 3, "the string tables are found (\(folders.count))")
     for folder in folders.sorted() {
@@ -134,13 +205,18 @@ private func settingsPathChecks() {
               let table = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String] else {
             check(false, "\(folder): Localizable.strings reads as a strings table"); continue
         }
-        for key in SkyCutDailyLimit.settingsKeys + [line] {
-            check(table[key] != nil, "\(folder) translates \"\(key)\" (the settings path and the panels' line)")
+        for key in SkyCutDailyLimit.settingsKeys + [fits, never, "The same setting as in %@."] {
+            check(table[key] != nil, "\(folder) translates \"\(key)\" (the settings path and the panels' lines)")
         }
         let lookup: (String) -> String = { table[$0] ?? $0 }
         if let want = expected[code] { checkEqual(SkyCutDailyLimit.settingsPath(lookup), want, "the settings path in \(code)") }
-        let shown = SkyCutDailyLimit.userLine(numbers, localized: lookup)
-        check(!shown.contains("%") && ["988", "1000", "36", SkyCutDailyLimit.settingsPath(lookup)].allSatisfy(shown.contains),
-              "the panels' line in \(code) fills every number and the path: \(shown)")
+        let locale = Locale(identifier: code)
+        let shown = SkyCutDailyLimit.userLine(numbers, localized: lookup, locale: locale)
+        let time = SkyCutDailyLimit.resetTime(numbers, locale: locale)
+        check(!shown.contains("%") && ["988", "1000", "12", "36", time, SkyCutDailyLimit.settingsPath(lookup)].allSatisfy(shown.contains),
+              "the panels' line in \(code) fills used, the limit, left, needed, the path and the reset time (\(time)): \(shown)")
+        let shownNever = SkyCutDailyLimit.userLine(paused, localized: lookup, locale: locale)
+        check(!shownNever.contains("%") && shownNever.contains("20") && shownNever.contains("36") && !shownNever.contains(time),
+              "a request a whole day cannot cover gives no reset time in \(code): \(shownNever)")
     }
 }

@@ -103,9 +103,23 @@ import SrtFlowMCPKit
         let blocked = try await fixture.resume(file, generate: true)
         require(blocked["status"] == "failed" && blocked["code"] == "daily_budget_exceeded" && VoiceRecoveryHTTP.posts == 3,
                 "a hard budget blocks missing generation while retaining all recovered audio")
-        require(blocked["blocked_by"] == "skycut_daily_credit_limit" && blocked["options"]?.arrayValue?.count == 3
+        // A limit of 0 never covers the batches: raise or change it, no waiting; option (a) carries its set_settings token (MSG1).
+        let options = blocked["options"]?.arrayValue ?? []
+        require(blocked["blocked_by"] == "skycut_daily_credit_limit"
+                && options.compactMap { $0["id"]?.stringValue } == ["raise_limit", "change_in_settings"]
+                && options.first?["confirm_token"]?.stringValue != nil
                 && blocked["next_step"]?.stringValue?.contains("resume with add_voiceover resume=recovery_file generate_missing=true") == true,
-                "the budget stop names SkyCut's own limit, offers the options and resumes its own missing batches (MSG1): \(blocked)")
+                "the budget stop names SkyCut's own limit, offers raising (asked once) or Settings, and resumes its own missing batches (MSG1): \(blocked)")
+        // Its numbers are the ones the batches were refused on, not the store's when the result is built (MSG1 review).
+        do {
+            _ = try SkyStudioVoiceBudgetProblem.reserve([40])
+            require(false, "a limit of 0 refuses the batches")
+        } catch let problem as SkyStudioVoiceBudgetProblem {
+            SkyStudioSpendStore.shared.setDailyLimit(1_000)
+            let later = SkyStudioJobGate.budgetBlocked(problem.numbers).payload
+            require(later["daily_limit_credits"] == 0 && later["credits_needed"] == 40,
+                    "the refusal keeps the limit and need it was refused on after the limit changed: \(later)")
+        }
         SkyStudioSpendStore.shared.setDailyLimit(1_000)
         // 恢复补批次：照记录的选择再报价（params.plan）。服务器这次要是自己选，会选成别的模型（rechoose）—— 不带选择就被认出来。
         VoiceRecoveryHTTP.rechoose = true

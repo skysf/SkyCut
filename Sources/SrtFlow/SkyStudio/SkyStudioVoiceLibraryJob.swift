@@ -165,7 +165,7 @@ final class SkyStudioVoiceLibraryJob {
             }
             let outcome: AIJobs.Status = Task.isCancelled ? .cancelled : .failed
             // The Sky Studio balance (MSG1): the task row stays with the user's line (a row with an issue is not removed).
-            if outcome == .failed, let balance = SkyStudioBalanceRefusal.failure(of: error) { status?.issue = SkyStudioBalanceRefusal.shown(balance) }
+            if outcome == .failed, let balance = SkyStudioBalanceRefusal.refusal(of: error) { status?.issue = SkyStudioBalanceRefusal.shown(balance) }
             finish(outcome, SkyStudioVoiceLibraryErrors.message(error), detail: await failureDetail(error))
         } catch {
             // 不是 Sky Studio 说的：没受理的退回；受理了的留着记录接着跟。
@@ -203,10 +203,12 @@ final class SkyStudioVoiceLibraryJob {
             if let approved = request.maxCredits { value["credits_approved"] = .number(approved) }
         }
         if let onFailure { value.merge(await onFailure(error.failure?.code, priced)) { _, new in new } }
-        // The Sky Studio balance, not SkyCut's daily limit (MSG1): the numbers and where only the user adds credits win over the
-        // caller's next step.
-        if !Task.isCancelled, let balance = SkyStudioBalanceRefusal.failure(of: error) {
-            value.merge(SkyStudioBalanceRefusal.fields(balance, retry: Self.retryCall(kind))) { _, new in new }
+        // The Sky Studio balance, not SkyCut's daily limit (MSG1): the numbers and where only the user adds credits, with the
+        // caller's own next step as the way on once they have (a MiniMax version mid-voiceover resumes from its recovery file and
+        // never sends the lines again: MSG1 review, 2026-11-25).
+        if !Task.isCancelled, let balance = SkyStudioBalanceRefusal.refusal(of: error) {
+            let callers = value["next_step"]?.stringValue
+            value.merge(SkyStudioBalanceRefusal.fields(balance, retry: callers ?? Self.retryCall(kind))) { _, new in new }
         }
         return value
     }

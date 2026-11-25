@@ -93,7 +93,10 @@ enum SkyStudioCharacterError {
     static let changed = AIToolError("The character changed. Read get_character and obtain a new quote and approval; nothing new was submitted.",
         details: ["code": "character_changed", "retryable": false])
 
-    static func tool(_ error: Error) -> AIToolError {
+    static func tool(_ error: Error) -> AIToolError { tool(error, beforeSubmission: false) }
+
+    /// `beforeSubmission`: the free price check (and the catalog) refused it, so there is no order or bill to look at.
+    static func tool(_ error: Error, beforeSubmission: Bool) -> AIToolError {
         guard case .server(let value)? = error as? SkyStudioFailure else {
             if let tool = error as? AIToolError { return tool }
             if let failure = error as? SkyStudioFailure {
@@ -110,7 +113,20 @@ enum SkyStudioCharacterError {
         var fields = value.fields
         fields["code"] = .string(value.code)
         fields["next_step"] = .string(SkyStudioGenerationRefusal.nextStep(value) ?? nextStep(value.code))
+        if beforeSubmission, SkyStudioGenerationRefusal.nextStep(value) == nil { fields["next_step"] = .string(quoteStep(value.code)) }
         return AIToolError(value.message, details: fields)
+    }
+
+    /// A refusal of the free price check: nothing was submitted, so there is no original job or bill to query (MSG1 review,
+    /// 2026-11-25: an upgrade or a busy provider sent the AI to look for orders that did not exist).
+    static func quoteStep(_ code: String) -> String {
+        switch code {
+        case "upgrade_required": return "Sky Studio needs a newer SkyCut first (download_url when given). Nothing was submitted or charged: this was only the price check."
+        case "rate_limited": return "Sky Studio's provider is busy. Nothing was submitted or charged: ask for the price again after retry_after seconds."
+        case "invalid_key": return "Sky Studio did not accept the API key. Nothing was submitted or charged: ask the user to paste a new key in SkyCut → Settings → Sky Studio."
+        case let other where other.hasPrefix("character_") || other == "not_found": return nextStep(other)
+        default: return "Nothing was submitted or charged: this was only the price check. Tell the user Sky Studio's message, fix what it names, then ask for the price again."
+        }
     }
 
     static func nextStep(_ code: String) -> String {

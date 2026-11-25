@@ -29,17 +29,20 @@ enum SkyStudioJobGate {
     /// user_requested_overrides 只在 user_request（用户点名规格的原话）里找得到每一项越档的名字时才免问（AIOverrideQuote）；
     /// 找不到就照常发确认码、结果里说明为什么没免（2026-11-10：Codex 把「画质尽量好」当成点名，自己跳过了确认）。
     /// overrides 是每一项越档和它的名字；不给就按 reason 算一项、没有能点名的写法（带了原话就算）。
+    /// `now` is the one moment the check, the booking and the refund's day use (a reservation that crosses midnight must not
+    /// be refunded from the next day: MSG1 review, 2026-11-25).
     static func decide(credits: Double, summary: String, identity: String, args: AIToolArguments,
                        store: SkyStudioSpendStore? = nil, access: AIAccessStore? = nil,
-                       reason: String? = nil, overrides: [AIOverrideQuote.Item]? = nil, project: String? = nil, profile: String = "") throws -> Decision {
+                       reason: String? = nil, overrides: [AIOverrideQuote.Item]? = nil, project: String? = nil, profile: String = "",
+                       now: Date = Date()) throws -> Decision {
         let store = store ?? SkyStudioSpendStore.shared
         let access = access ?? AIAccessStore.shared
         let scope = try args.choice("approval_scope", from: ["once", "project"]) ?? "once"
         let userRequested = try args.bool("user_requested_overrides") ?? false
         let userWords = try args.string("user_request")
         guard credits.isFinite, credits >= 0 else { throw AIToolError("Sky Studio returned an invalid price; nothing was started.") }
-        guard case .allow = store.decide(credits: credits) else {
-            return .needsConfirmation(budgetBlocked(credits: credits, store: store))
+        guard case .allow = store.decide(credits: credits, now: now) else {
+            return .needsConfirmation(budgetBlocked(credits: credits, store: store, now: now, access: access))
         }
         let priceChange = access.approvedPrice(project: project, profile: profile).flatMap { ceiling -> String? in
             credits > ceiling ? "The quote exceeds this project's approved per-task price of \(SkyStudioCredits.text(ceiling)) credits." : nil
@@ -73,32 +76,44 @@ enum SkyStudioJobGate {
         } else if userNamedIt, scope == "project", let project {
             access.approve(project: project, profile: profile, credits: credits)
         }
-        return .reserved(record(store, credits))
+        return .reserved(record(store, credits, now: now))
     }
 
-    /// Over the daily hard budget: nothing reserved, no token. The result says it is SkyCut's own limit (not the Sky Studio
-    /// balance), with the numbers and the three ways on (SkyCutDailyLimit; the settings path in the app's language).
-    static func budgetBlocked(credits: Double, store: SkyStudioSpendStore, now: Date = Date(),
+    /// Over the daily hard budget: nothing reserved, and no token for the refused request. The result says it is SkyCut's own
+    /// limit (not the Sky Studio balance), with the numbers and the ways on (SkyCutDailyLimit; the settings path in the app's
+    /// language); option (a) carries SkyCut's question and a set_settings token for exactly the suggested raise
+    /// (AISettingsApproval.limitRaise), so the user is asked once.
+    static func budgetBlocked(credits: Double, store: SkyStudioSpendStore, now: Date = Date(), access: AIAccessStore? = nil,
                               outcome: String = "Nothing was started or charged.", retry: String = "repeat this call") -> AIToolResult {
-        let numbers = SkyCutDailyLimit.Numbers(limit: store.dailyLimit, spent: store.spentToday(now: now), needed: credits, now: now)
+        budgetBlocked(SkyCutDailyLimit.Numbers(limit: store.dailyLimit, spent: store.spentToday(now: now), needed: credits, now: now),
+                      access: access, outcome: outcome, retry: retry)
+    }
+
+    /// The same from numbers read when the request was refused (a voiceover's missing batches build the result later).
+    static func budgetBlocked(_ numbers: SkyCutDailyLimit.Numbers, access: AIAccessStore? = nil,
+                              outcome: String = "Nothing was started or charged.", retry: String = "repeat this call") -> AIToolResult {
+        let raise = SkyCutDailyLimit.suggestedLimit(numbers).flatMap {
+            AISettingsApproval.limitRaise(to: $0, currentLimit: numbers.limit, access: access)
+        }
         return .ok(.object(SkyCutDailyLimit.aiResult(numbers, appPath: SkyCutDailyLimit.settingsPath(L10n),
-                                                     englishPath: SkyCutDailyLimit.settingsPath { $0 }, outcome: outcome, retry: retry)))
+                                                     englishPath: SkyCutDailyLimit.settingsPath { $0 }, raise: raise,
+                                                     outcome: outcome, retry: retry)))
     }
 
     /// 不停下来问、只守每日硬上限：额度内一次预留；超了回 nil，调用方回 daily_budget_exceeded（AI 起的）或不起任务（面板、按钮），
     /// 配旁白也不换本机的声音（2026-11-01）。
-    static func reserveWithoutAsking(credits: Double, store: SkyStudioSpendStore? = nil) -> Reservation? {
+    static func reserveWithoutAsking(credits: Double, store: SkyStudioSpendStore? = nil, now: Date = Date()) -> Reservation? {
         let store = store ?? SkyStudioSpendStore.shared
-        guard case .allow = store.decide(credits: credits) else { return nil }
-        return record(store, credits)
+        guard case .allow = store.decide(credits: credits, now: now) else { return nil }
+        return record(store, credits, now: now)
     }
 
     /// 原单已明确退回、用户已授权替换：既不能高于原报价，也不能突破当前每日硬预算。
-    static func reserveReplacement(credits: Double, approvedCeiling: Double, store: SkyStudioSpendStore? = nil) -> Reservation? {
+    static func reserveReplacement(credits: Double, approvedCeiling: Double, store: SkyStudioSpendStore? = nil, now: Date = Date()) -> Reservation? {
         let store = store ?? SkyStudioSpendStore.shared
         guard credits.isFinite, credits >= 0, approvedCeiling.isFinite, credits <= approvedCeiling,
-              case .allow = store.decide(credits: credits) else { return nil }
-        return record(store, credits)
+              case .allow = store.decide(credits: credits, now: now) else { return nil }
+        return record(store, credits, now: now)
     }
 
     // MARK: 声音库的三件事（SkyCut 声音方案 4.5；令牌绑什么、问句怎么写在 SkyStudioVoiceApproval）
@@ -132,10 +147,12 @@ enum SkyStudioJobGate {
 
     /// 一次性费用：每日硬预算先判（超了回 daily_budget_exceeded、不发码、不记账）；全部权限 + 长期授权直接记账，别的点过头才记。
     static func voiceOneTime(credits: Double, action: String, question: String, token: String?, ask: VoiceAsk,
-                             store: SkyStudioSpendStore? = nil) throws -> Decision {
+                             store: SkyStudioSpendStore? = nil, now: Date = Date()) throws -> Decision {
         let store = store ?? SkyStudioSpendStore.shared
         guard credits.isFinite, credits >= 0 else { throw AIToolError("Sky Studio returned an invalid price; nothing was started.") }
-        guard case .allow = store.decide(credits: credits) else { return .needsConfirmation(budgetBlocked(credits: credits, store: store)) }
+        guard case .allow = store.decide(credits: credits, now: now) else {
+            return .needsConfirmation(budgetBlocked(credits: credits, store: store, now: now))
+        }
         if ask != .standing {
             let (action, question) = asking(action, question, ask)
             let redemption = AIConfirmations.shared.redeem(token, for: action)
@@ -145,7 +162,7 @@ enum SkyStudioJobGate {
                         + "Never treat your own plan as the user's approval."))
             }
         }
-        return .reserved(record(store, credits))
+        return .reserved(record(store, credits, now: now))
     }
 
     /// 全部权限下补问的那一次：令牌另绑（带上点过头要补记的那一版，请求批准模式发的码不能拿来答它），问句后面接那段说明。
@@ -170,9 +187,10 @@ enum SkyStudioJobGate {
         return copy
     }
 
-    private static func record(_ store: SkyStudioSpendStore, _ credits: Double) -> Reservation {
-        store.record(credits)
-        return Reservation(credits: credits, day: Date())
+    /// Books on `now`'s day and remembers that same moment for the refund (one timestamp: MSG1 review, 2026-11-25).
+    private static func record(_ store: SkyStudioSpendStore, _ credits: Double, now: Date) -> Reservation {
+        store.record(credits, now: now)
+        return Reservation(credits: credits, day: now)
     }
 
 }

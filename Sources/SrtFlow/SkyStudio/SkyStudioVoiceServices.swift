@@ -32,8 +32,20 @@ struct SkyStudioVoiceServices {
     var jobSleep: (@Sendable (Double) async throws -> Void)?
 }
 
+/// The daily limit stopped the missing batches. `numbers` are read when it happened (the result is built after the recovery file is
+/// saved, when a refund or a raised limit could already have changed the store: MSG1 review, 2026-11-25).
 struct SkyStudioVoiceBudgetProblem: LocalizedError {
-    let credits: Double
+    let numbers: SkyCutDailyLimit.Numbers
+    var credits: Double { numbers.needed }
+
+    /// Reserves `credits` against the store now, or throws with the numbers it was refused on.
+    @MainActor
+    static func reserve(_ credits: [Double]) throws -> SkyStudioVoiceBudget {
+        let now = Date()
+        if let budget = SkyStudioVoiceBudget.reserve(credits, now: now) { return budget }
+        throw SkyStudioVoiceBudgetProblem(numbers: .reading(.shared, needed: credits.reduce(0, +), now: now))
+    }
+
     var errorDescription: String? {
         "SkyCut's own daily credit limit for AI (a SkyCut setting, not the Sky Studio balance) stops the remaining batches; "
             + "existing audio is preserved. next_step has the numbers and the options."
