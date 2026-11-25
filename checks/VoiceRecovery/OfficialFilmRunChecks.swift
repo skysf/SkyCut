@@ -62,7 +62,8 @@ func runOfficialFilmRunChecks(_ root: URL) async throws {
         let run = SkyStudioGenerationRun(
             generation: SkyStudioGeneration(kind: .image, prompt: prompt, params: [:], notes: [], operation: "generate"), model: model,
             quote: quote, references: references, folder: folder, stem: "film", project: project,
-            reservation: SkyStudioJobGate.Reservation(credits: 8, day: Date()), idempotencyKey: operationKey, official: operation)
+            reservation: SkyStudioJobGate.Reservation(credits: 8, day: Date(), dayKey: DailySpendLedger.dayKey(for: Date())),
+            idempotencyKey: operationKey, official: operation)
         GenerationHTTP.lock.withLock { GenerationHTTP.drops = 3 }
         let posts = GenerationHTTP.count("POST", "/generation-check/api/skycut/v1/jobs")
         let job = run.start()

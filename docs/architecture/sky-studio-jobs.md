@@ -800,10 +800,12 @@ design and MiniMax versions, manage_characters. The AI gets:
     queries that original job and never submits it again. get_job on a failed voice change GETs that job and settles the books by
     its billing.
 
-A voice change's books move only by a final bill (`VoiceChangeBilling`, 2026-11-26):
-- a top-level `credits_charged` of 0 without a final bill is neither settled nor reported as the charge;
-- a refusal's final bill for the original job counts (a 402 billed 6.5);
-- a default change whose result lacks its background keeps its reservation until a bill comes.
+A voice change's books move only by its final charge (`SkyStudioJobStatus.finalCharge`, as above; `VoiceChangeBilling.charge`,
+2026-11-26):
+- a bare top-level `credits_charged` of 0 with no bill at all is not one: it is neither settled nor reported as the charge;
+- a refusal's final bill for the original job counts (a 402 billed 6.5), and get_job's reply then reads the books after settling;
+- a default change whose result lacks its background keeps its reservation until a bill comes;
+- get_job's one refresh (`refreshBill`) reads the original job while the bill is pending or after the change failed or stopped.
 
 The task row shows the localized line with the numbers and the path to Add Credits (SkyCut → Settings → Sky Studio → Add Credits,
 or the pane when Sky Studio sent no address). Only `SkyStudioBalanceRefusal` names the code, apart from `SkyStudioJobAdmission`'s

@@ -159,6 +159,9 @@ task row whatever the app's language. On upscale and change voice the AI got onl
     the sample and failed every PR.
   - get_job's `spent_today_credits` after a 402 with a final bill is read from the books after settling
     (`VoiceChangeBilling.refusalBill`). It said 9 reserved while the books held 6.5.
+  - Merged with #554 (download retry): the voice change takes #554's `finalCharge` (the bill's net, else the top-level amount
+    when no bill came) except a bare top-level 0, which keeps the reservation. #554's get_job re-read of a pending bill and this
+    case's original-job GET for a failed change are one refresh (`refreshBill`).
 
 ## Similar refusals
 
