@@ -10,13 +10,68 @@ import SrtFlowMCPKit
 // - recovered first with add_voiceover resume, then the old row's Download again: the voiceover is not landed a second time (one
 //   segment; the row once landed it again from its stale copy of the recovery record);
 // - the user stops the job while the batch downloads: stopped with download_stopped, and the row keeps its Download again, which then
-//   lands the voiceover.
+//   lands the voiceover;
+// - a batch file that does not decode (4 bytes) fails local_split, and resume downloads that batch again from its original job instead
+//   of failing on the same file (CXD5: the paid batch was unreachable);
+// - a batch recovered while its bill is under review keeps its unknown amount, never the top-level figure as the charge (CXD5).
 
 @MainActor
 func runVoiceoverDownloadChecks(_ root: URL) async throws {
     try await rowRecovers(root)
     try await resumedThenRow(root)
     try await stoppedWhileDownloading(root)
+    try await brokenBatchFile(root)
+    try await recoveredBillUnderReview(root)
+}
+
+@MainActor
+private func fileGets() -> Int { VoiceRecoveryHTTP.log.filter { $0.0 == "GET" && $0.1.hasPrefix("/files/") }.count }
+
+/// A batch file that does not decode is not trusted: resume downloads it again from its original job.
+@MainActor
+private func brokenBatchFile(_ root: URL) async throws {
+    let fixture = try VoiceRecoveryFixture(folder: root.appendingPathComponent("voiceover-broken-file"))
+    fixture.failSplitOnce = false
+    SkyStudioSpendStore.shared.setDailyLimit(100_000)
+    VoiceRecoveryHTTP.brokenFiles = 1
+    let failed = try await fixture.wait(fixture.started(await fixture.narrate(["Hello world."])))
+    guard failed["failure_stage"] == "local_split", let file = failed["recovery_file"]?.stringValue else {
+        return require(false, "a batch file that does not decode fails local_split with its recovery file: \(failed)")
+    }
+    let gets = fileGets(), posts = VoiceRecoveryHTTP.posts
+    let resumed = try await fixture.resume(file)
+    require(resumed["status"] == "done" && fileGets() == gets + 1 && VoiceRecoveryHTTP.posts == posts,
+            "resume downloads the batch again from its original job (one more file GET, nothing generated again): \(resumed)")
+}
+
+/// A batch that already started when the job was stopped, recovered while its bill is under review: its unknown amount stays (the
+/// reservation), and the top-level figure is never booked as the charge.
+@MainActor
+private func recoveredBillUnderReview(_ root: URL) async throws {
+    let lines = ["Hello world."]
+    let fixture = try VoiceRecoveryFixture(folder: root.appendingPathComponent("voiceover-bill-review"))
+    fixture.failSplitOnce = false
+    SkyStudioSpendStore.shared.setDailyLimit(100_000)
+    VoiceRecoveryHTTP.deferred = true
+    VoiceRecoveryHTTP.promptIndex = [lines[0]: 0]
+    VoiceRecoveryHTTP.holdUntil = [0: 99]
+    VoiceRecoveryHTTP.override = { method, path in   // already started on Sky Studio: a stop cannot cancel it
+        method == "POST" && path.hasSuffix("/cancel")
+            ? (409, ["error": ["code": "not_cancellable", "message": "Sky Studio already started this job.", "status": "running"]]) : nil
+    }
+    let result = try fixture.started(await fixture.narrate(lines))
+    guard let id = result.payload["job_id"]?.stringValue, let job = AIJobs.shared.job(id) else { return require(false, "the voiceover starts") }
+    for _ in 0..<1_000 where AIJobs.shared.json(job)["batches_running"] != 1 { try await Task.sleep(nanoseconds: 10_000_000) }
+    AIJobs.shared.cancel(job)
+    let stopped = try await fixture.wait(result)
+    guard stopped["unknown_batch_indices"] == [0], let file = stopped["recovery_file"]?.stringValue else {
+        return require(false, "the stopped batch's outcome is unknown: \(stopped)")
+    }
+    VoiceRecoveryHTTP.lock.withLock { VoiceRecoveryHTTP.billUnderReview = 0.1; VoiceRecoveryHTTP.override = nil }
+    VoiceRecoveryHTTP.release()
+    let recovered = try await fixture.resume(file)
+    require(recovered["status"] == "done" && recovered["credits_charged"] == 0 && recovered["credits_unknown"] == 2.5,
+            "recovered while its bill is under review: the 2.5 unknown stays, 0.1 is never booked as the charge: \(recovered)")
 }
 
 /// A one-line voiceover whose batch download gives up; returns the failed job's answer and its row.

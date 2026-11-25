@@ -31,7 +31,7 @@ struct CloudResultDownload {
         onProgress: @escaping @Sendable (Double) -> Void
     ) async throws -> CloudResultFile {
         let partial = place.partial()
-        defer { try? FileManager.default.removeItem(at: partial) }   // its private name: nobody else's
+        defer { CloudResultPlace.removePrivateFile(partial) }   // its private name; only a regular file, never a folder that took it
         var address = url
         var resumeData: Data?
         var asked = false

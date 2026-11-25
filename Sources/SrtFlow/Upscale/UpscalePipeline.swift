@@ -138,7 +138,7 @@ enum UpscalePipeline {
         }
         try FileManager.default.createDirectory(at: workFolder, withIntermediateDirectories: true)
         let trimmed = workFolder.appendingPathComponent("\(UUID().uuidString)-in.mp4")
-        defer { try? FileManager.default.removeItem(at: trimmed) }
+        defer { CloudResultPlace.removePrivateFile(trimmed) }
 
         // 1. 输入：整个 mp4 直接用，否则裁出那一段（只有画面）；探出送上去的那个文件的宽、高、时长、帧率。
         phase(.preparing)
@@ -209,7 +209,7 @@ enum UpscalePipeline {
         catch { throw UpscaleUndelivered(failure: .notSaved(error), delivery: delivery) }
         let stamp = UUID().uuidString
         let muxed = workFolder.appendingPathComponent("\(stamp)-muxed.mp4")
-        defer { try? FileManager.default.removeItem(at: muxed) }   // a private name in SkyCut's work folder
+        defer { CloudResultPlace.removePrivateFile(muxed) }   // a private name in SkyCut's work folder; only a regular file
         phase(.downloading(fraction: nil))
         let id = delivery.jobID
         var renew: (@Sendable () async throws -> URL?)?

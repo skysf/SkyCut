@@ -44,6 +44,9 @@ final class VoiceChangeJob {
     private var held: SkyStudioHeldCredits
     /// Sky Studio's bill was not final when the job finished: the reservation stays until get_job reads a final one (refreshBill).
     private var billPending = false
+    /// The status whose final bill the day's books took: every receipt after it says that bill (a Download again once showed the
+    /// older, pending one, CXD5 on PR #554).
+    private var settledBill: SkyStudioJobStatus?
     private let status: SkyStudioMediaStatus
     private var serverID: String?
     private var task: Task<Void, Never>?
@@ -89,7 +92,8 @@ final class VoiceChangeJob {
     private func execute() async {
         // 截好的那段声音只为这一单：怎么结束都删。没做成的那一行留在浮层里（有 issue 的 remove 不拿掉）。
         defer {
-            try? FileManager.default.removeItem(at: source.url.deletingLastPathComponent())
+            CloudResultPlace.removePrivateFile(source.url)   // the source WAV, then its own folder only if empty: never recursive
+            rmdir(source.url.deletingLastPathComponent().path)
             SkyStudioGenerationActivity.shared.remove(status)
             VoiceChangeActivity.shared.ended(origin.clipID)
         }
@@ -114,7 +118,7 @@ final class VoiceChangeJob {
                 : SkyStudioVoiceLibraryErrors.uncharged(error))
         }
         // The final charge only (a bill under review keeps the reservation until get_job reads a final one).
-        if let charged = done.finalCharge { held.settle(charged: charged) } else { billPending = true }
+        if let charged = done.finalCharge { held.settle(charged: charged); settledBill = done } else { billPending = true }
         guard case .conversion(let result)? = done.voiceResult else {
             return finish(.failed, "Sky Studio finished but returned no voice and background files; do not start the same change again "
                 + "before checking this job with Sky Studio.", detail: charges(done))
@@ -415,7 +419,8 @@ final class VoiceChangeJob {
 
     // MARK: 结果
 
-    private func charges(_ server: SkyStudioJobStatus) -> [String: JSONValue] {
+    private func charges(_ status: SkyStudioJobStatus) -> [String: JSONValue] {
+        let server = settledBill ?? status   // once the books took a final bill, the receipt keeps saying it
         var value: [String: JSONValue] = ["skystudio_job_id": .string(server.jobID), "billing_pending": .bool(server.finalCharge == nil)]
         if let charged = server.finalCharge {
             value["credits_charged"] = .number(SkyStudioCredits.number(charged))
@@ -436,6 +441,7 @@ final class VoiceChangeJob {
               let server = try? await services.api.job(id, key: key), let charged = server.finalCharge, billPending else { return }
         held.settle(charged: charged)
         billPending = false
+        settledBill = server
         AIJobs.shared.updateDetail(job, charges(server))
     }
 

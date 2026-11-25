@@ -251,7 +251,9 @@ hold:
      the flow's own by device and inode (`CloudResultFile.file`): a flow that gives it up removes it with
      `ExclusivePlacement.discard`, only while it is still that file. Placing a WebM's editing copy and an upscale next to its
      original go the same way. (Replacing a file at the name once overwrote a whole file with a gzip 206 and removed a folder that
-     had taken the name; two voice changes in SkyCut and SkyCut Beta overwrote each other's voice.)
+     had taken the name; two voice changes in SkyCut and SkyCut Beta overwrote each other's voice.) The download's own private files
+     (its partial, a flow's temporary files) are removed by name only while they are regular files, never recursively
+     (`CloudResultPlace.removePrivateFile`: a folder that took a `.part-*` path between two GETs was once removed with its contents).
    - **The system never follows a redirect** here: a 3xx with a Location is followed by the next GET, which counts as one, and later
      tries go to the target directly (three tries were once six GETs).
 2. **An HTTP answer is never tried again as it is**, even when its body broke afterwards (a 403 whose body broke is a 403).
@@ -313,10 +315,13 @@ hold:
      only), and a failure or a stop deletes only a file that download placed, while it is still that file and no open project's
      timeline uses it (two jobs once chose the same two paths and a cancel deleted the other's files; across SkyCut and SkyCut Beta
      a new job overwrote the old one's voice; a cancel deleted a file that had replaced its own). Its bill settles only once final,
-     as an upscale's (`SkyStudioJobStatus.finalCharge`, get_job reads it again);
+     as an upscale's (`SkyStudioJobStatus.finalCharge`, get_job reads it again), and every receipt after that says the settled bill
+     (a Download again once showed it pending again);
    - voiceover batches: the row's button runs the same local recovery as `add_voiceover resume=recovery_file` (only GETs the original
      jobs; `generate_missing` stays off), as a new job, from the record as it is on disk (a resume that already landed the voiceover
-     leaves it inserted, so the row adds nothing); a user's stop during the batch download keeps the button.
+     leaves it inserted, so the row adds nothing); a user's stop during the batch download keeps the button. A batch file that does
+     not decode is forgotten (and removed), so the resume downloads it again from its original job (a 4-byte WAV once made the paid
+     batch unreachable); a batch recovered while its bill is under review keeps its unknown amount (`SkyStudioJobStatus.finalCharge`).
    - **Asking again for the same thing is a new request** (user, 2026-11-25: "an identical paid request sent again is a deliberate new
      version"): generate_media without that job's key (or with another), upscale_clip, change_voice and the upscale / voice change
      panels start a new paid job, even for identical input; nothing maps a new request to an old held job by its parameters (that

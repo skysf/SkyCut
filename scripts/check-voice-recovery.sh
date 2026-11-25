@@ -57,12 +57,13 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 \
   checks/VoiceRecovery/PaidToolEntryChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" \
   -o "${APP}/Contents/MacOS/VoiceRecoveryCheck"
-# 外层看门狗不能放在 Swift 协作线程池里；脚本超时明确红。
+# 外层看门狗不能放在 Swift 协作线程池里；脚本超时明确红。300 s (2026-11-26, was 180): the paid-download checks of PR #554 brought the
+# binary to ~150 s on this Mac and the whole step to 224 s on CI; a hang still ends red.
 SRTFLOW_VOICE_RECOVERY_CHECK_DIR="${ROOT}/work" \
 SRTFLOW_FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}" \
 SRTFLOW_SMOKE_SCRIPT="${ROOT}/isolated" SRTFLOW_SMOKE_MUTE=1 \
 python3 - "${APP}/Contents/MacOS/VoiceRecoveryCheck" <<'PYTHON'
 import subprocess
 import sys
-subprocess.run([sys.argv[1]], timeout=180, check=True)
+subprocess.run([sys.argv[1]], timeout=300, check=True)
 PYTHON

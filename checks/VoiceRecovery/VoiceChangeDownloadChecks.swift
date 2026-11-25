@@ -14,7 +14,9 @@ import SrtFlowMCPKit
 // - a stop during Download again keeps the button (download_stopped, with the GET it sent), and the next press lands it;
 // - an expired address (403): one GET of the original job for a fresh address; the change lands with no new job;
 // - a bill under review when it lands: the reservation stays and the receipt says the bill is pending (not its amount as the charge);
-//   get_job reads the original job again, and once the bill is final the books and the receipt take it (the reviews of PR #554).
+//   get_job reads the original job again, and once the bill is final the books and the receipt take it (the reviews of PR #554);
+// - held with a bill under review, settled by get_job, then its row's Download again: the receipt keeps the settled bill (it once went
+//   back to pending with 9 reserved, CXD5).
 // Main checks that every keep-awake lease came back.
 
 @MainActor
@@ -42,6 +44,26 @@ private func billChecks(_ root: URL) async throws {
     let final = try await AIExportTools.job(AIToolArguments(["job_id": .string(id)])).payload
     require(final["billing_pending"] == false && final["credits_charged"] == 7.5 && abs(books() - 7.5) < 0.001,
             "once the bill is final, get_job settles it: the books and the receipt say 7.5: \(final), \(books())")
+
+    // Held with a bill under review, settled by get_job, then Download again: the receipt keeps the settled bill.
+    fixture.project.effectiveUndoManager?.undo()
+    VoiceChangeHTTP.lock.withLock { VoiceChangeHTTP.billUnderReview = true; VoiceChangeHTTP.fileDrops = 3 }
+    let heldStart = try await fixture.change(args(fixture, clipID))
+    _ = try await fixture.wait(heldStart)
+    guard let heldID = heldStart.payload["job_id"]?.stringValue, let heldJob = AIJobs.shared.job(heldID),
+          let row = SkyStudioGenerationActivity.shared.runs.first(where: { $0.aiJobID == heldID }) else {
+        return require(false, "the held change keeps its row")
+    }
+    VoiceChangeHTTP.lock.withLock { VoiceChangeHTTP.billUnderReview = false }
+    let settled = try await AIExportTools.job(AIToolArguments(["job_id": .string(heldID)])).payload
+    require(settled["billing_pending"] == false && settled["credits_charged"] == 7.5, "get_job settles the held change's bill: \(settled)")
+    VoiceChangeHTTP.lock.withLock { VoiceChangeHTTP.billUnderReview = true }   // Download again's re-read still shows the review
+    row.retryDownload?()
+    await AIJobs.shared.wait(for: heldJob, seconds: 30)
+    let landed2 = AIJobs.shared.json(heldJob)
+    require(landed2["status"] == "done" && landed2["billing_pending"] == false && landed2["credits_charged"] == 7.5
+            && landed2["credits_reserved"] == nil,
+            "Download again keeps the settled bill in the receipt, never pending again: \(landed2)")
 }
 
 @MainActor

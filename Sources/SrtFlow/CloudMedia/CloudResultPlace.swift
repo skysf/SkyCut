@@ -10,6 +10,8 @@ import SrtFlowCore
 // that moment (ExclusivePlacement, the same placement as exports). A name taken by anything (a file, a folder, a name that differs
 // only in case) is never touched. The placed file is the caller's own by device and inode (`CloudResultFile.file`): a flow that gives
 // it up removes it with ExclusivePlacement.discard, only while it is still that file.
+// Its private files (the partial, a flow's temporary files) are removed by name only while they are regular files, never recursively
+// (`removePrivateFile`: a folder that took a `.part-*` path between two GETs was once removed with its contents, CXD5).
 // What it does not cover: the GETs (CloudResultDownload), picking folders and stems (each flow).
 
 struct CloudResultPlace: Sendable {
@@ -37,6 +39,16 @@ struct CloudResultPlace: Sendable {
         return try await MediaReadQueue.run(on: MediaReadQueue.analysis) {
             Result { try ExclusivePlacement.placeOwned(partial, in: folder, stem: stem, pathExtension: pathExtension, from: number) }
         }.get()
+    }
+}
+
+extension CloudResultPlace {
+    /// Removes a private file (a partial, a flow's temporary file) by name: only a regular file, never recursively, never a link's
+    /// target; a folder or anything else that took the name is left as it is.
+    static func removePrivateFile(_ url: URL) {
+        var info = stat()
+        guard lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return }
+        unlink(url.path)
     }
 }
 

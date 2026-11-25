@@ -19,6 +19,40 @@ func runDownloadRetryChecks(_ server: UploadServer) async {
     await runDownloadAnswerChecks(server, folder: folder, result: result)
     await runDownloadStopChecks(server, folder: folder, result: result)
     await runDownloadEdgeChecks(server, folder: folder, result: result) { events, timeout in downloadAPI(server, events: events, getTimeout: timeout) }
+    await runPartialTakenChecks(server, folder: folder, result: result)
+}
+
+/// A folder (with a file in it) that takes the download's private `.part-*` path between two GETs is never removed: neither the next
+/// GET nor the clean-up at the end removes anything but a regular file (CXD5 on PR #554: the next GET removed it with its contents).
+private func runPartialTakenChecks(_ server: UploadServer, folder: URL, result: Data) async {
+    let place = folder.appendingPathComponent("taken", isDirectory: true)
+    try? FileManager.default.createDirectory(at: place, withIntermediateDirectories: true)
+    let events = UploadEvents()
+    let takeover: @Sendable (TimeInterval) async throws -> Void = { _ in
+        // Between the empty answer and the next GET: the partial it left is replaced by someone's folder.
+        guard let name = (try? FileManager.default.contentsOfDirectory(atPath: place.path))?.first(where: { $0.contains(".part-") }) else { return }
+        let partial = place.appendingPathComponent(name)
+        try? FileManager.default.removeItem(at: partial)
+        try? FileManager.default.createDirectory(at: partial, withIntermediateDirectories: true)
+        try? Data("someone's".utf8).write(to: partial.appendingPathComponent("keep.txt"))
+        events.add(.pause(0))
+    }
+    server.configureDownload(gets: [.empty, .file], result: result)
+    _ = try? await downloadAPI(server, events: events, sleep: takeover).download(server.resultURL("a.mp4"), to: place.appendingPathComponent("a.mp4"))
+    let left = ((try? FileManager.default.contentsOfDirectory(atPath: place.path)) ?? []).filter { $0.contains(".part-") }
+    check(events.pauses.count == 1 && left.count == 1
+            && (try? Data(contentsOf: place.appendingPathComponent(left[0]).appendingPathComponent("keep.txt"))) == Data("someone's".utf8),
+          "a folder that took the partial's path between two GETs is left with its contents: \(left)")
+    // The removal itself: a regular file goes, a folder (with its contents) and a link stay.
+    let file = place.appendingPathComponent("private.part-file"), link = place.appendingPathComponent("private.part-link")
+    try? Data("mine".utf8).write(to: file)
+    try? FileManager.default.createSymbolicLink(at: link, withDestinationURL: place)
+    CloudResultPlace.removePrivateFile(file)
+    CloudResultPlace.removePrivateFile(link)
+    CloudResultPlace.removePrivateFile(place)
+    check(!FileManager.default.fileExists(atPath: file.path) && (try? FileManager.default.destinationOfSymbolicLink(atPath: link.path)) != nil
+            && FileManager.default.fileExists(atPath: place.path),
+          "removing a private file removes only a regular file: never a folder, never through a link")
 }
 
 /// Waits between tries are recorded, not slept (unless `sleep` is given).

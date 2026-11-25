@@ -86,7 +86,9 @@ grep -qF 'switch SkyStudioDownloadRetry.wholeness(status: status, contentRange: 
   || fail "${DOWNLOAD_GETS}: a result must be checked whole (a short or encoded 206, an empty answer) before it is moved into place"
 grep -qF 'file = CloudResultFile(file: try await place.place(partial, pathExtension: corrected), gets: gets)' "${DOWNLOAD_GETS}" \
   && grep -qF 'Result { try ExclusivePlacement.placeOwned(partial, in: folder, stem: stem, pathExtension: pathExtension, from: number) }' "${DOWNLOAD_PLACE}" \
-  && ! grep -qE '\.moveItem\(|replaceItemAt|removeItem\(at: (destination|place|file)' "${DOWNLOAD_GETS}" "${DOWNLOAD_PLACE}" \
+  && ! grep -qE '\.moveItem\(|replaceItemAt|removeItem\(' "${DOWNLOAD_GETS}" "${DOWNLOAD_PLACE}" \
+  && grep -qF 'guard lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return }' "${DOWNLOAD_PLACE}" \
+  && grep -qF 'CloudResultPlace.removePrivateFile(destination)' Sources/SrtFlow/CloudMedia/CloudTransfer.swift \
   || fail "${DOWNLOAD_GETS}: a whole result takes its name only through ExclusivePlacement, never replacing, moving over or removing what is at the name (a gzip 206 overwrote a file; a folder at the name was removed)"
 grep -qF 'guard SkyStudioDownloadRetry.renewableStatuses.contains(status), attempt < attempts, try await moveToFreshAddress() else {' "${DOWNLOAD_GETS}" \
   || fail "${DOWNLOAD_GETS}: only an expired address (403 / 404 / 410) asks for a fresh one, once, while a try is left"
@@ -179,7 +181,8 @@ grep -qF 'let places = VoiceChangeOutputName.places(' "${DOWNLOAD_CHANGE_JOB}" \
   && grep -qF 'for file in placed where !Self.onAnyTimeline(file.url) { ExclusivePlacement.discard(file) }' "${DOWNLOAD_CHANGE_JOB}" \
   && ! grep -qE 'removeItem\(at: (places|file|voice|separated)' "${DOWNLOAD_CHANGE_JOB}" \
   && grep -qF 'if let failure = SkyStudioDownloadFailure.from(error) { throw failure.after(gets) }' "${DOWNLOAD_CHANGE_JOB}" \
-  && grep -qF 'if let charged = done.finalCharge { held.settle(charged: charged) } else { billPending = true }' "${DOWNLOAD_CHANGE_JOB}" \
+  && grep -qF 'if let charged = done.finalCharge { held.settle(charged: charged); settledBill = done } else { billPending = true }' "${DOWNLOAD_CHANGE_JOB}" \
+  && grep -qF 'let server = settledBill ?? status' "${DOWNLOAD_CHANGE_JOB}" \
   && grep -qF 'job.refresh = { [self] in await refreshBill() }' "${DOWNLOAD_CHANGE_JOB}" \
   || fail "${DOWNLOAD_CHANGE_JOB}: a voice change's files take their names on disk; a failure deletes only a file it placed, while it is still that file and no timeline uses it (a cancel once deleted another process's file and a file that replaced its own); every GET counted; its bill settles only once final"
 ! grep -qE 'attempt \+= 1|attempt < 3' "${DOWNLOAD_CHANGE_JOB}" \

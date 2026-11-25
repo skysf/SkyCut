@@ -375,7 +375,8 @@
     three empty 200s end `download_incomplete`; each followed by the whole answer is the whole result. A folder at the name and a
     case-only variant are left whole (the next number); a folder SkyCut may not write, before the GET and once the result is whole,
     ends `download_not_saved` (the real write errors). `ImageResultChecks`: a PNG header alone is thrown away, the next GET's image
-    saved. `ExclusivePlacementChecks` (`core`): `placeOwned` and `discard` by identity.
+    saved. `ExclusivePlacementChecks` (`core`): `placeOwned` and `discard` by identity. A folder that takes the partial's path between
+    two GETs is left with its contents; removing a private file removes only a regular file.
   - Answers: a 403 whose body stalls (status held back) goes to the job's fresh address at once; a 500 whose body stalls is one GET
     when the job gives the same address or none, two when the fresh one stalls too, never three; a redirect counts as a GET; a 403
     renewed once to a fresh address that works; a 404 without renewal, a 404 whose body broke, the same address again, a second
@@ -400,7 +401,9 @@
     timeline; another process's file at the voice's name is never replaced or deleted; a voice called like the background lands as its
     own file; a stop during the background says both GETs, never deletes a file that replaced its voice, and deletes only a voice it
     placed that nothing uses), `OfficialFilmRunChecks` (a real official film generation held after three drops: its next step says
-    a key-less film call is refused); every paid job these download checks start gives its job slot back (Main), `UpscaleJobDownloadChecks` (books at
+    a key-less film call is refused); `VoiceoverDownloadChecks` also: a batch file that does not decode is downloaded again on resume,
+    a batch recovered while its bill is under review keeps its unknown amount; `VoiceChangeDownloadChecks`: Download again keeps a
+    settled bill in the receipt; every paid job these download checks start gives its job slot back (Main), `UpscaleJobDownloadChecks` (books at
     72 of 75 from each charge field alone and from the re-read; 75 kept while the bill is under review; Cancel while downloading
     again), `VoiceoverDownloadChecks` (the row's recovery, never twice after a resume, a stop keeps the button),
     `OfficialRecoveryDownloadChecks` (through generate_media with film arguments and the operation's key: held through a 503 while

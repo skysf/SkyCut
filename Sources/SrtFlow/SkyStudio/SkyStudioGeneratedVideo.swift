@@ -30,7 +30,7 @@ enum SkyStudioGeneratedVideo {
     /// writes a private file first, which then takes its name without replacing or removing anything (ExclusivePlacement).
     static func makeCopy(_ original: URL, in folder: URL, stem: String, ffmpeg: URL) async throws -> URL {
         let partial = folder.appendingPathComponent(".\(UUID().uuidString).mp4")
-        defer { try? FileManager.default.removeItem(at: partial) }   // its private name: nobody else's
+        defer { CloudResultPlace.removePrivateFile(partial) }   // its private name; only a regular file
         let process = FFmpegProcess()
         try await withTaskCancellationHandler {
             try await process.run(executable: ffmpeg, arguments: [

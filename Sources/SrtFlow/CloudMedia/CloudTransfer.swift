@@ -129,7 +129,7 @@ final class CloudTransferDelegate: NSObject, URLSessionDataDelegate, URLSessionD
         // 这个回调一返回，系统就删 `location`：当场挪走。
         guard let destination = moveDestination else { return }
         do {
-            try? FileManager.default.removeItem(at: destination)
+            CloudResultPlace.removePrivateFile(destination)   // the download's own partial: a folder that took the name stays
             try FileManager.default.moveItem(at: location, to: destination)
             lock.lock()
             movedTo = destination

@@ -96,6 +96,14 @@ retries in #549; downloads did not.
      the Download again entry already released, and the original key then only returned `started`, no second GET.
    - Why the checks stayed green: the not-saved check built its error by hand (mapping the real write error back to a network one
      stayed green), and the film wording was checked by calling the wording function, not through the film flow.
+8. **Round 5 (`a6d43d50`) held in realistic use; four edge cases that lose a file, under-book or strand a paid result remained**
+   (Codex's re-check CXD5; the rest went to the backlog under the user's 2026-11-19 bug policy):
+   - The download's private files were removed by path, recursively: a non-empty folder that took a `.part-*` path between two GETs
+     was deleted with its contents by the next GET.
+   - A voiceover batch file that did not decode (a length-less 4-byte WAV) stayed in the recovery record, so every resume failed
+     `local_split` on it and never downloaded the batch again.
+   - A voiceover batch recovered while its bill was under review booked the top-level 0.1 as its charge and cleared its unknown 2.5.
+   - A voice change settled by get_job (9 → 7.5) and then downloaded again showed its old pending bill (reserved 9) in the receipt.
 
 ## Fix
 
@@ -220,6 +228,12 @@ so this PR keeps only what concerns the download of a job that was already paid 
   `credits_reserved`, and get_job reads the original job again until it is final (`UpscaleJob.refreshBill`, `VoiceChangeJob.refreshBill`).
 - Real-path tests: the real write errors (a read-only folder before the GET and once the result is whole) and an official film
   generation through `SkyStudioGenerationRun` with a production plan and authority.
+
+**Round 6 (2026-11-26, the last, narrow), after CXD5:** private files are removed only as regular files
+(`CloudResultPlace.removePrivateFile`: the partial, the transfer's move target, the WebM and upscale temporaries; the voice change's
+source folder with `rmdir`, only once empty); a voiceover batch file that does not decode is forgotten and removed, so the resume
+downloads it again; a recovered voiceover batch books only a final charge (`received` uses `finalCharge`); a voice change keeps the
+bill its books settled (`settledBill`) in every later receipt.
 
 Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift` (`download`), `CloudMedia/CloudResultDownload.swift`, `CloudMedia/CloudResultPlace.swift`,
 `Sources/SrtFlowCore/ExclusivePlacement.swift` (`placeOwned`), `SkyStudioDownloadRetry.swift`,
@@ -390,6 +404,15 @@ Narrowed round (the local server now also answers a gzip 206 and an empty 200; t
     (2) a voice change deleting by path, a voice change settling a bill under review, the image check skipped, get_job never refreshing
     an upscale's bill, a held generation keeping a job slot, the background's stem allowed to match the voice's in case.
 
+- Round 6 (2026-11-26): `DownloadRetryChecks` (a folder with a file that takes the `.part-*` path between two GETs is left, the
+  download ending `download_not_saved`; removing a private file never removes a folder or follows a link); `VoiceoverDownloadChecks`
+  (a 4-byte batch file fails `local_split` and resume downloads it again with one more file GET and no POST; a batch stopped while
+  running and recovered with a bill under review keeps its 2.5 unknown, 0.1 never booked); `VoiceChangeDownloadChecks` (held with a
+  pending bill, settled by get_job at 7.5, then Download again: the receipt keeps 7.5). Reverse-verified: check-sky-studio with the
+  removal recursive (2 FAILs); check-voice-recovery with the broken file kept, the recovered bill booked at the top-level figure and
+  the receipt taking the stale status (each its own FAIL). The voice-recovery binary now takes ~149 s on the developer Mac (224 s for
+  the whole step on CI in round 5), so its watchdog is 300 s.
+
 ## Lessons
 
 - A download after payment is the most expensive step to lose: retry what a second try can fix, resume when the system kept the
@@ -417,6 +440,8 @@ Narrowed round (the local server now also answers a gzip 206 and an empty 200; t
   a failed download (held), never as an arrived result.
 - Test the error and the words through the real path: a constructed error or a direct call of a wording function stays green when
   the real path is mapped back.
+- Remove your own temporary files only as files: a recursive removal by path deletes whatever took the name. And a cached paid file
+  that fails to decode is not the result: forget it, so the next try fetches it again.
 - A fake server that only resumes the happy way proves little: give it the edges the real network gives (a short 206, a stalled
   error body, a redirect) before trusting the retry logic.
 - The long-term rules are in [Sky Studio jobs](../architecture/sky-studio-jobs.md), "Downloads that the network interrupts".
