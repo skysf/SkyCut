@@ -33,7 +33,20 @@ enum VoiceChangeBilling {
     static func charges(_ server: SkyStudioJobStatus) -> [String: JSONValue] {
         var value = detail(server.billing)
         value["skystudio_job_id"] = .string(server.jobID)
-        value["spent_today_credits"] = .number(SkyStudioCredits.number(SkyStudioSpendStore.shared.spentToday()))
+        value["spent_today_credits"] = spentToday
         return value
     }
+
+    /// get_job after a refusal for the original job that carried its bill: the charge, Sky Studio's note, and the books read after
+    /// settling. The job's detail still had the day's total from before, with the whole 9 reserved (Codex CXM4: it said 9 while the
+    /// books held 6.5).
+    static func refusalBill(_ billing: SkyStudioBilling) -> [String: JSONValue] {
+        var value = detail(billing)
+        value["billing_note"] = .string(billing.message)
+        value["spent_today_credits"] = spentToday
+        return value
+    }
+
+    /// What SkyCut's books hold today, read when the reply is built.
+    private static var spentToday: JSONValue { .number(SkyStudioCredits.number(SkyStudioSpendStore.shared.spentToday())) }
 }

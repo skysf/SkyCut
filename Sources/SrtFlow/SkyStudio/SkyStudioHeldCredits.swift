@@ -43,9 +43,10 @@ struct SkyStudioHeldCredits {
 
     /// 做完：账上记的是报价，换成实收（一般一样）。实收记在预留的那一天：Sky Studio 交的时候就扣了，
     /// 跨了零点（SkyCut 重启之后第二天才接着跟完的声音库收费单）也不挪到今天的额度上。
-    mutating func settle(charged: Double) {
+    /// `now`: the clock the ledger's 40-day clean-up goes by (a check passes its own; Codex CXM4).
+    mutating func settle(charged: Double, now: Date = Date()) {
         guard let held, abs(held.credits - charged) > 0.0001, let key = bookedDay(of: held, for: "settlement") else { return }
-        store.settle(reserved: held.credits, charged: charged, dayKey: key)
+        store.settle(reserved: held.credits, charged: charged, dayKey: key, now: now)
         self.held = SkyStudioJobGate.Reservation(credits: charged, day: held.day, dayKey: key)
     }
 

@@ -8,7 +8,8 @@ import SrtFlowMCPKit
 // - a 402 while following an accepted change may come with a charge: the AI queries that job, never "not charged" or a redo;
 // - get_job on the original job answering 402 with a final bill of 6.5 settles the books at 6.5 (a try? dropped it: 9 stayed);
 // - without a final bill a top-level credits_charged of 0 is neither settled nor reported as the charge;
-// - a default change whose result lacks its background keeps the 9 reserved until a final bill comes.
+// - a default change whose result lacks its background keeps the 9 reserved until a final bill comes;
+// - get_job's spent_today_credits after a 402 with a final bill is read from the books after settling (Codex CXM4: 9, not 6.5).
 // docs/bugfixes/2026-11-24-daily-limit-refusal-unclear.md
 
 @MainActor
@@ -17,6 +18,28 @@ func voiceChangeSettleChecks(_ root: URL) async throws {
     try await refusalBillChecks(root)
     try await noFinalBillChecks(root)
     try await missingBackgroundChecks(root)
+    try await refusalBillReplyChecks(root)
+}
+
+@MainActor
+private func refusalBillReplyChecks(_ root: URL) async throws {
+    let fixture = try VoiceChangeFixture(folder: root.appendingPathComponent("change-no-background-402-bill"))
+    let clip = fixture.placeClip(try fixture.stereoSource())
+    let books = SkyStudioSpendStore.shared.spentToday()
+    VoiceChangeHTTP.lock.withLock { VoiceChangeHTTP.omitBackground = true; VoiceChangeHTTP.unbilled = true }
+    let failed = try await change(fixture, clip)
+    let before = failed["spent_today_credits"]?.doubleValue ?? -1
+    VoiceChangeHTTP.lock.withLock {
+        VoiceChangeHTTP.originalJobErrors["convert-1"] = (402, ["error": ["code": "insufficient_credits", "message": "You need 9 credits; you have 2."],
+                                                                "billing": ["status": "charged", "credits_charged": 6.5]])
+    }
+    guard let id = failed["job_id"]?.stringValue, let job = AIJobs.shared.job(id) else { return require(false, "the failed change has a job") }
+    await job.refresh?()
+    let asked = AIJobs.shared.json(job)
+    let ledger = SkyStudioCredits.number(SkyStudioSpendStore.shared.spentToday())
+    require(abs(held(since: books) - 6.5) < 0.0001 && asked["spent_today_credits"]?.doubleValue == ledger && abs(before - ledger - 2.5) < 0.0001,
+            "after a 402 with a final bill of 6.5, get_job's spent_today_credits is the books' \(ledger), not \(before) from before settling: \(asked)")
+    dismissFailedRows()
 }
 
 @MainActor

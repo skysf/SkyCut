@@ -213,9 +213,7 @@ final class VoiceChangeJob {
             // A refusal can carry the job's final bill (a 402 billed 6.5): settle by it. A try? here dropped it, so the books kept 9.
             guard let billing = SkyStudioJobError.request(failure).failure?.billing else { return }
             VoiceChangeBilling.settle(&held, by: billing)
-            var detail = VoiceChangeBilling.detail(billing)
-            detail["billing_note"] = .string(billing.message)
-            AIJobs.shared.updateDetail(job, detail)
+            AIJobs.shared.updateDetail(job, VoiceChangeBilling.refusalBill(billing))
             return
         } catch { return }
         VoiceChangeBilling.settle(&held, by: server.billing)

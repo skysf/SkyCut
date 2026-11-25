@@ -117,7 +117,7 @@ fi
 #   without one uses only a day the ledger proves holds it, never a day worked out from its date (Codex CXM3);
 HELD="Sources/SrtFlow/SkyStudio/SkyStudioHeldCredits.swift"
 grep -qF 'store.refund(held.credits, dayKey: key)' "${HELD}" \
-  && grep -qF 'store.settle(reserved: held.credits, charged: charged, dayKey: key)' "${HELD}" \
+  && grep -qF 'store.settle(reserved: held.credits, charged: charged, dayKey: key, now: now)' "${HELD}" \
   && grep -qF 'held.dayKey ?? store.ledger.provenDayKey(holding: held.credits, bookedAt: held.day)' "${HELD}" \
   || fail "${HELD}: a refund and a settlement go to the booking's day key (a settlement in one write), a keyless one to a proven day"
 if grep -qF 'DailySpendLedger.dayKey(for:' "${HELD}"; then

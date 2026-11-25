@@ -153,6 +153,12 @@ task row whatever the app's language. On upscale and change voice the AI got onl
     after the write would let a restart settle it twice.
   - A voice change's books move only by a final bill (`VoiceChangeBilling`): a refusal's bill for the original job counts, a
     top-level 0 is neither settled nor reported, and a result without its background keeps the 9 until a bill comes.
+- **Fourth-check fixes (Codex CXM4, 2026-11-26):**
+  - A settlement takes its caller's clock for the ledger's 40-day clean-up (`SkyStudioHeldCredits.settle(charged:now:)`). The
+    settle checks used a fixed October sample but settled by this Mac's clock, so from December the clean-up would have deleted
+    the sample and failed every PR.
+  - get_job's `spent_today_credits` after a 402 with a final bill is read from the books after settling
+    (`VoiceChangeBilling.refusalBill`). It said 9 reserved while the books held 6.5.
 
 ## Similar refusals
 
@@ -252,6 +258,23 @@ numbers, and what the user can do? The review re-judged three items.
     - in `check-voice-recovery.sh` (2 failures): the refresh removed;
     - in the wiring part: the two price-check entries reverted; the full-access wording dropped. One guard pattern was made specific,
       because the old one matched a second, unrelated line.
+- Third check (2026-11-26):
+  - New checks:
+    - `LimitTokenChecks`: 1,000 → 2,000 → 1,000; a used or unknown token replayed with `theme=classic`;
+    - `SettleChecks`: a Tokyo settlement on the booking's day; keyless at midnight and at noon; one write;
+    - `VoiceChangeSettleChecks`: a polled 402; a 402 GET with a final bill; no final bill; a result without its background;
+    - guard lines for the exact accepted flag, the final-bill rule, the booking's key and the one write.
+  - Reverse checks, each red and restored byte for byte:
+    - in `check-sky-studio.sh` (11 failures): the revision dropped (2); the old early return (2); the settle day from the date (3);
+      the keyless day from the date (3); two writes (1);
+    - in `check-voice-recovery.sh` (7): accepted pinned to false (1); the try? (2); the top-level fallback (4);
+    - in the wiring part: 12 lines.
+- Fourth check (2026-11-26):
+  - `SettleChecks` runs on three clocks: the fixed sample, today, and 120 days ago.
+  - `VoiceChangeSettleChecks` checks the reply's day total after a 402 with a final bill.
+  - Reverse checks:
+    - a settlement without the caller's clock: 7 failures, all on the 120-days-ago clock, and the wiring guard;
+    - the reply without the fresh total: 1 real-App failure.
 - Not verified in a real window: the popover, the panels' layout and the reset time in each language. These are on the manual list
   ([Sky Studio jobs](../architecture/sky-studio-jobs.md) section 11).
 
