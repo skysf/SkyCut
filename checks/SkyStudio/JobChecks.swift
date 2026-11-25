@@ -237,7 +237,7 @@ private func runTransferChecks() async {
     let destination = folder.appendingPathComponent("out.mp4")
     let downloaded = FractionLog()
     do {
-        try await api.download(URL(string: "https://cdn.skystudioai.com/generations/abc.mp4")!, to: destination) { downloaded.add($0) }
+        try await api.download(URL(string: "https://cdn.skystudioai.com/generations/abc.mp4")!, to: destination, onProgress: { downloaded.add($0) })
     } catch {
         check(false, "the download works: \(error)")
     }
