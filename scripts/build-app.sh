@@ -41,6 +41,9 @@ if [ -z "${VERSION:-}" ]; then
   fi
 fi
 
+# A Developer ID build ends with notarization: a notary profile notarytool cannot use stops it here, before the compile.
+scripts/signing/notarize.sh --check
+
 echo "==> swift build -c release (arm64, -O)"
 swift build -c release --arch arm64
 BUILD_DIR="$(swift build -c release --arch arm64 --show-bin-path)"
@@ -110,16 +113,22 @@ swift scripts/make-icon.swift "$ICONSET" >/dev/null
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/SkyCut.icns"
 rm -rf "$(dirname "$ICONSET")"
 
-# 签名只经 sign-app.sh 一处（嵌套的先签、外层最后签）：有发布用的签名身份就用它，系统里给过的录屏、麦克风、
-# 下载文件夹、钥匙串权限跨版本有效；没有就退回 ad-hoc 并警告（docs/architecture/code-signing-and-permissions.md）。
+# Signing only through scripts/signing/ (docs/architecture/code-signing-and-permissions.md): the pinned Developer ID with
+# the hardened runtime, nested code first; on a Mac without it, ad-hoc with a warning. Then notarized and stapled, so the
+# app inside the DMG opens directly, offline too.
 echo "==> codesign"
 scripts/signing/sign-app.sh "$APP"
+echo "==> notarize the app"
+scripts/signing/notarize.sh "$APP"
 
 # DMG: the real App / Applications icons, the six-language install background and the fixed Finder layout (no Finder
-# automation).
+# automation); then signed, notarized and stapled itself.
 echo "==> 生成 DMG"
 DMG="$DIST/$APP_NAME-$VERSION-arm64.dmg"
 /bin/bash scripts/build-dmg.sh "$APP" "$DMG"
+echo "==> sign and notarize the DMG"
+scripts/signing/sign-dmg.sh "$DMG"
+scripts/signing/notarize.sh "$DMG"
 
 echo
 echo "完成："

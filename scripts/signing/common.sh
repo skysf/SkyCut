@@ -1,70 +1,117 @@
-# 发布签名的公共部分（被 create-identity.sh、sign-app.sh source，自己不单独跑）：
-# 签名身份放在哪、叫什么、仓库里钉着哪一把，以及签名那几秒把专用钥匙串挂上搜索列表、签完原样放回。
+# Release signing, shared by sign-app.sh, sign-dmg.sh and notarize.sh (sourced, never run on its own): which identity
+# signs SkyCut for users and releases, how a run picks the way to sign, the app's entitlements and the notary profile.
 #
-# 为什么要有一把固定的签名身份：macOS 的系统权限（录屏、麦克风、下载文件夹、钥匙串）按签名记账，
-# ad-hoc 签名换一个版本就是「另一个 App」—— 见 docs/architecture/code-signing-and-permissions.md。
+# The identity is the Developer ID Application certificate of team 26TVX3S9FR (TIANYU LU), pinned by its SHA-1 in
+# packaging/signing-identity.sha1; its private key is in the login keychain. macOS keys its privacy grants (screen
+# recording, microphone, Downloads, Automation, the keychain) to the signature's designated requirement, and a Developer
+# ID requirement names the team, not the certificate: a renewed certificate of the same team keeps every grant
+# (docs/architecture/code-signing-and-permissions.md).
 #
-# 调用方先 cd 到仓库根目录再 source（SIGNING_PIN_FILE 是相对路径）。
+# Callers cd to the repository root first (the paths below are relative).
 
-# 仓库外（同 ~/.config/srtflow/r2.env）：私钥不进仓库，换机器时把整个目录拷过去。
-SIGNING_DIR="${SRTFLOW_SIGNING_DIR:-${HOME}/.config/srtflow/signing}"
-SIGNING_KEYCHAIN="${SIGNING_DIR}/srtflow-signing.keychain-db"
-SIGNING_PASSWORD_FILE="${SIGNING_DIR}/keychain-password"
-SIGNING_IDENTITY_NAME="SrtFlow Signing"
-# 发布用的那把证书的 SHA-1。换证书 = 每个用户给过的系统权限再作废一次，所以钉在仓库里、改它要显式改这个文件。
 SIGNING_PIN_FILE="packaging/signing-identity.sha1"
+SIGNING_TEAM_ID="26TVX3S9FR"
+# Only the app has entitlements; the helpers need none under the hardened runtime.
+SIGNING_ENTITLEMENTS="packaging/SkyCut.entitlements"
+# One profile for all of the user's apps (user, 2026-11-26), named by the team. The user creates it once with
+# `xcrun notarytool store-credentials`; scripts only name it and never read, ask for or print the credentials.
+NOTARY_PROFILE="${SKYCUT_NOTARY_PROFILE:-notary-${SIGNING_TEAM_ID}}"
 
-signing_identity_present() {
-  [ -f "${SIGNING_KEYCHAIN}" ] && [ -f "${SIGNING_PASSWORD_FILE}" ]
-}
-
-# 专用钥匙串里那把证书的 SHA-1（小写十六进制）；找不到输出空。
-# 取第一行用 awk 不用 head：pipefail 下 head 提前退出会让上游吃 SIGPIPE、整条管道判失败。
-signing_identity_sha1() {
-  { security find-certificate -c "${SIGNING_IDENTITY_NAME}" -Z "${SIGNING_KEYCHAIN}" 2>/dev/null || true; } \
-    | awk '/^SHA-1 hash: / && !seen++ { print tolower($3) }'
-}
-
-# 仓库钉着的 SHA-1（小写）；文件不在或没有内容输出空。
+# The pinned SHA-1, lowercase; empty when the file is missing or holds no hash.
 signing_pinned_sha1() {
   if [ -f "${SIGNING_PIN_FILE}" ]; then
     { grep -v '^#' "${SIGNING_PIN_FILE}" || true; } | tr -d '[:space:]' | tr 'A-F' 'a-f'
   fi
 }
 
-# codesign 只在搜索列表里的钥匙串中找签名身份：`--keychain` 只是在列表里挑，钥匙串不在列表里就报
-# 「no identity found」（2026-10-03 实测）。所以签名那几秒挂上去、签完原样放回。不长期挂着：上了锁的钥匙串
-# 留在列表里，别的 App 找证书时会弹框要它的密码。
-SIGNING_SAVED_SEARCH_LIST=()
-
-signing_keychain_attach() {
-  local keychain_real line
-  keychain_real="$(cd "$(dirname "${SIGNING_KEYCHAIN}")" && pwd -P)/$(basename "${SIGNING_KEYCHAIN}")"
-  SIGNING_SAVED_SEARCH_LIST=()
-  while IFS= read -r line; do
-    line="${line#"${line%%[![:space:]]*}"}"
-    line="${line#\"}"
-    line="${line%\"}"
-    # 上一次被强杀没来得及放回的话，列表里还挂着它：记的时候就去掉，放回时顺手摘干净。
-    if [ -n "${line}" ] && [ "${line}" != "${keychain_real}" ]; then
-      SIGNING_SAVED_SEARCH_LIST+=("${line}")
-    fi
-  done < <(security list-keychains -d user)
-  if [ "${#SIGNING_SAVED_SEARCH_LIST[@]}" -eq 0 ]; then
-    # 空列表放回去 = 连登录钥匙串都摘掉了，宁可不签。
-    echo "✗ 读不到钥匙串搜索列表（security list-keychains -d user 没输出），不动它" >&2
-    return 1
-  fi
-  security unlock-keychain -p "$(cat "${SIGNING_PASSWORD_FILE}")" "${SIGNING_KEYCHAIN}"
-  security list-keychains -d user -s "${SIGNING_SAVED_SEARCH_LIST[@]}" "${keychain_real}"
+# The SHA-1s (lowercase) in a `security find-identity` listing; with a second argument, only our team's Developer IDs.
+# A listing line: `  1) 1EC5…8841 "Developer ID Application: TIANYU LU (26TVX3S9FR)"`; an expired one ends with
+# ` (CSSMERR_TP_CERT_EXPIRED)`.
+signing_listed_sha1s() {
+  awk -v team="${2:-}" '
+    $1 ~ /^[0-9]+\)$/ {
+      name = $0
+      sub(/^[^"]*"/, "", name)
+      sub(/".*$/, "", name)
+      suffix = "(" team ")"
+      if (team == "" || (index(name, "Developer ID Application: ") == 1 &&
+          substr(name, length(name) - length(suffix) + 1) == suffix)) print tolower($2)
+    }' <<<"$1"
 }
 
-# 放回原来的搜索列表、把专用钥匙串锁上。没挂过也能调、调几次都一样：调用方把它写进自己的 EXIT trap
-# （trap 只有一个，这里不替调用方设，免得把调用方自己的清理冲掉）。
-signing_keychain_detach() {
-  if [ "${#SIGNING_SAVED_SEARCH_LIST[@]}" -gt 0 ]; then
-    security list-keychains -d user -s "${SIGNING_SAVED_SEARCH_LIST[@]}"
-    SIGNING_SAVED_SEARCH_LIST=()
+# How to sign, from the code-signing identities this Mac has. Pure over its inputs so checks/release-signing.sh can feed
+# it listings: $1 = `security find-identity -v -p codesigning` (valid identities), $2 = the same without -v (expired and
+# revoked ones too). Prints "developer-id" (the pinned identity is valid) or "ad-hoc" (no Developer ID of our team at
+# all: CI, someone building from source); refuses with the reason (status 1) when our team's Developer ID is here but is
+# not the pinned one, or the pinned one is no longer valid. It never picks any other identity.
+signing_mode_from() {
+  local valid="$1" all="$2" pinned other
+  pinned="$(signing_pinned_sha1)"
+  if ! grep -qxE '[0-9a-f]{40}' <<<"${pinned}"; then
+    echo "✗ ${SIGNING_PIN_FILE} must hold exactly one SHA-1 (the Developer ID that signs SkyCut)" >&2
+    return 1
   fi
-  security lock-keychain "${SIGNING_KEYCHAIN}" 2>/dev/null || true
+  if grep -qxF "${pinned}" <<<"$(signing_listed_sha1s "${valid}")"; then
+    echo developer-id
+    return 0
+  fi
+  if grep -qxF "${pinned}" <<<"$(signing_listed_sha1s "${all}")"; then
+    echo "✗ The pinned Developer ID (${pinned}) is in the keychain but no longer valid (expired or revoked)." >&2
+    echo "  Renew it at developer.apple.com: a new certificate of team ${SIGNING_TEAM_ID} keeps every permission users" >&2
+    echo "  gave SkyCut. Then put its SHA-1 in ${SIGNING_PIN_FILE}." >&2
+    return 1
+  fi
+  other="$(signing_listed_sha1s "${all}" "${SIGNING_TEAM_ID}" | awk 'NR == 1')"
+  if [ -n "${other}" ]; then
+    echo "✗ This Mac has a Developer ID of team ${SIGNING_TEAM_ID} (${other}) but not the pinned one (${pinned})." >&2
+    echo "  If it is the renewed certificate, put its SHA-1 in ${SIGNING_PIN_FILE} (same team: users keep every permission)." >&2
+    return 1
+  fi
+  echo ad-hoc
+}
+
+signing_mode() {
+  local valid all
+  valid="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+  all="$(security find-identity -p codesigning 2>/dev/null || true)"
+  signing_mode_from "${valid}" "${all}"
+}
+
+# The signature on $1 is the pinned Developer ID's: our team, the pinned leaf certificate and a secure timestamp
+# (notarization refuses code without one). Says what is wrong (status 1) otherwise.
+signing_check_identity() {
+  local code="$1" details work leaf
+  details="$(codesign -dvvv "${code}" 2>&1 || true)"
+  if ! grep -qxF "TeamIdentifier=${SIGNING_TEAM_ID}" <<<"${details}"; then
+    echo "✗ ${code} is not signed by team ${SIGNING_TEAM_ID}" >&2
+    return 1
+  fi
+  if ! grep -q '^Timestamp=' <<<"${details}"; then
+    echo "✗ ${code} has no secure timestamp (notarization refuses it)" >&2
+    return 1
+  fi
+  work="$(mktemp -d)"
+  codesign -d --extract-certificates="${work}/certificate" "${code}" >/dev/null 2>&1 || true
+  leaf=""
+  if [ -f "${work}/certificate0" ]; then
+    leaf="$(shasum -a 1 "${work}/certificate0" | awk '{ print $1 }')"
+  fi
+  rm -rf "${work}"
+  if [ "${leaf}" != "$(signing_pinned_sha1)" ]; then
+    echo "✗ ${code} is signed with certificate ${leaf:-(none)}, not the pinned $(signing_pinned_sha1)" >&2
+    return 1
+  fi
+}
+
+# notarytool can use the profile (it exists, its password works, Apple answers). Says how to create it otherwise.
+notary_profile_ready() {
+  local error
+  if error="$(xcrun notarytool history --keychain-profile "${NOTARY_PROFILE}" --output-format json 2>&1 >/dev/null)"; then
+    return 0
+  fi
+  echo "✗ notarytool cannot use the keychain profile \"${NOTARY_PROFILE}\": ${error}" >&2
+  echo "  If it does not exist yet, create it once in Terminal (it asks for an app-specific password made at" >&2
+  echo "  appleid.apple.com; one profile serves every app of the team):" >&2
+  echo "    xcrun notarytool store-credentials ${NOTARY_PROFILE} --apple-id <your Apple ID> --team-id ${SIGNING_TEAM_ID}" >&2
+  return 1
 }

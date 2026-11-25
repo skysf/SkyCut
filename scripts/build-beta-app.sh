@@ -19,6 +19,8 @@ if [ ! -d "${SRC}" ]; then
   echo "✗ 没找到 ${SRC}：先跑 scripts/build-app.sh" >&2
   exit 1
 fi
+# The Beta is notarized like the release: a notary profile notarytool cannot use stops it before anything is copied.
+scripts/signing/notarize.sh --check
 
 echo "==> 复制成 ${BETA}"
 rm -rf "${BETA}"
@@ -41,8 +43,11 @@ done
 echo "   ${COUNT} 种文档类型改成备选"
 
 # 改了 Info.plist，外层签名就失效了：重签，和 build-app.sh 同一处（同一把签名身份，测试版的系统权限也跨版本有效）。
+# The new signature is new code to Gatekeeper: sign-app.sh drops the release's stapled ticket, notarize.sh staples the Beta's.
 echo "==> codesign"
 scripts/signing/sign-app.sh "${BETA}"
+echo "==> notarize"
+scripts/signing/notarize.sh "${BETA}"
 
 echo
 echo "完成：${BETA}"
