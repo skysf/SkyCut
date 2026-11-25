@@ -21,6 +21,8 @@
 1. **First round: Codex.** Codex reviews the first round of every change, read-only (since 2026-11-23 gpt-6.2-astra at max
    effort). Exception: a docs-only change (Markdown only: `docs/`, AGENTS.md, README) is wording, and the coordinator reads
    its diff instead. DOC1, the change that wrote this doc, went that way.
+   When Codex's weekly quota is used up, Fable 5.2 at xhigh effort reviews read-only in its place until the quota resets (user,
+   2026-11-26); the review log marks those rounds as Fable's.
 2. **Real smokes.** A change that reaches paid providers, the network or production also gets a real smoke test on what
    landed, whatever its reviews found. Ops runs it as SMK1–SMK3 did: Sky Studio's test account, a spend cap in the brief,
    and everything changed for the run restored and read back.
