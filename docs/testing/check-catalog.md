@@ -391,16 +391,25 @@
       path in every table; a refused price check names no order or bill.
     - `SpendChecks`: one moment per reservation across midnight; a refund after the time zone changed goes back to the day key it was
       booked on.
+    - `LimitTokenChecks` (2026-11-26): a raise's token void after the limit went to 2,000 and back to 1,000; a used or unknown
+      token replayed with `theme=classic` writes nothing and says to repeat without it; with a mode change it asks.
+    - `SettleChecks` (2026-11-26): a settlement in Tokyo on the booking's day key; a keyless refund or settlement only into a day the
+      ledger proves (Shanghai midnight: none; noon: that day); a settlement writes the ledger once.
     - `ReferenceTotalChecks`: the actual totals.
   - `scripts/check-voice-recovery.sh`:
     - `VoiceChangeBalanceChecks`: change_voice into a plain 402 and into one with pending billing, with real App objects; get_job then
       GETs the original job and settles by its billing;
+    - `VoiceChangeSettleChecks` (2026-11-26): a polled 402 queries the original job; a 402 GET with a final bill of 6.5 settles at
+      6.5; no final bill keeps the 9 and reports no charge (done, or get_job on the original job); a result without its background
+      keeps the 9 until get_job reads the bill;
     - the voiceover's budget stop: its options, the numbers read at the refusal, its own resume;
     - the mid-voiceover fee over the limit, with both ways (`FallbackFeeChecks`).
   - `checks/sky-studio-wiring/daily-limit.sh` pins:
     - one builder for each refusal and option (a)'s advance question;
     - the panels' note and its in-place popover, and the sheets leaving the race to the note;
-    - the voiceover's refusal-time numbers and the six paid jobs.
+    - the voiceover's refusal-time numbers and the six paid jobs;
+    - no constant accepted flag (the voice change's is its job id), the voice change settling only by a final bill and reading a
+      refusal's bill, the booking's day key and the one-write settlement, and no day worked out from a reservation's date.
   - Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md) section 11.
 - Picture transitions: `scripts/check-mcp.sh` → `TransitionReportChecks` preserves 1.042 seconds when both handles suffice,
   reports shortening limits and reasons, and preserves legacy overlapping seams; `scripts/check-video-fade.sh` checks the
