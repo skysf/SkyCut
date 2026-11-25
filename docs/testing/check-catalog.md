@@ -547,10 +547,13 @@
   profile name, notarytool only with the keychain profile (never a password), staple, `stapler validate` and Gatekeeper's
   verdict. It feeds `signing_mode_from` listings (pinned valid → developer-id; expired pin, another certificate of the team →
   refused with the right advice; other teams only or nothing → ad-hoc), checks `packaging/SkyCut.entitlements` against
-  Info.plist's usage descriptions (no `com.apple.security.cs.*` exception), and signs a fixture app ad-hoc with a stub
-  `security` (runtime on all four pieces, entitlements on the app only, stray code refused). The older sections stay:
-  录自定义区域请求授权之前先删钉着旧签名的记录、`tccutil` 只在一处、文案不再叫人「关掉再打开」. Reverse verification
-  (22 sabotages, each red): [the Developer ID report](../reports/2026-11-26-developer-id-signing.md).
+  Info.plist's usage descriptions (no `com.apple.security.cs.*` exception). Steps are matched as whole lines (commented out
+  or made conditional is red) and every failure branch must end the run. With stub `security`, `xcrun` and `codesign` it
+  runs the real scripts: they refuse a failing `security`, an expired pin, no Developer ID without `SKYCUT_ALLOW_ADHOC=1`,
+  an unusable notary profile and another leaf certificate; with the opt-out `sign-app.sh` signs a fixture app ad-hoc
+  (runtime on all four pieces, entitlements on the app only, stray code refused). The older sections stay:
+  录自定义区域请求授权之前先删钉着旧签名的记录、`tccutil` 只在一处、文案不再叫人「关掉再打开」. Reverse verification (48
+  sabotages after the FBS1 review, each red): [the Developer ID report](../reports/2026-11-26-developer-id-signing.md).
 - 产品名与代码名（看得见的叫 SkyCut；bundle id、UTType、数据文件夹、钥匙串、AI 通道这些身份沿用 SrtFlow，改了就丢用户的授权、设置和数据）：
   `checks/product-name.sh`。
 - 工程不再是单例（全仓没有 `VideoEditProject.shared`、工程只由 `OpenProjects` 建、撤销不退到键窗口、工程代号全 App 一个计数、

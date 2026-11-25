@@ -86,10 +86,11 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 - User builds (official and Beta) and releases are signed only with the Developer ID
   `Developer ID Application: TIANYU LU (26TVX3S9FR)` (user, 2026-11-25), pinned by SHA-1 in `packaging/signing-identity.sha1`,
-  with the hardened runtime, and notarized and stapled: `scripts/build-app.sh` and `build-beta-app.sh` do it only through `scripts/signing/`. A build that
-  warns 「⚠️ No Developer ID on this Mac」 (ad-hoc, not notarized) is **never installed for the user or released**: macOS
-  takes each ad-hoc build for another app and drops its screen recording, microphone, Downloads and keychain grants.
-- The signature names the team, not the certificate: new builds and a renewed certificate of the team keep every grant.
+  with the hardened runtime, and notarized and stapled: `scripts/build-app.sh` and `build-beta-app.sh` do it only through `scripts/signing/`
+  and stop without that Developer ID. A build made with the opt-out `SKYCUT_ALLOW_ADHOC=1` (ad-hoc, not notarized: building from
+  source) is **never installed for the user or released**: macOS takes each ad-hoc build for another app and drops its grants.
+- The signature names the team, not the certificate, so new builds and a renewed certificate of the team are expected to
+  keep every grant (to be confirmed on the next installs; the keychain asks once more first).
   Renew before 2027-12-25 and update the pin; never sign with another team. Notarization uses the keychain profile
   `notary-26TVX3S9FR` (one for all of the user's apps), which the user creates: never ask for, handle or print its password.
   The first Developer ID build asks for the grants once more (accepted: no external users). The old self-signed identity in
