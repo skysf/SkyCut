@@ -26,6 +26,16 @@ final class VoiceChangeHTTP: URLProtocol {
     static var quoteFailure: (Int, JSONValue)?
     /// POST /jobs：断网（结果不明）。
     static var submitNetworkFailure = false
+    /// POST /jobs answers this refusal (a 402 insufficient_credits: nothing admitted or charged).
+    static var submitRefusal: (Int, JSONValue)?
+    /// GET /jobs/{id} for other jobs than convert-1 (the original job a refusal named): id → the job's answer.
+    static var originalJobs: [String: JSONValue] = [:]
+    /// GET /jobs/{id} for such a job answers this error instead (a 402 that carries the final bill).
+    static var originalJobErrors: [String: (Int, JSONValue)] = [:]
+    /// GET /jobs/convert-1 answers this error (a 402 while following an accepted job).
+    static var pollRefusal: (Int, JSONValue)?
+    /// The done answer carries no final bill: a top-level credits_charged of 0 and billing pending_review.
+    static var unbilled = false
     /// POST /jobs 先回 queued；GET /jobs/{id} 等这个变成 true 才回 done。
     static var holdJob = false
     static var released = true
@@ -67,7 +77,9 @@ final class VoiceChangeHTTP: URLProtocol {
         lock.lock(); defer { lock.unlock() }
         requests = []; uploads = []
         voices = [voiceID: voice(voiceID, name: "Sky", languages: ["zh", "en"])]
-        libraryFailure = nil; quoteFailure = nil; submitNetworkFailure = false; holdJob = false; released = true; jobFails = false
+        libraryFailure = nil; quoteFailure = nil; submitNetworkFailure = false; submitRefusal = nil; originalJobs = [:]; holdJob = false
+        originalJobErrors = [:]; pollRefusal = nil; unbilled = false
+        released = true; jobFails = false
         voiceExtraSeconds = 0.02; backgroundSeconds = nil; sourceSeconds = 4.0; charged = 7.5
         separationFails = false; quoteIgnoresSkip = false; omitBackground = false; jobDirect = false
         fileDrops = 0; expireVoiceFile = false; voiceRenamed = false; holdFiles = false; holdNext = [:]; billUnderReview = false
@@ -163,11 +175,19 @@ final class VoiceChangeHTTP: URLProtocol {
         }
         if path.hasSuffix("/jobs"), method == "POST" {
             if submitNetworkFailure { return nil }
+            if let (status, value) = submitRefusal { return (status, value, nil) }
             jobDirect = body["params"]?["skip_separation"]?.boolValue == true
             if holdJob { return (200, ["job_id": "convert-1", "kind": "voice_convert", "status": "queued", "queue_position": 1, "poll_after_seconds": 2], nil) }
             return (200, finished(), nil)
         }
+        if method == "GET", let range = path.range(of: "/jobs/"), let (status, value) = originalJobErrors[String(path[range.upperBound...])] {
+            return (status, value, nil)
+        }
+        if method == "GET", let range = path.range(of: "/jobs/"), let answer = originalJobs[String(path[range.upperBound...])] {
+            return (200, answer, nil)
+        }
         if path.hasSuffix("/jobs/convert-1"), method == "GET" {
+            if let (status, value) = pollRefusal { return (status, value, nil) }
             if !released { return (200, ["job_id": "convert-1", "kind": "voice_convert", "status": "running", "poll_after_seconds": 2], nil) }
             return (200, finished(), nil)
         }
@@ -203,9 +223,10 @@ final class VoiceChangeHTTP: URLProtocol {
             "padded_seconds": 0, "model": "chatterbox-hd", "fallback_used": false, "skip_separation": .bool(jobDirect)
         ]
         if !jobDirect && !omitBackground { result["background_url"] = "http://127.0.0.1/files/background.wav" }
-        let bill: JSONValue = billUnderReview ? ["status": "pending_review", "review_required": true, "credits_charged": .number(charge)]
+        let bill: JSONValue = unbilled ? ["status": "pending_review"]
+            : billUnderReview ? ["status": "pending_review", "review_required": true, "credits_charged": .number(charge)]
             : ["status": "charged", "credits_charged": .number(charge)]
-        return ["job_id": "convert-1", "kind": "voice_convert", "status": "done", "credits_charged": .number(charge),
+        return ["job_id": "convert-1", "kind": "voice_convert", "status": "done", "credits_charged": .number(unbilled ? 0 : charge),
                 "billing": bill, "result": .object(result)]
     }
 }

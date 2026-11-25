@@ -131,6 +131,8 @@ explain() {
       echo "${d1} 是符号链接：docs/ 下的文档只许是普通文件 —— 符号链接不算文档（不占上限），索引也链不到它" ;;
     ext)
       echo "${d1}：文档的后缀只许小写的「.md」—— 别的写法（.MD、.markdown、.mdx）守卫当它不是文档，漏了索引也不红" ;;
+    empty_doc)
+      echo "${d1} is empty (only whitespace): its index line still opens it, so nothing else notices the doc is gone — restore it from git (git log -p -- ${d1} shows the commit that emptied it), or delete it together with its index line" ;;
     size)
       echo "${INDEX} 有 ${d1} 字节，超过上限 ${d2}（${SIZE_BASE_BYTES} + ${SIZE_PER_DOC_BYTES} × ${d3} 份 ${BUG_DIR}/ 以外的文档）：每个会话一开就整份读它 —— 必读表右列只留链接和一两条硬约束、检查入口每个脚本一行、索引每条一句话，细节挪进文档（docs/testing/check-catalog.md 或对应的架构文档），Bug 案例的条目只进 ${BUG_INDEX}；必读表里的旧案例链接只许撤一种：同一行链着的架构文档已经写了那条规矩、并且那份架构文档里链着这份案例（案例照旧留在 ${BUG_INDEX}）；别抬上限" ;;
     *)

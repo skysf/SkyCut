@@ -107,10 +107,7 @@ final class SkyStudioVoiceCloudBatches {
                 + "(\(voice.plan?.model ?? "unknown")), so nothing was generated. Keep the recovery_file; the finished batches stay.")
         }
         let missingCredits = voice.batches.map(\.credits)
-        guard let reserved = SkyStudioVoiceBudget.reserve(missingCredits) else {
-            throw SkyStudioVoiceBudgetProblem(credits: missingCredits.reduce(0, +))
-        }
-        budget = reserved
+        budget = try SkyStudioVoiceBudgetProblem.reserve(missingCredits)
         credits = missingCredits
         positions = Dictionary(uniqueKeysWithValues: indices.enumerated().map { ($0.element, $0.offset) })
         for (offset, index) in indices.enumerated() {

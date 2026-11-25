@@ -49,6 +49,8 @@ final class VoiceChangeJob {
     private var settledBill: SkyStudioJobStatus?
     private let status: SkyStudioMediaStatus
     private var serverID: String?
+    /// The job id a refusal came with when Sky Studio had not given one before (a 402 with pending billing): get_job asks it.
+    private var originalID: String?
     private var task: Task<Void, Never>?
     private var job: AIJobs.Job?
     /// The paid result whose download gave up, kept for Download again; nil once it starts.
@@ -101,8 +103,16 @@ final class VoiceChangeJob {
         do {
             done = try await convert()
         } catch let error as SkyStudioJobError {
+            if serverID == nil { originalID = error.failure?.jobID }
             settle(failed: error)
             if error.failure?.code == SkyStudioVoiceCodes.separationFailed { return separationFailed(error) }
+            if !Task.isCancelled, let balance = SkyStudioBalanceRefusal.refusal(of: error, accepted: serverID != nil) {
+                // The Sky Studio balance, not SkyCut's daily limit: the numbers and where only the user adds credits (MSG1).
+                var fields = SkyStudioBalanceRefusal.fields(balance, retry: "call change_voice again")
+                fields["failure"] = balance.failure.json
+                fields["code"] = .string(SkyStudioBalanceRefusal.code)
+                return finish(.failed, SkyStudioVoiceLibraryErrors.message(error), detail: fields, shown: SkyStudioBalanceRefusal.shown(balance))
+            }
             return finish(Task.isCancelled ? .cancelled : .failed, SkyStudioVoiceLibraryErrors.message(error))
         } catch {
             // 传的时候、交上之前出的错：一分没花。
@@ -117,8 +127,9 @@ final class VoiceChangeJob {
                 ? "The voice change was stopped before Sky Studio accepted it; nothing was charged."
                 : SkyStudioVoiceLibraryErrors.uncharged(error))
         }
-        // The final charge only (a bill under review keeps the reservation until get_job reads a final one).
-        if let charged = done.finalCharge { held.settle(charged: charged); settledBill = done } else { billPending = true }
+        // The final charge only (a bill under review, or a bare top-level 0, keeps the reservation until get_job reads a final one;
+        // VoiceChangeBilling.charge): a result without its files keeps it too.
+        if let charged = VoiceChangeBilling.charge(of: done) { held.settle(charged: charged); settledBill = done } else { billPending = true }
         guard case .conversion(let result)? = done.voiceResult else {
             return finish(.failed, "Sky Studio finished but returned no voice and background files; do not start the same change again "
                 + "before checking this job with Sky Studio.", detail: charges(done))
@@ -247,6 +258,34 @@ final class VoiceChangeJob {
     }
 
     private func remember(_ id: String) { if serverID == nil { serverID = id } }
+
+    private var refreshing = false
+    /// get_job reads the original job again (only a GET, never a new submission) while the books wait for its last word: a finished
+    /// job whose bill was not final (PR #554), or a change that failed or was stopped and may have been charged (a 402 with a job id
+    /// and pending billing, a failure after acceptance: MSG1). A final bill settles the books once. A refusal that carries the job's
+    /// final bill counts too (a 402 billed 6.5; a try? here once dropped it and the books kept 9), and its reply reads the books after
+    /// settling (Codex CXM4).
+    private func refreshBill() async {
+        guard !refreshing, let job, job.status != .running, let id = serverID ?? originalID,
+              billPending || job.status == .failed || job.status == .cancelled else { return }
+        refreshing = true
+        defer { refreshing = false }
+        let server: SkyStudioJobStatus
+        do {
+            server = try await services.api.job(id, key: key)
+        } catch let failure as SkyStudioFailure {
+            guard let billing = SkyStudioJobError.request(failure).failure?.billing else { return }
+            if billing.isFinal { billPending = false }
+            VoiceChangeBilling.settle(&held, by: billing)
+            AIJobs.shared.updateDetail(job, VoiceChangeBilling.refusalBill(billing))
+            return
+        } catch { return }
+        if let charged = VoiceChangeBilling.charge(of: server) { held.settle(charged: charged); billPending = false; settledBill = server }
+        var detail = charges(server)
+        if let state = server.state { detail["skystudio_status"] = .string(state.rawValue) }
+        if let billing = server.billing, detail["billing_note"] == nil { detail["billing_note"] = .string(billing.message) }
+        AIJobs.shared.updateDetail(job, detail)
+    }
 
     /// 下载两个文件到原素材旁边，量出各自多长。下到一半断了不留半个文件（SkyStudioAPI.download）；只下成一个就把它也删掉。
     /// A direct change downloads the voice alone (no background was made; one sent anyway is not what was asked for).
@@ -419,10 +458,12 @@ final class VoiceChangeJob {
 
     // MARK: 结果
 
+    /// The receipt: the final charge (VoiceChangeBilling.charge), or what stays reserved while the bill is not final.
     private func charges(_ status: SkyStudioJobStatus) -> [String: JSONValue] {
         let server = settledBill ?? status   // once the books took a final bill, the receipt keeps saying it
-        var value: [String: JSONValue] = ["skystudio_job_id": .string(server.jobID), "billing_pending": .bool(server.finalCharge == nil)]
-        if let charged = server.finalCharge {
+        let charge = VoiceChangeBilling.charge(of: server)
+        var value: [String: JSONValue] = ["skystudio_job_id": .string(server.jobID), "billing_pending": .bool(charge == nil)]
+        if let charged = charge {
             value["credits_charged"] = .number(SkyStudioCredits.number(charged))
         } else {
             value["credits_reserved"] = .number(SkyStudioCredits.number(quote.credits))
@@ -432,17 +473,6 @@ final class VoiceChangeJob {
         if let billing = server.billing { value["billing"] = billing.json }
         value["spent_today_credits"] = .number(SkyStudioCredits.number(SkyStudioSpendStore.shared.spentToday()))
         return value
-    }
-
-    /// get_job: a finished job whose bill was not final reads the original job again (only a GET); once its bill is final the day's
-    /// books and the receipt take that charge.
-    private func refreshBill() async {
-        guard billPending, let job, job.status != .running, let id = serverID,
-              let server = try? await services.api.job(id, key: key), let charged = server.finalCharge, billPending else { return }
-        held.settle(charged: charged)
-        billPending = false
-        settledBill = server
-        AIJobs.shared.updateDetail(job, charges(server))
     }
 
     private func live() -> [String: JSONValue] {

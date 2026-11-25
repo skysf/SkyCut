@@ -1368,7 +1368,19 @@
 
 "AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it." = "La IA se pausa al alcanzar este presupuesto diario. Auméntalo en Ajustes para continuar; ningún modo de permisos lo omite.";
 
-"Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue." = "Se alcanzó el presupuesto diario de IA. Auméntalo en Ajustes > Sky Studio para continuar.";
+"SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@. Raise it in %5$@, or wait until %6$@, when it resets." = "Lo detiene el límite diario de créditos de SkyCut, no tu saldo de Sky Studio: hoy llevas %1$@ de %2$@ créditos, quedan %3$@ y esto necesita %4$@. Súbelo en %5$@ o espera a las %6$@, cuando se reinicia.";
+
+"SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@, more than a whole day allows, so waiting does not help. Raise it in %5$@." = "Lo detiene el límite diario de créditos de SkyCut, no tu saldo de Sky Studio: hoy llevas %1$@ de %2$@ créditos, quedan %3$@ y esto necesita %4$@, más de lo que permite un día entero, así que esperar no sirve. Súbelo en %5$@.";
+
+"Change Limit…" = "Cambiar límite…";
+
+"Change SkyCut's daily limit for AI here; it is the same setting as in Settings" = "Cambia aquí el límite diario de SkyCut para la IA; es el mismo ajuste que en Ajustes";
+
+"The same setting as in %@." = "Es el mismo ajuste que en %@.";
+
+"Not enough Sky Studio credits: your balance is %1$@ and this needs %2$@. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %3$@." = "No hay suficientes créditos de Sky Studio: tu saldo es %1$@ y esto necesita %2$@. Es tu saldo de Sky Studio, no el límite diario de SkyCut. Añade créditos en %3$@.";
+
+"Not enough Sky Studio credits. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %@." = "No hay suficientes créditos de Sky Studio. Es tu saldo de Sky Studio, no el límite diario de SkyCut. Añade créditos en %@.";
 
 "Theme" = "Tema";
 

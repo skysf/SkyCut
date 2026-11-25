@@ -184,7 +184,8 @@ private func makeRun(_ folder: URL, stem: String, key: String = UUID().uuidStrin
     return SkyStudioGenerationRun(
         generation: SkyStudioGeneration(kind: .image, prompt: "a cabin in snow", params: [:], notes: [], operation: "generate"),
         model: model, quote: quote, references: SkyStudioReferencePlan(mode: "none", files: []), folder: folder, stem: stem,
-        project: OpenProjects.shared.primary, reservation: SkyStudioJobGate.Reservation(credits: 4, day: Date()), idempotencyKey: key)
+        project: OpenProjects.shared.primary,
+        reservation: SkyStudioJobGate.Reservation(credits: 4, day: Date(), dayKey: DailySpendLedger.dayKey(for: Date())), idempotencyKey: key)
 }
 
 @MainActor

@@ -22,6 +22,7 @@
 ## 唯一设置窗口
 
 SwiftUI `Settings` 场景只装 `SettingsWindowView().appLanguage()`；工具栏用 `SettingsLink`，与 SkyCut → 设置及 ⌘, 打开同一窗口。不得另做语言浮层或另一份设置数据。
+The paid panels' Change Limit… (2026-11-24) edits the limit's own row in a popover, in place. It never switches this window's pane: Design a Voice is a sheet of the Editing pane, and switching away would close it and lose its draft (MSG1 review, 2026-11-25).
 
 | 稳定分类 id | 分类 | 复用组件与数据 |
 | --- | --- | --- |
@@ -43,6 +44,7 @@ SwiftUI `Settings` 场景只装 `SettingsWindowView().appLanguage()`；工具栏
 - `set_settings` 只认明确白名单：`language`（system / en / zh-Hans / es）、`theme`（forest / classic）、`optimized_media_cache_gb`（设置原有十进制档位）、`clear_optimized_media_cache`、`daily_ai_credit_limit`（原 Store 的整数范围，0 暂停收费）、`ai_access_mode`、`confirm_token`。省略 / null 不动，至少一项有效改动。
 - **全部参数先读完、验完再写任何 Store**，错误整次不做。缓存仍由 `OptimizedMediaCacheSettings` 执行，不能绕过它直接删目录 / 写 defaults。清空可能异步完成，用 `get_settings section=cache` 的 `clearing` 核对，不把开始清空说成已完成。
 - 2026-10-31 的每日额度「询问阈值」规则已被 2026-11-01 用户决策取代：每日额度是硬预算，两种模式均不可绕过；0 暂停收费任务。余额不足提供服务器充值链接，日预算不足提供设置入口，不循环索要一次性越额批准。MCP 提高硬预算需明确同意和确认码。
+  Since 2026-11-24 a daily-limit refusal names it as SkyCut's own setting (not the Sky Studio balance), with the numbers, the reset and its options. The first is the exact `set_settings` call with a suggested value, plus SkyCut's question and a token for exactly that raise (the user's 「只问一次」, 2026-11-25). Any other value asks like any raise ([Sky Studio jobs](sky-studio-jobs.md) section 11).
 - 剪辑风格沿用 recipes / save_recipe，声音安装沿用 add_voiceover download_voices=true / get_job。账号密钥与客户端连接 / 断开仍从设置操作；新读权限仍走现有确认，不能借设置绕过。
 - 工具清单、总说明目录都列出新工具；旧小程序通过现有 MCPCatalogSync 获得 App 的新清单。
 
@@ -76,6 +78,8 @@ SwiftUI `Settings` 场景只装 `SettingsWindowView().appLanguage()`；工具栏
 - 全部权限自动执行并通知；读外部文件与移入废纸篓复用现有工具执行而不再问。不改变系统权限、套餐、原文件不覆盖、服务能力、硬预算或原单结算规则。切回请求批准后，全部权限期间的外部读取不会被偷偷记成永久读取授权。
   One exception in both modes (2026-11-26): the 5th identical paid request in a row asks once ([Sky Studio jobs](sky-studio-jobs.md), "Identical paid requests in a row").
 - `set_settings ai_access_mode=...` 的实际模式变更始终先回确认码，当前已是全部权限也一样；用户同意后携原码重调才写入。所有参数在确认前验完，未批准、错误或串码时整批不写。
+  Since 2026-11-26 a token is checked before anything in the call is written. One that was used, expired or not issued writes nothing either,
+  and a token is void after any change of the daily limit since its question ([Sky Studio jobs](sky-studio-jobs.md) section 11).
 - **打开全部权限时的说明与长期授权（2026-11-10 声音 PR 7，[SkyCut 声音方案](../plans/2026-11-09-voice-features.md) 5.6）**：设置里选「全部权限」先弹
   `FullAccessConsentSheet`（不再先问的几件事、声音的一次性费用价目从 `/models` 读、每日额度、打开即确认的那句长期授权），只有「同意并打开」才写 Store 并
   `POST /voices/consent-grant`（用户看到的那一版），「取消」不改，每次切到全部权限都弹；记不上照样打开、这一节下面写一行「还没记上」。切回请求批准立刻写 Store、

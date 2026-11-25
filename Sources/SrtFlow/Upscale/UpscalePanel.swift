@@ -213,6 +213,9 @@ struct UpscalePanel: View {
             if case .ready(let answer)? = offers.known(row.quote) { return answer } else { return nil }
         }
         let overLimit = spent + (quote?.credits ?? 0) > spend.dailyLimit + 0.0005
+        // Over the limit with a price: say which limit, the numbers and where to change it (MSG1), in place of the spent line.
+        let limitNote = overLimit ? quote : nil
+        if let limitNote { DailyCreditLimitNote(needed: limitNote.credits, spend: spend) }
         Divider()
         if held != nil {
             Label(SkyStudioPanelHeldText.upscaleLine, systemImage: "arrow.down.circle")
@@ -225,8 +228,10 @@ struct UpscalePanel: View {
                     Text(String(format: L10n("Saves next to the original as %@"), model.fileName(size: size, tier: selected.tier)))
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 }
-                Text(String(format: L10n("Spent today %@ of your %@-credit daily limit"), SkyStudioCredits.text(spent), SkyStudioCredits.text(spend.dailyLimit)))
-                    .font(.caption).foregroundStyle(overLimit ? .red : .secondary)
+                if limitNote == nil {
+                    Text(String(format: L10n("Spent today %@ of your %@-credit daily limit"), SkyStudioCredits.text(spent), SkyStudioCredits.text(spend.dailyLimit)))
+                        .font(.caption).foregroundStyle(overLimit ? .red : .secondary)
+                }
             }
             Spacer()
             if let held {

@@ -112,18 +112,25 @@ struct SkyStudioReferencePlan: Equatable, Sendable {
         }
         for type in ["video", "audio"] {
             let total = files.filter { $0.type == type }.reduce(0) { $0 + ($1.duration ?? 0) }
-            if let max = limits["max_total_\(type)_seconds"]?.doubleValue, total > max + tolerance { return "\(model.title) accepts at most \(max) seconds of \(type) references in total." }
+            if let max = limits["max_total_\(type)_seconds"]?.doubleValue, total > max + tolerance {
+                return "\(model.title) accepts at most \(max) seconds of \(type) references in total; these are \(String(format: "%.1f", total)) seconds."
+            }
         }
         let allBytes = files.reduce(0) { $0 + $1.bytes }
-        if let max = limits["max_total_bytes"]?.doubleValue, allBytes > max { return "The reference files exceed \(model.title)'s total size limit." }
+        // The actual total next to the limit (MSG1 review, 2026-11-25): the user can see how much to drop.
+        if let max = limits["max_total_bytes"]?.doubleValue, allBytes > max {
+            return "The reference files total \(Int(allBytes)) bytes, over \(model.title)'s total size limit (\(Int(max)) bytes)."
+        }
         // A fit_images model's total for all reference images is shared at upload time (SkyStudioReferenceTotal); without
         // fit_images it is refused here, like its other limits.
         let imageBytes = files.filter { $0.type == "image" }.reduce(0) { $0 + $1.bytes }
         if fitting == nil, let max = limits["max_total_image_bytes"]?.doubleValue, imageBytes > max {
-            return "The reference images exceed \(model.title)'s total image size limit (\(Int(max)) bytes)."
+            return "The reference images total \(Int(imageBytes)) bytes, over \(model.title)'s total image size limit (\(Int(max)) bytes)."
         }
         let videoBytes = files.filter { $0.type == "video" }.reduce(0) { $0 + $1.bytes }
-        if let max = limits["max_total_video_bytes_exclusive"]?.doubleValue, videoBytes >= max { return "The reference videos must total less than \(Int(max)) bytes for \(model.title)." }
+        if let max = limits["max_total_video_bytes_exclusive"]?.doubleValue, videoBytes >= max {
+            return "The reference videos must total less than \(Int(max)) bytes for \(model.title); these are \(Int(videoBytes)) bytes."
+        }
         return nil
     }
 }

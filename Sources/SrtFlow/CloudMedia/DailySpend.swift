@@ -14,7 +14,8 @@ enum DailySpendPolicy {
     }
 
     /// 一单位的千分之一以内的误差不算（浮点加出来的 9.999999999 不该算超）。
-    private static let slack = 0.0005
+    /// A refusal's suggested higher limit rounds with the same slack (SkyCutDailyLimit.suggestedLimit).
+    static let slack = 0.0005
 
     static func decide(estimate: Double, spentToday: Double, dailyLimit: Double) -> Decision {
         if spentToday + estimate <= dailyLimit + slack { return .allow }
@@ -39,17 +40,47 @@ struct DailySpendLedger: Codable, Equatable, Sendable {
     }
 
     mutating func add(_ amount: Double, on date: Date, calendar: Calendar = .current) {
+        add(amount, dayKey: Self.dayKey(for: date, calendar: calendar))
+    }
+
+    /// Books on a day key already worked out (a settlement goes on the day its reservation was booked on).
+    mutating func add(_ amount: Double, dayKey key: String) {
         guard amount > 0 else { return }
-        days[Self.dayKey(for: date, calendar: calendar), default: 0] += amount
+        days[key, default: 0] += amount
     }
 
     /// 退回一笔（生成失败 / 取消了、服务器没收钱）：不会退到负数。
     mutating func refund(_ amount: Double, on date: Date, calendar: Calendar = .current) {
-        guard amount > 0 else { return }
-        let key = Self.dayKey(for: date, calendar: calendar)
-        guard let current = days[key] else { return }
+        refund(amount, dayKey: Self.dayKey(for: date, calendar: calendar))
+    }
+
+    /// Refunds on the day key recorded at booking: a time zone changed since then (traveling, a system setting) must not move
+    /// the refund to another day (MSG1 review, 2026-11-25: a 60 refund cut the next day's 80 to 20).
+    mutating func refund(_ amount: Double, dayKey key: String) {
+        guard amount > 0, let current = days[key] else { return }
         let left = max(0, current - amount)
         if left == 0 { days[key] = nil } else { days[key] = left }
+    }
+
+    /// The days `date` falls on somewhere on Earth (UTC−12 to UTC+14): two or three in a row. A booking made at `date` in a time
+    /// zone nobody recorded sits on one of them.
+    static func possibleDayKeys(for date: Date, calendar: Calendar = .current) -> [String] {
+        var keys: [String] = []
+        for hours in [-12, 0, 14] {
+            var zoned = calendar
+            zoned.timeZone = TimeZone(secondsFromGMT: hours * 3_600) ?? calendar.timeZone
+            let key = dayKey(for: date, calendar: zoned)
+            if !keys.contains(key) { keys.append(key) }
+        }
+        return keys
+    }
+
+    /// The day a booking of `amount` made at `date` provably sits on when its day key was not recorded (a reservation saved before
+    /// day keys): the only one of its possible days that still holds that much. nil when none or several do, and then no day is
+    /// guessed: refunding into a day worked out in today's time zone took the next day's 80 down to 20 (Codex CXM3).
+    func provenDayKey(holding amount: Double, bookedAt date: Date, calendar: Calendar = .current) -> String? {
+        let holding = Self.possibleDayKeys(for: date, calendar: calendar).filter { (days[$0] ?? 0) + DailySpendPolicy.slack >= amount }
+        return holding.count == 1 ? holding[0] : nil
     }
 
     /// 只留最近的几天：账本不该越攒越长。

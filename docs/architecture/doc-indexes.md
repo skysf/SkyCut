@@ -119,6 +119,8 @@ AGENTS.md 是唯一入口，每个会话一开就整份读进来。2026-11-13 �
 **`docs/` 下的文件**：文档只许是普通文件、后缀小写的 `.md`、路径只用字母、数字、`.` `_` `-`（所以链接不用去支持括号和空格）。叫 `xxx.md` 的文件夹不算文档；
 符号链接、`.MD` / `.markdown`、名字不合规的都红。`docs/bugfixes/` 下只放 `YYYY-MM-DD-<slug>.md`、`TEMPLATE.md`、`INDEX.md`，不建子文件夹。
 漏索引、死链、算整份上限用的是同一份清单；路径大小写也要一字不差。
+A doc on that list, and a `.md` file at the root, is never empty (only whitespace counts as empty): an emptied file still exists, so
+its index line and the dead-link check stay green. A script's no-op rewrite emptied a linked doc that way (PR #555, 2026-11-25).
 
 **不设单条上限的小节**只多一条：列表项不许以链接开头 —— 那是索引条目的写法，条目放进索引小节才有每条 400 字节的上限
 （规则里要提一份文档，把链接写在句子中间）。

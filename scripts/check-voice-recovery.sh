@@ -56,6 +56,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 \
   checks/VoiceRecovery/OfficialFilmRunChecks.swift \
   checks/VoiceRecovery/PaidToolEntryChecks.swift \
   checks/VoiceRecovery/RepeatRequestChecks.swift checks/VoiceRecovery/RepeatPanelChecks.swift \
+  checks/VoiceRecovery/VoiceChangeBalanceChecks.swift checks/VoiceRecovery/VoiceChangeSettleChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" \
   -o "${APP}/Contents/MacOS/VoiceRecoveryCheck"
 # 外层看门狗不能放在 Swift 协作线程池里；脚本超时明确红。300 s (2026-11-26, was 180): the paid-download checks of PR #554 brought the

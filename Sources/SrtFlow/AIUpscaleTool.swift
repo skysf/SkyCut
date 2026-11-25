@@ -253,6 +253,13 @@ enum AIUpscaleTool {
                 // The state holds the user's localized line; the AI gets the English, the code and the count (nothing was submitted).
                 AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: " + failure.message,
                                      detail: .object(failure.fields(retry: "call upscale_clip again.")))
+            } else if let balance = ended.balanceRefusal {
+                // The Sky Studio balance: which system, the numbers, where only the user adds credits (MSG1).
+                var fields = SkyStudioBalanceRefusal.fields(balance, retry: "call upscale_clip again")
+                fields["failure"] = balance.failure.json
+                fields["code"] = .string(SkyStudioBalanceRefusal.code)
+                if let id = ended.skyStudioJobID { fields["skystudio_job_id"] = .string(id) }
+                AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: " + balance.failure.message, detail: .object(fields))
             } else if let failure = ended.downloadFailure {
                 // Made, only its download gave up: this job's row downloads it again at no charge; upscale_clip again is a new upscale.
                 AIJobs.shared.finish(aiJob, .failed, message: failure.message, detail: .object(heldFields(ended, failure.fields(retry: retry))))

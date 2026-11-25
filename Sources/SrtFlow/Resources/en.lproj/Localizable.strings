@@ -1368,7 +1368,19 @@
 
 "AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it." = "AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it.";
 
-"Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue." = "Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue.";
+"SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@. Raise it in %5$@, or wait until %6$@, when it resets." = "SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@. Raise it in %5$@, or wait until %6$@, when it resets.";
+
+"SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@, more than a whole day allows, so waiting does not help. Raise it in %5$@." = "SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@, more than a whole day allows, so waiting does not help. Raise it in %5$@.";
+
+"Change Limit…" = "Change Limit…";
+
+"Change SkyCut's daily limit for AI here; it is the same setting as in Settings" = "Change SkyCut's daily limit for AI here; it is the same setting as in Settings";
+
+"The same setting as in %@." = "The same setting as in %@.";
+
+"Not enough Sky Studio credits: your balance is %1$@ and this needs %2$@. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %3$@." = "Not enough Sky Studio credits: your balance is %1$@ and this needs %2$@. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %3$@.";
+
+"Not enough Sky Studio credits. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %@." = "Not enough Sky Studio credits. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %@.";
 
 "Theme" = "Theme";
 

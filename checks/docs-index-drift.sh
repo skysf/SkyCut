@@ -11,6 +11,7 @@
 #      发现，而其中「播放头断线」那份正好是当天新 bug 的孪生兄弟。分两份查：docs/bugfixes/ 下的每一份（INDEX.md 自己除外）
 #      在 docs/bugfixes/INDEX.md 里当条目列着；其余每一份、连同 INDEX.md，能从 AGENTS.md 的链接找到。
 #   2. 索引里的链接都指向真实存在的文件 —— 死链比没有索引更坏：它会让人以为查过了。
+#      An empty doc is as lost as a dead link (step 1d): the file still exists, so nothing else notices.
 #   3. 索引每条只有「链接 + 一句话」，AGENTS.md 整份不再长回去 —— 它每个会话一开就整份读进来。2026-11-13 之前每条索引都带着
 #      一大段摘要：339 KB，一个会话光读它就约 14.7 万 token，而规则本身只有 11 KB。小节分三类（索引小节、指路的小节、
 #      不设单条上限的小节），名单、几个数和它们的来历在 docs-index-drift/config.sh。
@@ -113,6 +114,17 @@ while IFS= read -r doc; do
   [ -n "${doc}" ] || continue
   found F 0 ext "${doc}"
 done <<< "$(find docs -type f \( -iname '*.md' -o -iname '*.markdown' -o -iname '*.mdown' -o -iname '*.mkd' -o -iname '*.mdx' \) -not -name '*.md' | LC_ALL=C sort)"
+# 1d. No doc here or at the root is empty (only whitespace counts): it still exists, so its index line and the dead-link check
+#     stayed green when a script's no-op rewrite emptied a linked doc (PR #555). Each file is read up to its first non-blank line.
+read -r -d '' BLANK_AWK <<'AWK' || true
+$0 != "" { f = $0; blank = 1
+  while ((getline line < f) > 0) if (line ~ /[^[:space:]]/) { blank = 0; break }
+  close(f); if (blank) print f }
+AWK
+while IFS= read -r doc; do
+  [ -n "${doc}" ] || continue
+  found F 0 empty_doc "${doc}"
+done <<< "$(printf '%s\n' "${DOCS_ALL}" "${ROOT_MD}" | LC_ALL=C awk "${BLANK_AWK}")"
 
 # ── 2. 逐行认两份索引的写法（docs-index-drift/lines.sh）──────────────
 for file in "${INDEX}" "${BUG_INDEX}"; do

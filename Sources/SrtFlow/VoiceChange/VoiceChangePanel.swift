@@ -71,6 +71,8 @@ struct VoiceChangePanel: View {
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // Over the limit: which limit, the numbers and where to change it (MSG1), in place of the spent line.
+            if overLimit, let quote = model.quote { DailyCreditLimitNote(needed: quote.credits, spend: spend) }
             Divider()
             if let held = model.held {
                 // A paid result is waiting: getting it again is free and the main button; a new version is a new paid change.
@@ -120,12 +122,15 @@ struct VoiceChangePanel: View {
         }
     }
 
-    /// Today's spending against the daily limit (red when the quote would go over it).
+    /// Today's spending against the daily limit; over it, DailyCreditLimitNote above the divider says it instead (MSG1).
+    @ViewBuilder
     private func spentToday(_ overLimit: Bool) -> some View {
-        Text(String(format: L10n("Spent today %@ of your %@-credit daily limit"), SkyStudioCredits.text(spend.spentToday()), SkyStudioCredits.text(spend.dailyLimit)))
-            .font(.caption)
-            .foregroundStyle(overLimit ? .red : .secondary)
-            .fixedSize(horizontal: false, vertical: true)
+        if !overLimit {
+            Text(String(format: L10n("Spent today %@ of your %@-credit daily limit"), SkyStudioCredits.text(spend.spentToday()), SkyStudioCredits.text(spend.dailyLimit)))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     /// 按「开始」：就是确认（VoiceChangePanelModel.start）；起了任务就收起。

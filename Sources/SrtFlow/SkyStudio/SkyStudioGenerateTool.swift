@@ -102,7 +102,7 @@ enum SkyStudioGenerateTool {
         } catch let error as AIToolError {
             throw error
         } catch {
-            throw SkyStudioCharacterError.tool(error)
+            throw SkyStudioCharacterError.tool(error, beforeSubmission: true)
         }
 
         // 每一项越档连同用户点名它时会说的写法（user_requested_overrides 要 user_request 里找得到，AIOverrideQuote）。

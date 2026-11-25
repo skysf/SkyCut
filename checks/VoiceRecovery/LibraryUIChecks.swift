@@ -318,8 +318,9 @@ private func designChecks(_ root: URL) async throws {
     let spent = spend.spentToday()
     spend.setDailyLimit(max(1, (spent + 100).rounded()))
     require(chinese.overLimit(spend: spend), "a quote over today's budget is flagged")
-    require(!chinese.design() && chinese.problem != nil && VoiceLibraryHTTP.calls("POST", "/jobs").count == jobs && abs(spend.spentToday() - spent) < 0.001,
-            "and pressing Design reserves nothing and starts nothing")
+    require(!chinese.design() && chinese.problem == nil && chinese.overLimit(spend: spend)
+            && VoiceLibraryHTTP.calls("POST", "/jobs").count == jobs && abs(spend.spentToday() - spent) < 0.001,
+            "and pressing Design reserves nothing and starts nothing; the sheet's note says why, with no second line in problem (MSG1)")
     spend.setDailyLimit(100_000)
     chinese.close()
 

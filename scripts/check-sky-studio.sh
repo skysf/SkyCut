@@ -55,6 +55,12 @@
 #      the GETs it sent. HeldDownloadChecks: a request's key is part of what it is bound to, and only its own job is downloaded again.
 #      The debug-only hook SRTFLOW_TEST_DOWNLOAD_DROPS (CloudDownloadFault) is refused by the same probe; its checks
 #      (checks/UploadFault/DownloadFaultChecks.swift) run in the -D DEBUG binary.
+#  14. SkyCut's own daily credit limit stopping a request (2026-11-24, MSG1; DailyLimitChecks): the AI's result names the limit,
+#      gives the numbers, the reset and three options (the exact set_settings call with a friendly suggested value, which still
+#      asks the user; the settings path read from every real string table; waiting); the panels' line in every language.
+#      Its twin, Sky Studio's balance refusal (BalanceRefusalChecks): the account, not SkyCut's limit; the numbers; where to add credits.
+#      Tokens and settlements (Codex CXM3): a raise's token void after any change of the limit, checked before anything is written
+#      (LimitTokenChecks); a settlement on the booking's day key, in one ledger write, a keyless one only on a proven day (SettleChecks).
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写只有一份 KeychainSecret，真钥匙串在 scripts/check-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -167,6 +173,14 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioRepeatGuard.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioRepeatWords.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioRequestDigest.swift \
+  Sources/SrtFlow/SkyStudio/SkyCutDailyLimit.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioBalanceRefusal.swift \
+  Sources/SrtFlow/SettingsCategory.swift \
+  Sources/SrtFlow/AppLanguage.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
+  Sources/SrtFlow/PerfCounters.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioHeldCredits.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceBatch.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoicePlan.swift \
@@ -248,6 +262,10 @@ xcrun swiftc \
   checks/SkyStudio/ApprovalChecks.swift \
   checks/SkyStudio/RepeatGuardChecks.swift \
   checks/SkyStudio/AccessChecks.swift \
+  checks/SkyStudio/DailyLimitChecks.swift \
+  checks/SkyStudio/BalanceRefusalChecks.swift \
+  checks/SkyStudio/LimitTokenChecks.swift \
+  checks/SkyStudio/SettleChecks.swift \
   checks/SkyStudio/VoiceChecks.swift \
   checks/SkyStudio/VoiceTimingChecks.swift \
   checks/SkyStudio/VoiceSplitChecks.swift \

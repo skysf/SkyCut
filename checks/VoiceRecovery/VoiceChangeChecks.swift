@@ -482,6 +482,7 @@ private func failureChecks(_ root: URL) async throws {
     require(unknown.project.state.clip(with: other)?.isMuted == false && unknown.project.state.audioTracks.count == 1, "and the timeline is untouched")
     for row in SkyStudioGenerationActivity.shared.runs where row.issue != nil { SkyStudioGenerationActivity.shared.dismiss(row) }
     SkyStudioSpendStore.shared.refund(9, on: Date())
+    try await voiceChangeBalanceChecks(root)
 }
 
 // MARK: 面板背后的那一份
@@ -520,8 +521,9 @@ private func panelChecks(_ root: URL) async throws {
     let spent = SkyStudioSpendStore.shared.spentToday()
     SkyStudioSpendStore.shared.setDailyLimit(spent + 5)
     require(model.overLimit(spend: SkyStudioSpendStore.shared), "a price over the daily limit is flagged")
-    require(!model.start() && model.problem != nil && VoiceChangeHTTP.calls("POST", "/jobs").isEmpty
-            && SkyStudioSpendStore.shared.spentToday() == spent, "over the daily limit the button starts nothing and records nothing")
+    require(!model.start() && model.problem == nil && VoiceChangeHTTP.calls("POST", "/jobs").isEmpty
+            && SkyStudioSpendStore.shared.spentToday() == spent,
+            "over the daily limit the button starts nothing and records nothing; the note says why, no second line in problem (MSG1)")
     SkyStudioSpendStore.shared.setDailyLimit(100_000)
 
     // 按下「开始」就是确认：记账、起同一个任务、做完自动落地、提示条说一句；记住上次用的声音。
