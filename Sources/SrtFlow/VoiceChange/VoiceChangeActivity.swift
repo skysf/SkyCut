@@ -38,6 +38,14 @@ final class VoiceChangeActivity: ObservableObject {
     func noteSeparationFailed(_ clipID: UUID) { separationFailures.insert(clipID) }
     func noteLanded(_ clipID: UUID) { separationFailures.remove(clipID) }
 
+    /// The AI job id of the change last started for each clip in each opening of a project (2026-11-26): the panel opened again on
+    /// that clip offers its Download again while Sky Studio's result is held (SkyStudioPanelHeldDownload). Found by the job's own
+    /// clip, never by a request's parameters.
+    private var lastJobs: [String: String] = [:]
+
+    func noteJob(_ jobID: String, clip clipID: UUID, generation: Int) { lastJobs["\(generation):\(clipID)"] = jobID }
+    func lastJob(for clipID: UUID, generation: Int) -> String? { lastJobs["\(generation):\(clipID)"] }
+
     /// 上次变声用的那个声音（`voice_…` / `gemini:<名字>`）；没用过是 nil。
     var lastVoiceID: String? {
         get { UserDefaults.standard.string(forKey: Self.lastVoiceKey) }

@@ -16,8 +16,9 @@
 #   - every paid download passes `renew:` (the job's current address, never a new job) and goes through SkyStudioAPI.download;
 #   - every flow keeps its paid result for Download again on the job's own row / id / key until it has come down, an output folder
 #     that cannot be made included; nothing maps a new request to an old held job by its parameters (generate_media's key, as SkyCut
-#     reads it, is part of what a request is bound to; upscale_clip, change_voice and the panels start a new paid job: user,
-#     2026-11-25); voiceover's row runs its recovery from the record on disk; an upscale's or a voice change's charge reaches the day's
+#     reads it, is part of what a request is bound to; upscale_clip, change_voice and the panels' paid button start a new paid job:
+#     user, 2026-11-25; a panel's Download again is only its own clip's held job); voiceover's row runs its recovery from the record on
+#     disk; an upscale's or a voice change's charge reaches the day's
 #     books only once its bill is final (get_job reads it again until it is); a voice change's files take their names on disk and a
 #     failure deletes only a file it placed, while it is still that file and no timeline uses it;
 #   - the user's lines name the network, never a proxy;
@@ -122,8 +123,10 @@ grep -qF 'let requestIdentity = SkyStudioGenerationRequests.identity(arguments: 
   || fail "${DOWNLOAD_TOOL}: generate_media reaches a held result only through its own key's cached answer"
 others="$(code_files_with 'heldAnswer\(key:|heldDownload\(|heldChange\(|dismissedHeld|holdsResult\(' || true)"
 [ -z "${others}" ] || fail "these files look a held result up by a request's parameters: $(tr '\n' ' ' <<<"${others}")— an identical paid request is a new job (user, 2026-11-25); only the job's own row / id / key reaches its result"
-others="$(grep -lE 'downloadAgain|retryDownload|SkyStudioHeldDownloads|heldDownload|heldChange' "${DOWNLOAD_UPSCALE_TOOL}" "${DOWNLOAD_UPSCALE_PANEL}" \
-          "${DOWNLOAD_UPSCALE_INSPECTOR}" "${DOWNLOAD_CHANGE_TOOL}" "${DOWNLOAD_CHANGE_PANEL}" "${DOWNLOAD_CHANGE_MODEL}" || true)"
+# The panels offer Download again only for their own clip's held job, through SkyStudioPanelHeldDownload (2026-11-26, B47's UI half;
+# checks/sky-studio-wiring/repeat-requests.sh pins how it finds it); the tools and the inspector never do.
+others="$(grep -lE 'downloadAgain|retryDownload|SkyStudioHeldDownloads|heldDownload|heldChange' "${DOWNLOAD_UPSCALE_TOOL}" \
+          "${DOWNLOAD_UPSCALE_INSPECTOR}" "${DOWNLOAD_CHANGE_TOOL}" || true)"
 [ -z "${others}" ] || fail "these entries offer Download again for the same input: $(tr '\n' ' ' <<<"${others}")— they start a new paid job; Download again stays on the job's own row"
 
 # Generation: every way a download does not finish holds the result until it has come down; Download again reads the job first.
@@ -210,3 +213,7 @@ fenced="$(awk '
 grep -qF -- '-e SRTFLOW_TEST_DOWNLOAD_DROPS -e CloudDownloadFault' scripts/debug-hook-probe.sh \
   && grep -qF 'for HOOK in SRTFLOW_TEST_UPLOAD_DROPS SRTFLOW_TEST_DOWNLOAD_DROPS; do' scripts/check-sky-studio.sh \
   || fail "scripts/debug-hook-probe.sh must refuse a binary naming the download hook, and scripts/check-sky-studio.sh's control must see it named"
+
+# The panels' Download again for their own clip and identical paid requests in a row (2026-11-26): repeat-requests.sh.
+# shellcheck source=checks/sky-studio-wiring/repeat-requests.sh
+source checks/sky-studio-wiring/repeat-requests.sh

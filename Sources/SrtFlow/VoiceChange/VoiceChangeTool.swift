@@ -8,7 +8,8 @@ import SrtFlowMCPKit
 // 1. 核对：这一段有声音、没静音；源秒数不超过 `/models` 的上限（超了拒、叫它先 split_clip）；目标声音是声音库的 `voice_…`（向
 //    Sky Studio 问一次，拿名字和有哪几种语言的录音）或预设（`gemini:<名字>`、不带前缀的预设名）。
 // 2. 收费之前：截出这一段的声音（几乎没声音的拒）、定这段说的是什么语言（`language` 给了就用它，否则本机检测）、`POST /quote`。
-// 3. 把关：只判每日硬预算（不是一次性费用，两种权限模式都不问；超了回 daily_budget_exceeded、什么都不起）。
+// 3. 把关：只判每日硬预算（不是一次性费用，两种权限模式都不问；超了回 daily_budget_exceeded、什么都不起）。The one question:
+//    the 5th identical change in a row in this project asks the user once, in both modes (SkyStudioRepeatGuard, 2026-11-26).
 // 4. 起任务、**回任务号**；做完那一刻的落地是异步落账，任务里自己包一层 `AIUndoGrouping.step`（VoiceChangeJob.land）。
 // Key 只静默读（AI 起的，没人在看）；声音库用不了（503 voice_library_unavailable）照实说、一分不花。
 // `skip_separation` (optional, default false, 2026-11-21): a direct change, in the draft and so in the quote and the job; a
@@ -64,19 +65,25 @@ enum VoiceChangeTool {
             throw AIToolError("Sky Studio's quote does not confirm skip_separation, so it would separate the clip and charge for it. "
                 + "Nothing was started or charged. Call change_voice without skip_separation, or try again later.")
         }
+        // What is sent (the cut sound by its bytes): identical requests in a row are counted, the 5th asks (SkyStudioRepeatGuard).
+        let sent = try await SkyStudioRequestDigest.identity(draft, files: [.init(role: "source_audio", url: source.url)])
 
         // 问 Sky Studio 的这几秒里工程可能换了、这一段可能没了、别的调用可能已经起了这一段。
         guard project.documentGeneration == generation, let current = project.state.clip(with: id),
               !VoiceChangeActivity.shared.isChanging(id) else {
             throw AIToolError("The project changed while SkyCut prepared the voice change; nothing was started or charged. Call change_voice again.")
         }
-        // 花钱：只判每日硬预算（不是一次性费用，不问）。
+        // 花钱：每日硬预算；不问，只有一连第 5 次一样的变声先问用户一次（全部权限也问，SkyStudioRepeatGuard）。
+        let repeated = SkyStudioRepeatGuard.shared.check(.changeVoice, project: project.documentGeneration, identity: sent, credits: quote.credits)
+        if let question = SkyStudioJobGate.repeatConfirmation(repeated, summary: "Voice change · \(target.name) · " + String(format: "%.1f s", source.seconds),
+                                                              token: try args.string("confirm_token")) { return question }
         guard let reservation = SkyStudioJobGate.reserveWithoutAsking(credits: quote.credits) else {
             return SkyStudioJobGate.budgetBlocked(credits: quote.credits, store: SkyStudioSpendStore.shared)
         }
         let job = VoiceChangeOrder.start(clip: current, source: source, draft: draft, quote: quote, target: target, key: key,
                                          reservation: reservation, project: project, notifies: false, services: services)
         started = true
+        SkyStudioRepeatGuard.shared.started(repeated)
 
         let spend = SkyStudioSpendStore.shared
         let minutes = quote.typicalSeconds.map { CloudJobProgress.minutes($0) }
@@ -101,7 +108,7 @@ enum VoiceChangeTool {
         if let language = draft.params["target_language"]?.stringValue { result["target_language"] = .string(language) }
         let notes = notes(target: target, spoken: spoken, given: given != nil)
         if !notes.isEmpty { result["note"] = .string(notes.joined(separator: " ")) }
-        return .ok(.object(result))
+        return SkyStudioRepeatWords.adding(repeated, to: .ok(.object(result)))
     }
 
     /// 目标声音：声音库的问 Sky Studio 一次（名字、有哪几种语言的录音），预设从目录里认（`gemini:charon`、`Charon` 都行）。
