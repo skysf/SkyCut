@@ -78,18 +78,22 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - 只有最终 PR 的 CI 通过并合并到 `main` 后，才允许由合并后的 `main` 提交触发官网部署；不从本地未合并工作区上传，不用反复部署替代本地验收。
 - 本地命令、API 验证和部署分支配置见 [SkyCut 官网](docs/architecture/skycut-website.md)。官网上线与 Mac App 发版分别管理。
 
-### 打包与签名（2026-10-03 起）
+### 打包与签名（2026-10-03 起；Developer ID since 2026-11-26）
 
 - DMG 使用脚本生成的六语 Retina 安装引导背景和固定 Finder 布局，不带旧 txt；正常打包不自动控制 Finder。
   生成 / 模板更新和真挂载验收见 [构建与打包](docs/build/build-and-packaging.md)「DMG 安装窗口」
   （含 macOS 26.5.2 仍沿用用户路径栏 / 状态栏偏好的实测限制；不能把模板字段关闭当成实机已隐藏）。
 
-- 装给用户的包（正式版、测试版）和发版的包，只用固定的签名身份签：`scripts/build-app.sh`、`build-beta-app.sh` 自动经
-  `scripts/signing/sign-app.sh` 签。它打出「⚠️ 没有发布用的签名身份，退回 ad-hoc」的包**不许装给用户、不许发版**：ad-hoc 的
-  每个版本在 macOS 眼里都是另一个 App，录屏、麦克风、下载文件夹、钥匙串的授权全部作废，录屏那条拨开关都救不回来。
-- 签名身份（私钥）在仓库外的 `~/.config/srtflow/signing/`，**永不重建**：换一把证书 = 所有用户再授权一次（`sign-app.sh` 认
-  `packaging/signing-identity.sha1` 钉着的那把，对不上就拒签）。换机器把整个目录拷过去；**这个目录必须有备份**（用户的事，
-  见到它不在就停下来告诉用户，别去跑 `create-identity.sh`）。细节见 [签名与系统权限](docs/architecture/code-signing-and-permissions.md)。
+- User builds (official and Beta) and releases are signed only with the Developer ID
+  `Developer ID Application: TIANYU LU (26TVX3S9FR)` (user, 2026-11-25), pinned by SHA-1 in `packaging/signing-identity.sha1`,
+  with the hardened runtime, and notarized and stapled: `scripts/build-app.sh` and `build-beta-app.sh` do it only through `scripts/signing/`. A build that
+  warns 「⚠️ No Developer ID on this Mac」 (ad-hoc, not notarized) is **never installed for the user or released**: macOS
+  takes each ad-hoc build for another app and drops its screen recording, microphone, Downloads and keychain grants.
+- The signature names the team, not the certificate: new builds and a renewed certificate of the team keep every grant.
+  Renew before 2027-12-25 and update the pin; never sign with another team. Notarization uses the keychain profile
+  `notary-26TVX3S9FR` (one for all of the user's apps), which the user creates: never ask for, handle or print its password.
+  The first Developer ID build asks for the grants once more (accepted: no external users). The old self-signed identity in
+  `~/.config/srtflow/signing/` stays untouched as a backup; nothing uses it. 细节见 [签名与系统权限](docs/architecture/code-signing-and-permissions.md)。
 - One SkyCut and one SkyCut Beta (user, 2026-11-19): only `/Applications/SkyCut.app` and `/Applications/SkyCut Beta.app` stay
   installed; a local install, only when the user asks, replaces one while it isn't running (never quit the user's copy) and
   deletes the old bundle; test, smoke and probe bundles are never installed and are unregistered and deleted when the run
@@ -163,7 +167,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 修改范围 | 动手前必读 |
 | --- | --- |
 | 官网 `website/`、本地网页预览、官网 Vercel 配置与部署、首屏 3D 场景（`website/src/scene*.js`、烤好的静图 `hero-still-*`、`main.js` 里加载场景的那一段） | [SkyCut 官网](docs/architecture/skycut-website.md)（改了场景外观要 `npm run build:hero-still` 重烤并提交指纹；不加 npm 依赖） |
-| 构建、打包、版本、授权、shell、CI、签名（`scripts/signing/`）、local installs and test app bundles (`lsregister`) | [签名与系统权限](docs/architecture/code-signing-and-permissions.md)（打包脚本只经 `sign-app.sh` 签；证书永不重建；退回 ad-hoc 的包不许发版）、[构建与打包](docs/build/build-and-packaging.md) (one SkyCut and one Beta installed; test bundles unregistered and deleted)、[构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)、[包内授权声明过期](docs/bugfixes/2026-08-06-stale-bundled-license-notice.md)、[CI 首跑与吞错](docs/bugfixes/2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) |
+| 构建、打包、版本、授权、shell、CI、签名（`scripts/signing/`）、the Developer ID, hardened runtime and entitlements (`packaging/SkyCut.entitlements`, `packaging/signing-identity.sha1`), notarization (`notarytool`, `stapler`, `spctl`), code added to the app bundle, local installs and test app bundles (`lsregister`) | [签名与系统权限](docs/architecture/code-signing-and-permissions.md)（signing and notarization only through `scripts/signing/`; only the pinned Developer ID; every piece of code in the bundle named in `sign-app.sh`, an entitlement only with proof; ad-hoc or un-notarized builds never go to users）、[构建与打包](docs/build/build-and-packaging.md) (one SkyCut and one Beta installed; test bundles unregistered and deleted)、[构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)、[包内授权声明过期](docs/bugfixes/2026-08-06-stale-bundled-license-notice.md)、[CI 首跑与吞错](docs/bugfixes/2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) |
 | Web-motion renderer: `skycut-web-motion`, `SrtFlowWebMotionKit`, `Sources/SrtFlow/WebMotion/`, `set_motion`, stored pages and project-relative motion caches (`WebMotionRecovery`); page checks (MCP-75), memory / time limits | [Web-motion renderer](docs/architecture/web-motion-renderer.md) (pages only run in the helper; the network lock is never relaxed and fails closed; the page clock is SkyCut's own, never the probe's) |
 | AGENTS.md 和 `docs/bugfixes/INDEX.md` 的索引：加 / 改 / 收短一条索引或必读表的一行、新加小节、`checks/docs-index-drift.sh` 红了或要改它（`--self-test`）、并行的 PR 撞在索引的同一行、`merge=union` | [文档索引怎么写](docs/architecture/doc-indexes.md)（只许规定的写法，别的都红；收成一句话时「只有 / 一律」写全例外、实测数字带着条件；超了不抬数；`INDEX.md` 按文件名里日期后面那一段的字母序插） |
 | App、小程序、MCP 服务器叫什么（SkyCut / `skycut-mcp` / `skycut`）；新加身份类的字符串（bundle id、UTType、数据文件夹、UserDefaults 的键、钥匙串、AI 通道、环境变量）；界面和给 AI 的话里写产品名 | [产品名与代码名](docs/architecture/product-name.md)（看得见的写 SkyCut；身份类的名字沿用 SrtFlow，新加的同类照旧用老前缀）、[改名方案](docs/plans/2026-10-18-rename-to-skycut.md) |
@@ -345,7 +349,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/project-file-wiring.sh` — 工程存盘 / 选择 / 隐藏 / 导出这批合同的生产接线；搬代码、改名之后先跑它；cover/grade frame-window selection and timeline-look requests.
 - `checks/project-versions-wiring.sh` — Saved versions: the router hook, `undo version=`, the round's save points, the one-step restore, one writer of project files.
 - `checks/region-framing-wiring.sh` — 源矩形取景接进现有编辑 / 批量和原生渲染。
-- `checks/release-signing.sh` — 发布版用固定的签名身份签；`tccutil` 只在一处。
+- `checks/release-signing.sh` — the Developer ID, hardened runtime, entitlements and notarization only through `scripts/signing/`, in order; signs a fixture ad-hoc; `tccutil` 只在一处。
 - `checks/report-evidence-no-local-paths.sh` — 进仓库的实测证据里没有本机的绝对路径。
 - `checks/screen-recording-ai-wiring.sh` — AI 录屏：不开系统选择窗口、不覆盖、入轨包 step、丢弃先问。
 - `checks/sfx-catalog.sh` — 音效目录：id 连号永不改、tag 在词表里。
@@ -384,7 +388,6 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/render-voice-library.sh <输出目录>`、`scripts/render-motion-presets.sh <输出目录>` — 声音库 / 变声、动效预设的离屏出图（动效预设还要 ffmpeg）。要图形会话。
 - `scripts/render-project-versions.sh <folder>` — Off-screen images of the Versions sheet and the AI banner's version line. Needs a graphical session.
 - `scripts/render-inspector-sound.sh <folder>` — Off-screen images of the clip inspector's sound section (volume, voice band, scene). Needs a graphical session.
-- `scripts/signing/create-identity.sh` — 建签名身份，一次性的；见到签名目录不在先停下来告诉用户，别去跑它。
 - 官网（在 `website/`）：`tests/*.test.mjs` 和 `npm run check:seo` 在 CI 的网站那一步里；浏览器级的 `scripts/check-hero-browsers.mjs`、`scripts/check-legibility-browsers.mjs`（`npx -y -p playwright@1.65.0 node …`）是手动的、无头、只在 Mac 上；改了首屏场景的外观要 `npm run build:hero-still` 重烤。
 
 ## 规划与实施报告索引
@@ -430,6 +433,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ### 报告（docs/reports/）
 
+- [Developer ID signing, hardened runtime and notarization](docs/reports/2026-11-26-developer-id-signing.md) — the entitlement probe, the E2E and Kokoro runs on a hardened build, the notarization runs and times, the guard's sabotages; the permission proofs still waiting for the user (as of 2026-11-26).
 - [Review rounds: the baseline behind the risk-based policy](docs/reports/2026-11-24-review-rounds-baseline.md) — five PRs on 11-23/24: first Codex rounds found 24 issues counted point by point, all 5 serious ones among them; the one second round 5 smaller; real smokes 3 provider facts no review could; time per round.
 - [CI: full-App checks over three shards, cheap flakes](docs/reports/2026-11-20-ci-rebalance.md) — the longest shard 26.9 → 14.5–15.7 min (11-19 median vs #523's and #525's runs), the same 118 checks; uploads can't fail a shard.
 - [合并后 main 上那一轮：树已经验过就不再跑检查](docs/reports/2026-11-13-main-ci-verified-tree.md) — how often a merge's tree was exactly the one its PR's green run tested and why main went red (to 11-13), the options compared, GitHub's tested behaviour.
@@ -479,7 +483,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [写代码的规范](docs/architecture/coding-standards.md) — 模块化六条、单文件目标 400 / 上限 600 行、老文件只许降的基线、审查清单。
 - [文档索引怎么写](docs/architecture/doc-indexes.md) — AGENTS.md 和 `docs/bugfixes/INDEX.md` 里许写什么、不许写什么（白名单）、三类小节、整份上限和超了怎么收；收成一句话时例外、条件、适用范围不能丢；Bug 案例索引按文件名里日期后面那一段排，并行的 PR 别撞在同一行（为什么不用 `merge=union`）。
 - [开着的工程（OpenProjects）](docs/architecture/open-projects.md) — 工程不再是单例：注册表、短 id、全 App 一个代号计数、每个工程自己的撤销、工程窗口、后台工程；谁该找哪一个工程。
-- [签名与系统权限](docs/architecture/code-signing-and-permissions.md) — 固定的自签名证书「SrtFlow Signing」（永不重建、仓库钉 SHA-1）；系统授权按签名记账；钥匙串每个新构建仍要输一次密码。
+- [签名与系统权限](docs/architecture/code-signing-and-permissions.md) — since 2026-11-26 the Developer ID of team 26TVX3S9FR (pinned SHA-1), the hardened runtime with two entitlements and notarization; system grants keyed to the team's requirement; the self-signed history.
 - [产品名与代码名](docs/architecture/product-name.md) — 看得见的叫 SkyCut；身份（bundle id、UTType、钥匙串、数据文件夹…）和代码名永远沿用 SrtFlow。
 - [AI 接口（MCP）](docs/architecture/ai-control-mcp.md) — 三段结构（客户端 → `skycut-mcp` → App）、工具清单只有一份、通道、工具在 App 里的规矩（一个工具 = 一步撤销、不弹模态框、什么时候问用户按权限模式和第四节第 6 条、硬预算不能绕过）、「连接 AI」。
 - [视频 upscale](docs/architecture/video-upscale.md) — 片段送 Sky Studio 放大：范围带余料、成品的声音自己封回原片的、做完不替换（对比后才换源）、花积分的规矩。
