@@ -1,14 +1,15 @@
 """Batches for the merge slot (scripts/merge-slot.py loads this file by path). When more than one labeled pull request
-is ready, one checks run tests main plus all of them; if it's green they merge in label order. The rules are in
-docs/build/build-and-packaging.md "Merge slot"; checks/MergeSlot/BatchCases.py tests this against a fake GitHub.
+is ready, one checks run tests main plus all of them; a green batch lands whole, in label order, or not at all. The
+rules are in docs/build/build-and-packaging.md "Merge slot"; checks/MergeSlot/BatchCases.py and BatchLandingCases.py
+test this against a fake GitHub.
 
 A batch lives on the branch merge-slot/pr-batch as one commit made for it:
 - its tree is main + the first pull request + the second + ..., merged one after another with the Merges API;
 - its parents are main and the members' heads in that order, so checks.yml classifies and measures it against main as
   it does a single pull request's test merge (scripts/ci-docs-only.sh and the preview perf ratchet compare with HEAD^1);
 - its message lists each member's number, head and the tree main must have right after merging it.
-Everything is read back from GitHub on every pass (the branch, that commit, the runs on the branch), so the workflow's
-next job carries on where this one stopped.
+Everything is read back from GitHub on every pass (the branch, that commit, the runs on the branch, the members and
+their merge commits), so the workflow's next job carries on where this one stopped.
 """
 import datetime as dt
 import re
@@ -52,8 +53,9 @@ class Batch:
 
 
 class Batches:
-    """The slot's batch: forms it where the slot would test one pull request, holds the slot while its run goes, merges
-    it when green, and after a red one has its members tested one at a time (Slot.serve calls step() every pass)."""
+    """The slot's batch: forms it where the slot would test one pull request, holds the slot while its run goes, lands
+    it whole when green, and after a red one has its members tested one at a time (Slot.serve calls step() every pass,
+    and once more before it stops on an empty queue, so a batch is finished off)."""
 
     def __init__(self, slot, error, label, prefix, workflow, workflow_path, max_age, timeout):
         self.slot, self.gh, self.error = slot, slot.gh, error
@@ -63,6 +65,8 @@ class Batches:
         self.cancelled = set()  # runs this job asked GitHub to cancel
         self.verdicts = {}  # (run id, attempt) -> the final verdict on a red batch run
         self.commits = {}  # sha -> GET commits/{sha}: a commit never changes
+        self.refusals = {}  # number -> (refused merges counted, when the last counted one was)
+        self.settled = set()  # (batch commit, number): merged members whose branches and comment are done
 
     # ---- reading GitHub ----
     def commit(self, sha):
@@ -90,6 +94,40 @@ class Batches:
             return None
         check = self.slot.head_check(pull["head"]["sha"])
         return pull if check and check[:2] == ("completed", "success") else None
+
+    def unfit(self, pull, head):
+        """Why a member can't land from its batch's run any more, or None. pull: a fresh read, or the queue's listing
+        (which has no "merged": everything in it is open)."""
+        number = pull["number"]
+        if pull.get("merged") or pull["state"] != "open":
+            return f"#{number} was " + ("merged some other way" if pull.get("merged") else "closed")
+        if not any(label["name"] == self.label for label in pull["labels"]):
+            return f"#{number} was unlabeled"
+        if pull["head"]["sha"] != head:
+            return f"#{number} was pushed"
+        if pull["draft"]:
+            return f"#{number} was made a draft"
+        if pull["head"]["repo"]["full_name"] != pull["base"]["repo"]["full_name"] or pull["base"]["ref"] != "main":
+            return f"#{number} no longer merges a branch of this repository into main"
+        return None
+
+    def changed(self, batch, pulls):
+        """Why the batch can't land as its run tests it, from the queue (pulls: the waiting ones by number), or None."""
+        for number, head, _ in batch.members:
+            why = self.unfit(pulls[number], head) if number in pulls else f"#{number} was unlabeled, closed or merged"
+            if why:
+                return why
+        return None
+
+    def ours(self, pull, expected, member):
+        """Whether this batch merged the member (on an earlier pass or in an earlier job): its merge commit's parents
+        are (expected, the tested head) and its tree is the one the run tested."""
+        _, head, tree = member
+        sha = pull.get("merge_commit_sha") or ""
+        if not (pull.get("merged") and sha):
+            return False
+        commit = self.commit(sha)
+        return [p["sha"] for p in commit["parents"]] == [expected, head] and commit["commit"]["tree"]["sha"] == tree
 
     def green(self, run, batch):
         """A green checks run of this repository on the batch commit, under a day old."""
@@ -173,8 +211,9 @@ class Batches:
         return self.dispatch(batch)
 
     def step(self, waiting, runs):
-        """This pass's batch: "testing" while a batch run holds the slot, "merged" / "moved" when it acted, "fallback"
-        while the members of a red batch are tested one at a time, None when there is no batch."""
+        """This pass's batch: "testing" while it holds the slot (its run goes, or a refused merge waits a poll),
+        "merged" / "moved" when it acted, "fallback" while the members of a red batch are tested one at a time, None
+        when there is no batch."""
         on_branch = [r for r in runs if r["head_branch"] == BATCH_REF]
         batch = self.current()
         own = [r for r in on_branch if batch and r["head_sha"] == batch.sha]
@@ -186,103 +225,149 @@ class Batches:
             return "testing"
         if batch is None:
             return None
-        heads = {pull["number"]: pull["head"]["sha"] for pull in waiting}
+        pulls = {pull["number"]: pull for pull in waiting}
         if run is None:
-            return self.undispatched(batch, heads)
+            return self.undispatched(batch, pulls)
         if run["status"] != "completed":
-            return self.running(batch, run, heads)
+            return self.running(batch, run, pulls)
         if run["conclusion"] == "success":
             if self.green(run, batch):
-                return self.land(batch, run)
+                return self.land(batch, run, runs)
             return self.drop(batch, f"its green run {run['html_url']} no longer proves it (a day old?)")
         if self.verdict(run) in ("rerunning", "pending", "green"):
             return "testing"  # GitHub's own failure is being re-run: the slot stays held, as for a single test
-        if any(heads.get(number) == head for number, head, _ in batch.members):
+        if any(number in pulls and pulls[number]["head"]["sha"] == head for number, head, _ in batch.members):
             return "fallback"  # each member still at the head it tested is tested alone, oldest first
         return self.drop(batch, f"its run {run['html_url']} ended {run['conclusion']} and each member is done")
 
-    def undispatched(self, batch, heads):
+    def undispatched(self, batch, pulls):
         sent = self.dispatched.get(batch.sha)
         if sent and self.slot.now() - sent < LIST_DELAY:
             return "testing"  # dispatched; GitHub lists the run a little later
-        if all(heads.get(n) == h for n, h, _ in batch.members) and self.slot.main_sha() == batch.base:
+        if self.changed(batch, pulls) is None and self.slot.main_sha() == batch.base:
             return self.dispatch(batch)  # built, never dispatched: the job before this one stopped in between
         return self.drop(batch, "it was never tested, and it changed since")
 
-    def running(self, batch, run, heads):
-        number, head, _ = batch.members[0]
+    def running(self, batch, run, pulls):
         if self.slot.now() - when(run.get("run_started_at") or run["created_at"]) > self.timeout:
             self.cancel(run)  # it ends cancelled; then its members are tested one at a time
             return "testing"
-        if heads.get(number) != head:
-            why = f"#{number}, the first in it, was pushed, unlabeled or closed"
-        elif self.slot.main_sha() != batch.base:
-            why = "main moved"
-        else:
-            return "testing"
-        self.cancel(run)  # its result could merge nothing
-        self.drop(batch, f"{why} while its run {run['html_url']} went")
-        return "testing"  # held until GitHub has stopped the run
+        why = self.changed(batch, pulls) or ("main moved" if self.slot.main_sha() != batch.base else None)
+        if why:  # a batch lands whole or not at all, so its result can't land any more
+            self.cancel(run)
+            self.drop(batch, f"{why} while its run {run['html_url']} went")
+        return "testing"  # held until the run ends, or until GitHub has stopped it
 
-    def land(self, batch, run):
-        """Merges the green batch in order, each member only while main is exactly the tested chain up to the one
-        before it; it stops at the first that changed or the first main move, and the rest go back to waiting."""
-        expected, landed, now, why = batch.base, 0, [], "every member merged"
-        numbers = [number for number, _, _ in batch.members]
-        for at, (number, head, tree) in enumerate(batch.members):
+    def land(self, batch, run, runs):
+        """A green batch lands whole, in label order, or not at all. Before its first merge every member is read again
+        and must be exactly what the run tested, its check-all still green, and main its base; else nothing merges and
+        the members wait again.
+        Then each merges with its head pinned, only while main is the previous merge, and main's parents and tree are
+        checked after it. A refused merge waits a poll. A change in the seconds between two merges, or a third refusal
+        after one, stops the batch part-way: the one rare path (build doc "Merge slot", "Batches")."""
+        pulls = [self.gh.call("GET", f"repos/{{repo}}/pulls/{number}") for number, _, _ in batch.members]
+        expected, done = batch.base, 0
+        while done < len(pulls) and self.ours(pulls[done], expected, batch.members[done]):
+            expected, done = pulls[done]["merge_commit_sha"], done + 1  # merged on an earlier pass or by an earlier job
+        if done:
+            self.settle(batch, run, pulls[done - 1])
+        else:  # nothing merged yet: all or nothing (main is checked before the first merge below)
+            why = next(filter(None, (self.unfit(pull, head) for pull, (_, head, _) in zip(pulls, batch.members))), None)
+            for number, head, _ in batch.members if why is None else ():
+                if (self.slot.head_check(head) or ())[:2] != ("completed", "success"):
+                    why = f"check-all on #{number}'s head isn't green any more"  # GitHub would refuse its merge
+                    break
+            if why:
+                self.drop(batch, f"{why} since its run {run['html_url']}: nothing merges from it")
+                return "moved"
+        why, left = None, None
+        for number, head, tree in batch.members[done:]:
             pull = self.gh.call("GET", f"repos/{{repo}}/pulls/{number}")
-            if pull.get("merged"):
-                done = pull.get("merge_commit_sha") or ""
-                if done and [p["sha"] for p in self.commit(done)["parents"]] == [expected, head] \
-                        and self.commit(done)["commit"]["tree"]["sha"] == tree:
-                    expected, landed = done, landed + 1  # this batch merged it on an earlier pass
-                    continue
-                why = f"#{number} was merged some other way"
-                break
-            if (pull["state"] != "open" or pull["head"]["sha"] != head
-                    or not any(l["name"] == self.label for l in pull["labels"])):
-                why = f"#{number} was pushed, unlabeled or closed during the run"
-                break
-            if self.slot.main_sha() != expected:
+            why = self.unfit(pull, head)
+            if why is None and self.slot.main_sha() != expected:
                 why = "main moved through another merge"
+            if why:
                 break
             try:
                 result = self.gh.call("PUT", f"repos/{{repo}}/pulls/{number}/merge", {"merge_method": "merge", "sha": head})
             except self.error as error:
                 if error.status not in (405, 409):
                     raise
-                if self.slot.refused(pull, error) != "left":
-                    if now:
-                        self.main_run()
-                    return "moved"  # the batch stays; the next pass tries this member again
-                why = f"GitHub refused to merge #{number}"
+                if self.refused(pull, error) == "waits":
+                    return "testing"  # the slot stays held; the next pass tries this member again
+                why, left = f"GitHub refused to merge #{number} three times", number
                 break
-            merged = (result or {}).get("sha") or self.slot.main_sha()
-            self.slot.refusals.pop(number, None)
-            self.slot.drop_ref(f"{self.prefix}{number}")
-            if (result or {}).get("merged") and pull["head"]["repo"]["full_name"] == pull["base"]["repo"]["full_name"]:
-                self.slot.drop_ref(pull["head"]["ref"])
-            self.slot.label_times.pop(number, None)
-            landed, now = landed + 1, now + [number]
-            others, rest = ", ".join(f"#{n}" for n in numbers if n != number), numbers[at + 1:]
-            if [p["sha"] for p in self.commit(merged)["parents"]] != [expected, head] \
-                    or self.commit(merged)["commit"]["tree"]["sha"] != tree:
-                self.slot.comment(number, f"merged, but main's tree after it isn't the one run {run['html_url']} "
-                                          "tested: main moved in the second before the merge. "
-                                          + (f"The rest of its batch ({', '.join(f'#{n}' for n in rest)}) goes back to "
-                                             "waiting; " if rest else "")
-                                          + "checks.yml on main checks what landed.")
+            self.refusals.pop(number, None)
+            merged, done = (result or {}).get("sha") or self.slot.main_sha(), done + 1
+            commit = self.commit(merged)
+            if [p["sha"] for p in commit["parents"]] != [expected, head] or commit["commit"]["tree"]["sha"] != tree:
+                self.finished(batch, run, pull, (result or {}).get("merged"),
+                              f"merged, but main's tree after it isn't the one run {run['html_url']} tested: main moved "
+                              "in the second before the merge. checks.yml runs in full on main to check what landed.")
                 why = f"main's tree after #{number} isn't the tested one"
                 break
-            self.slot.comment(number, f"merged after run {run['html_url']} tested it on main `{batch.base[:10]}` in one "
-                                      f"batch with {others} (they merge in label order). The branch is deleted; "
-                                      "checks.yml runs on main once the batch is in, to refresh the build cache.")
-            self.slot.log(f"#{number} merged (batch)")
+            self.finished(batch, run, pull, (result or {}).get("merged"))
             expected = merged
-        if landed:
-            self.main_run()
-        self.drop(batch, why)
-        return "merged" if now else "moved"
+        return self.end(batch, run, runs, done, why, left)
+
+    def refused(self, pull, error):
+        """GitHub refused a member's merge (405: a rule or a check; 409: the head changed): "waits" a poll to try again.
+        Only refusals at least a poll apart count; the third sends the member back as on the single path ("left")."""
+        number, now = pull["number"], self.slot.now()
+        count, last = self.refusals.get(number, (0, None))
+        if last is None or now - last >= dt.timedelta(seconds=self.slot.poll):
+            count, last = count + 1, now
+        self.refusals[number] = (count, last)
+        if count < 3:
+            self.slot.log(f"#{number}: GitHub refused the merge ({error}); trying again after a poll")
+            return "waits"
+        self.refusals.pop(number)
+        return self.slot.leave(pull, f"GitHub refused the merge three times: {error}")
+
+    def finished(self, batch, run, pull, confirmed, note=None):
+        """A member this batch merged: its branches are deleted, then it gets its comment (so a comment means done)."""
+        number = pull["number"]
+        self.slot.drop_ref(f"{self.prefix}{number}")
+        if confirmed and pull["head"]["repo"]["full_name"] == pull["base"]["repo"]["full_name"]:
+            self.slot.drop_ref(pull["head"]["ref"])  # GitHub confirmed the merge
+        self.slot.label_times.pop(number, None)
+        others = ", ".join(f"#{n}" for n, _, _ in batch.members if n != number)
+        self.slot.comment(number, note or f"merged after run {run['html_url']} tested it on main `{batch.base[:10]}` in "
+                                          f"one batch with {others} (they merge in label order). The branch is deleted; "
+                                          "checks.yml runs on main once the batch is in, to refresh the build cache.")
+        self.settled.add((batch.sha, number))
+        self.slot.log(f"#{number} merged (batch)")
+
+    def settle(self, batch, run, pull):
+        """The last member this batch merged before a job stopped may lack its branch deletions and comment: they are
+        done again unless its comment is there."""
+        if (batch.sha, pull["number"]) in self.settled:
+            return
+        found = self.gh.call("GET", f"repos/{{repo}}/issues/{pull['number']}/comments?since={run['created_at']}"
+                                    "&per_page=100") or []
+        if any(run["html_url"] in comment["body"] for comment in found):
+            self.settled.add((batch.sha, pull["number"]))
+        else:
+            self.finished(batch, run, pull, pull.get("merged"))
+
+    def end(self, batch, run, runs, done, why, left):
+        """The batch is over. After any merge of it checks.yml runs on main once: not again when a run on main's head
+        is listed already (a job dispatched it and stopped before deleting the branch). A batch that stopped part-way,
+        the one way main rests on part of a batch, tells each member that didn't merge from it why."""
+        if done:
+            main = self.slot.main_sha()
+            if not any(r["head_branch"] == "main" and r["head_sha"] == main for r in runs):
+                self.main_run()
+        self.drop(batch, why or "every member merged")
+        if done and why:
+            landed = ", ".join(f"#{n}" for n, _, _ in batch.members[:done])
+            for number, _, _ in batch.members[done:]:
+                if number != left:  # one sent back has its own comment
+                    self.slot.comment(number, f"its batch stopped after {landed} merged from run {run['html_url']}: "
+                                              f"{why}. It didn't merge from that run; with the label on, it is tested "
+                                              "again. Main now holds part of the batch, a tree no run tested on its own: "
+                                              "checks.yml runs in full on main to check what landed.")
+        return "merged" if done else "moved"
 
     def main_run(self):
         """A merge made with the workflow token starts no push run: checks.yml on main, once per batch."""

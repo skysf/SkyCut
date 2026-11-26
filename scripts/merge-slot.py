@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """The merge slot: merges pull requests labeled merge-slot, oldest label first, only after a green checks run on what
-lands: main + the pull request, or main + up to four of them tested as one batch and merged in that order
-(scripts/merge-slot-batch.py). One test runs at a time. .github/workflows/merge-slot.yml runs it; the rules are in
-docs/build/build-and-packaging.md "Merge slot" and AGENTS.md 「合并与分支」. checks/MergeSlot/MergeSlotChecks.py tests
-it against a fake GitHub.
+lands: main + the pull request, or main + up to four of them tested as one batch that lands whole, in that order, or
+not at all (scripts/merge-slot-batch.py). One test runs at a time. .github/workflows/merge-slot.yml runs it; the rules
+are in docs/build/build-and-packaging.md "Merge slot" and AGENTS.md 「合并与分支」. checks/MergeSlot/MergeSlotChecks.py
+tests it against a fake GitHub.
 
 A labeled pull request, oldest label first (where step 4 would dispatch its test and more labeled pull requests are
 ready, Batches.form tests them all in one run instead; after a red batch its members go through these steps alone):
@@ -52,6 +52,7 @@ WORKFLOW_PATH = ".github/workflows/checks.yml"
 SLOT_PREFIX = "merge-slot/pr-"
 MARKER_MAX_AGE = dt.timedelta(hours=24)  # same limit as scripts/ci-verified-tree.sh
 TEST_TIMEOUT = dt.timedelta(hours=3)
+POLL = 90  # seconds between passes
 
 
 def run_of(details_url):
@@ -67,6 +68,7 @@ def when(text):
 class Slot:
     def __init__(self, gh, now=lambda: dt.datetime.now(dt.timezone.utc), sleep=time.sleep, log=print):
         self.gh, self.now, self.sleep, self.log = gh, now, sleep, log
+        self.poll = POLL  # serve() sets it; a refused batch merge waits this long (Batches.refused)
         self.label_times = {}
         self.dispatched = {}  # (number, merge commit) -> when this job dispatched its test
         self.refusals = {}  # number -> merges GitHub refused in a row
@@ -368,19 +370,21 @@ class Slot:
             if not name[len(SLOT_PREFIX):].isdigit() or int(name[len(SLOT_PREFIX):]) not in open_numbers:
                 self.drop_ref(name)
 
-    def serve(self, deadline, poll=90):
+    def serve(self, deadline, poll=POLL):
         """Works the queue until it's empty or the deadline passes."""
+        self.poll = poll
         self.sweep()
         busy = 0  # passes in a row without sleeping
         while True:
             queue = self.queue()
-            if not queue:
-                self.log("the queue is empty")
-                return
             waiting = [p for p in queue
                        if self.left.get(p["number"]) != (p["head"]["sha"], self.label_times[p["number"]])]
             if not waiting:
-                self.log("only pull requests that left are labeled (their label couldn't be removed)")
+                # A batch whose last member left the queue is finished off first: checks.yml on main, the comments,
+                # its branch (a job stopped after its last merge; a red batch whose members are done).
+                self.batches.step(waiting, self.dispatch_runs())
+                self.log("the queue is empty" if not queue
+                         else "only pull requests that left are labeled (their label couldn't be removed)")
                 return
             runs = self.dispatch_runs()
             batch = self.batches.step(waiting, runs)  # a batch's run holds the slot like a single test's

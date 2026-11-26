@@ -58,7 +58,11 @@ class FakeGitHub:
         self.cancels, self.redispatched, self.created = [], [], []  # runs cancelled; dispatches on a busy ref; new refs
         self.after_merge = None  # a scenario hook: called with this fake and the number after each pull request merges
         self.race_on_merge = None  # this pull request's merge finds main moved by a hand merge a second before
+        self.push_before_merge = None  # this pull request gets a new head in the second before the slot merges it
         self.fail_dispatch = set()  # refs whose next dispatch fails (HTTP 500), like a job dying right there
+        self.fail_delete = set()  # refs whose next deletion fails (HTTP 500), like a job dying right there
+        self.refused_at = []  # (number, clock) of each merge GitHub refused
+        self.main_after = []  # at each dispatch on main: how many pull requests had merged by then
 
     # ---- building the world ----
     def commit(self, parents, tree, message=""):
@@ -306,6 +310,8 @@ class FakeGitHub:
             if any(r["status"] != "completed" and r["head_branch"] == ref for r in self.runs.values()):
                 self.redispatched.append(ref)  # GitHub would cancel the older run (same concurrency group)
             self.dispatches.append(ref)
+            if ref == "main":
+                self.main_after.append(len(self.merged))
             head = self.main if ref == "main" else self.refs[ref]
             run_id = self.add_run("workflow_dispatch", head, ref, None)
             self.runs[run_id]["ticks_left"] = self.slow_tests if ref != "main" else 0
@@ -324,6 +330,9 @@ class FakeGitHub:
                 self.refs[ref] = body["sha"]
                 return {}
             if method == "DELETE":
+                if ref in self.fail_delete:
+                    self.fail_delete.discard(ref)
+                    raise self.error(500, "Server Error")
                 if ref not in self.refs and not ref.startswith("topic-"):
                     raise self.error(422, "Reference does not exist")
                 self.refs.pop(ref, None)
@@ -336,6 +345,8 @@ class FakeGitHub:
         if m := re.fullmatch(r"pulls/(\d+)/merge", route):
             return self.merge(int(m.group(1)), body)
         if m := re.fullmatch(r"issues/(\d+)/comments", route):
+            if method == "GET":  # oldest first, like GitHub (since: every comment here is recent enough)
+                return [{"body": text} for text in self.comments.get(int(m.group(1)), [])]
             self.comments.setdefault(int(m.group(1)), []).append(body["body"])
             return {}
         if m := re.fullmatch(r"issues/(\d+)/labels/merge-slot", route):
@@ -379,12 +390,18 @@ class FakeGitHub:
     def merge(self, number, body):
         pull = self.pulls[number]
         assert body["merge_method"] == "merge", body
+        if self.push_before_merge == number:
+            self.push_before_merge = None
+            pull["head"]["sha"] = self.commit([self.main], f"tree-pushed-{number}")
+            self.set_check(pull["head"]["sha"], "success")
         if body.get("sha", pull["head"]["sha"]) != pull["head"]["sha"]:  # without sha, GitHub merges the head it has
+            self.refused_at.append((number, self.clock))
             raise self.error(409, "Head branch was modified")
         if any(f.startswith(".github/workflows/") for f in pull["files"]):
             raise self.error(403, "Resource not accessible by integration")
         if self.refuse_merge:
             self.refuse_merge -= 1
+            self.refused_at.append((number, self.clock))
             raise self.error(405, "Required status check check-all is failing")
         if self.checks[pull["head"]["sha"]][-1]["conclusion"] != "success":
             raise self.error(405, "Required status check check-all is failing")

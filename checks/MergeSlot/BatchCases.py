@@ -1,17 +1,29 @@
-"""Batch cases for the merge slot (scripts/merge-slot-batch.py). MergeSlotChecks.py runs them with its check().
+"""Batch cases for the merge slot (scripts/merge-slot-batch.py). MergeSlotChecks.py runs them with its check(); the
+landing cases (all or nothing, refusals, the rare path, finishing off) are in BatchLandingCases.py.
 
 Ready pull requests are tested together, up to four, in one run on main + all of them (a commit whose parents are main
-and their heads), and merge in label order only while main is exactly the tested chain up to the one before. A pull
-request that conflicts with the ones before it waits (sent back only when it conflicts with main alone). A red batch
-falls back to one test at a time from the oldest, so only the culprit is sent back. During a run, a member pushed,
-unlabeled or closed, or main moved by a hand merge, never lets the stale result merge it or anything after it; when the
-first member or main changed, the run is cancelled and the slot waits until it has stopped (never two test runs at
-once). A new job carries on from what GitHub shows (the batch branch and its runs): mid-run, mid-merge, mid-fallback,
-or a batch built but never dispatched. A single ready pull request takes the path from before batches.
+and their heads), and land whole, in label order, or not at all. A pull request that conflicts with the ones before it
+waits (sent back only when it conflicts with main alone). A red batch falls back to one test at a time from the oldest,
+so only the culprit is sent back. During a run, any member pushed, unlabeled, closed or made a draft, or main moved by a
+hand merge, cancels the run (its result can't land any more) and the slot waits until it has stopped (never two test
+runs at once). A new job carries on from what GitHub shows (the batch branch and its runs): mid-run, mid-merge,
+mid-fallback, or a batch built but never dispatched. A single ready pull request takes the path from before batches.
 """
 import datetime as dt
 
 BATCH = "merge-slot/pr-batch"
+
+
+def open_pulls(gh, count=3):
+    """count ready pull requests, #1 labeled first; their heads by number."""
+    for number in range(1, count + 1):
+        gh.open_pull(number, labeled_minutes=number)
+    return {number: gh.pulls[number]["head"]["sha"] for number in range(1, count + 1)}
+
+
+def next_job(slot_module, gh):
+    """The workflow's next job: nothing in memory, everything read from GitHub."""
+    return slot_module.Slot(gh, now=lambda: gh.clock, sleep=gh.tick, log=lambda *_: None)
 
 
 def merged(gh):
@@ -68,15 +80,18 @@ def unlabel(gh, number):
     gh.pulls[number]["labels"] = []
 
 
+def merge_stamps(gh):
+    """An after_merge hook and its list: how many tests had been dispatched when each pull request merged."""
+    stamps = []
+    gh.after_merge = lambda g, n: stamps.append(len(tests(g)))
+    return stamps
+
+
 def run_all(check, slot_module, world, serve, never_merged_untested):
-    def fresh(gh):  # the workflow's next job: nothing in memory, everything read from GitHub
-        return slot_module.Slot(gh, now=lambda: gh.clock, sleep=gh.tick, log=lambda *_: None)
+    def fresh(gh):
+        return next_job(slot_module, gh)
 
-    def three(gh, count=3):
-        for number in range(1, count + 1):
-            gh.open_pull(number, labeled_minutes=number)
-        return {number: gh.pulls[number]["head"]["sha"] for number in range(1, count + 1)}
-
+    three = open_pulls
     gh, slot = world()
     heads, main = three(gh, 2), gh.main
     serve(slot, gh)
@@ -182,6 +197,8 @@ def run_all(check, slot_module, world, serve, never_merged_untested):
           and any("ended failure" in c and "left the slot" in c for c in gh.comments.get(2, [])), (gh.merged, gh.comments))
     check("red batch: the others are not blamed", not sent_back(gh, 1) and not sent_back(gh, 3), gh.comments)
     check("red batch: it costs one extra run (four tests for three PRs)", len(tests(gh)) == 4, gh.dispatches)
+    check("red batch: its branch goes once its members are done, though nothing is labeled any more",
+          BATCH not in gh.refs and BATCH in gh.deleted, (gh.refs, gh.deleted))
     never_merged_untested("red batch", gh)
 
     gh, slot = world()
@@ -194,19 +211,29 @@ def run_all(check, slot_module, world, serve, never_merged_untested):
           (gh.dispatches, gh.merged))
     never_merged_untested("red batch, next job", gh)
 
-    gh, slot = world()
-    gh.slow_tests = 3
-    heads = three(gh)
-    gh.on_tick = once_running(lambda g: push(g, 2, "tree-head-2b"))
-    order = []
-    gh.after_merge = lambda g, n: order.append((n, len(batch_runs(g))))
-    serve(slot, gh)
-    check("a later member pushed mid-run: only the one before it merges from that run",
-          order == [(1, 1), (2, 2), (3, 2)] and tests(gh) == [BATCH, BATCH], (order, gh.dispatches))
-    check("…it and the one after it are tested again, its new head included",
-          merged(gh) == [1, 2, 3] and gh.merged_heads.get(2) != heads[2]
-          and not any("tree-head-2)" in tree for _, tree in gh.merged), gh.merged)
-    never_merged_untested("member pushed mid-run", gh)
+    for what, change, after in (  # a batch lands whole or not at all: any member's change ends the run
+            ("#2 pushed", lambda g: push(g, 2, "tree-head-2b"), [1, 2, 3]),
+            ("#3 unlabeled", lambda g: unlabel(g, 3), [1, 2]),
+            ("#2 closed", lambda g: g.pulls[2].update(state="closed"), [1, 3]),
+            ("#3 made a draft", lambda g: g.pulls[3].update(draft=True), [1, 2])):
+        gh, slot = world()
+        gh.slow_tests = 3
+        heads = three(gh)
+        gh.on_tick = once_running(change)
+        stamps = merge_stamps(gh)
+        serve(slot, gh)
+        first = (batch_runs(gh) or [{}])[0]
+        check(f"a later member changed mid-run ({what}): its run is cancelled, nothing merges from it, the rest is "
+              "tested again once it has stopped",
+              gh.cancels == [first.get("id")] and first.get("conclusion") == "cancelled" and merged(gh) == after
+              and stamps and min(stamps) >= 2 and not gh.overlaps and not gh.redispatched,
+              (what, gh.cancels, gh.dispatches, gh.merged, stamps))
+        if what == "#2 pushed":
+            check("…#2 pushed: its new head merges, tested in the next batch", gh.merged_heads.get(2) != heads[2],
+                  gh.merged_heads)
+        if what == "#3 unlabeled":
+            check("…#3 unlabeled: it isn't blamed", not gh.comments.get(3), gh.comments)
+        never_merged_untested(f"later member changed mid-run: {what}", gh)
 
     gh, slot = world()
     gh.slow_tests = 3
@@ -220,16 +247,6 @@ def run_all(check, slot_module, world, serve, never_merged_untested):
     check("…the next batch waits until the cancelled run stopped, then merges all three",
           not gh.overlaps and not gh.redispatched and merged(gh) == [1, 2, 3], (gh.overlaps, gh.merged))
     never_merged_untested("first member pushed mid-run", gh)
-
-    gh, slot = world()
-    gh.slow_tests = 3
-    heads = three(gh)
-    gh.on_tick = once_running(lambda g: unlabel(g, 3))
-    serve(slot, gh)
-    check("the last member's label removed mid-run: the others merge from that run, it doesn't (and isn't blamed)",
-          merged(gh) == [1, 2] and tests(gh) == [BATCH] and not gh.pulls[3]["merged"] and not gh.comments.get(3),
-          (gh.merged, gh.dispatches, gh.comments))
-    never_merged_untested("last label removed mid-run", gh)
 
     gh, slot = world()
     gh.slow_tests = 3
@@ -255,18 +272,25 @@ def run_all(check, slot_module, world, serve, never_merged_untested):
     heads = three(gh)
     gh.after_merge = lambda g, n: g.human_merge("tree-human") if n == 1 and "tree-human" not in str(g.merged) else None
     serve(slot, gh)
-    check("main moved by a hand merge between the batch's merges: the rest is tested again on the new main",
-          merged(gh) == [1, 2, 3] and tests(gh) == [BATCH, BATCH] and not any("isn't the one" in c for c in gh.comments[1])
+    check("main moved by a hand merge between the batch's merges (the rare path): the rest is tested again on the new "
+          "main", merged(gh) == [1, 2, 3] and tests(gh) == [BATCH, BATCH]
+          and not any("isn't the one" in c for c in gh.comments.get(1, []))
           and all("tree-human" in tree for n, tree in gh.merged if n != 1), (gh.merged, gh.dispatches))
-    never_merged_untested("hand merge between merges", gh)
+    check("…#2 and #3 are told why and that main's full run checks what landed",
+          all(any("main moved through another merge" in c and "runs in full on main" in c
+                  for c in gh.comments.get(n, [])) for n in (2, 3)), gh.comments)
+    never_merged_untested("hand merge between merges", gh, partial=True)
 
     gh, slot = world()  # no never_merged_untested here: #2 lands untested, the window every merge has (build doc)
     heads = three(gh)
     gh.after_merge = lambda g, n: setattr(g, "race_on_merge", 2) if n == 1 else None
     serve(slot, gh)
     check("a hand merge in the second before #2's merge: the slot sees main's tree differ and stops; #3 is tested again",
-          merged(gh)[:2] == [1, 2] and any("isn't the one run" in c and "(#3)" in c for c in gh.comments.get(2, []))
+          merged(gh)[:2] == [1, 2] and any("isn't the one run" in c for c in gh.comments.get(2, []))
           and tests(gh) == [BATCH, "merge-slot/pr-3"] and merged(gh) == [1, 2, 3], (gh.merged, gh.dispatches))
+    check("…main's run is dispatched once, after #2, and #3 is told why",
+          gh.main_after == [2, 3] and any("main's tree after #2 isn't the tested one" in c and "runs in full" in c
+                                          for c in gh.comments.get(3, [])), (gh.main_after, gh.comments.get(3)))
 
     gh, slot = world()
     three(gh, 6)
@@ -302,6 +326,9 @@ def run_all(check, slot_module, world, serve, never_merged_untested):
     serve(fresh(gh), gh)
     check("a job that stopped between the batch's merges: the next one merges the rest from the same run",
           merged(gh) == [1, 2, 3] and tests(gh) == [BATCH] and gh.dispatches[-1] == "main", (gh.merged, gh.dispatches))
+    check("…and finishes #1 off, which the stopped job merged without its comment or branch deletion",
+          [sum("merged after run" in c for c in gh.comments.get(n, [])) for n in (1, 2, 3)] == [1, 1, 1]
+          and "topic-1" in gh.deleted, (gh.comments, gh.deleted))
     never_merged_untested("resumed merges", gh)
 
     gh, slot = world()
@@ -338,14 +365,6 @@ def run_all(check, slot_module, world, serve, never_merged_untested):
           merged(gh) == [1, 2] and tests(gh) == [BATCH] and gh.reruns == [r["id"] for r in batch_runs(gh)][:1],
           (gh.dispatches, gh.reruns))
     never_merged_untested("infra re-run", gh)
-
-    gh, slot = world()
-    three(gh)
-    gh.after_merge = lambda g, n: setattr(g, "refuse_merge", 2) if n == 1 else None
-    serve(slot, gh)
-    check("GitHub refuses a member's merge twice: the batch stays and it merges on the third try",
-          merged(gh) == [1, 2, 3] and tests(gh) == [BATCH], (gh.merged, gh.dispatches))
-    never_merged_untested("refused twice", gh)
 
     gh, slot = world()
     gh.slow_tests = 400  # longer than the three hours a test may take
