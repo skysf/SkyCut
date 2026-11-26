@@ -148,8 +148,8 @@ xattr -dr com.apple.quarantine /Applications/SkyCut.app
 
 The app shows the command plus a button that opens System Settings when it
 detects the situation. (The DMG's install window no longer shows these steps:
-official builds are notarised and open directly.) Handing the app over on a USB drive or over `scp` avoids the flag
-entirely.
+official builds are notarised and open directly.) Handing the app over on a USB
+drive or over `scp` avoids the flag entirely.
 
 ### About the bundled ffmpeg
 
@@ -288,8 +288,8 @@ xattr -dr com.apple.quarantine /Applications/SkyCut.app
 ```
 
 App 识别到这种情况时，会把命令和一个「打开系统设置」的按钮一起显示出来
-（DMG 的安装窗口不再写这些步骤：正式构建经过公证，可以直接打开）。用 U 盘或 `scp` 传则完全
-不会被打上这个标记。
+（DMG 的安装窗口不再写这些步骤：正式构建经过公证，可以直接打开）。
+用 U 盘或 `scp` 传则完全不会被打上这个标记。
 
 ### 关于随包的 ffmpeg
 

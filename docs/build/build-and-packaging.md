@@ -102,12 +102,13 @@ English first: English, 简体中文, 繁體中文, Español, 日本語, Рус�
   - Every text run carries its language (`kCTLanguageAttributeName`). Untagged, Core Text draws Traditional Chinese and
     Japanese with Simplified Chinese faces and punctuation (PingFang SC instead of PingFang TC and Hiragino).
   - A line that would cross x 724 or come within 24 pt of the canvas bottom stops the build. Grow the canvas, the window
-    frame and both checks together, and keep the window fitting the 13-inch MacBook Air (below).
+    frame and both checks together, keep the hidden `.background` folder's position below the window (`check-layout.py`
+    asserts its icon's top is), and keep the window fitting the 13-inch MacBook Air (below).
 - 布局源：`packaging/dmg/DS_Store`，打包时拷成卷根的 `.DS_Store`。窗口框固定
   `{{120, 120}, {760, 598}}`（为标题栏及用户开启的路径 / 状态栏留出空间，图稿 760×510），图标 128 point，App / Applications
   中心为 `(200, 164)` / `(560, 164)`，分别在箭头两头；隐藏工具栏和侧栏。The hidden `.background` folder sits at `(380, 800)`, below
-  the canvas: a Finder that shows hidden files would otherwise put its icon on the first free spot, over the steps (seen
-  2026-11-26), and Finder hides it by default either way.
+  the window: a Finder that shows hidden files would otherwise put its icon on the first free spot, over the steps
+  ([case](../bugfixes/2026-11-26-dmg-hidden-background-icon-over-steps.md)), and Finder hides it by default either way.
   模板同时声明关闭状态栏 / 路径栏；Finder 可能沿用用户的这两项全局偏好，窗口高度仍能容下完整引导。
   背景 alias 使用卷内 `.background/background.tiff`，不携带开发机路径、卷 UUID 或 inode。
   `scripts/build-dmg.sh` **不控制 Finder、不调用 Apple Events**，正常打包不会申请「控制访达」权限。
@@ -142,6 +143,8 @@ Finder 的真实渲染属于人工回归，每次改图稿 / 模板后以及发�
    确认背景自动显示、两图标在箭头两头、第 1 步六种语言和第 2 步的教程链接完整，Retina 屏上字体清楚、图标标签能读。
    深浅色下背景本身底色不变；不要为了验收打断用户工作、切换全系统外观。
    路径栏 / 状态栏必须按用户原有偏好重开检查；只在当前窗口手动隐藏后的截图不能证明模板生效。
+   Look once with hidden files shown (Finder's ⇧⌘.): no item of the volume over the steps. With hidden files off, the status
+   bar says 2 items.
    If another volume named SkyCut is mounted (the user's installer disk, say), the test window shows that volume's
    background: the template's alias names only the volume, a fixed date and a relative path (seen 2026-11-20; a user
    with an older SkyCut disk still mounted sees the same). Leave the user's disk mounted and check a scratch copy of the
