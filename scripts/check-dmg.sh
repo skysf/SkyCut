@@ -28,6 +28,33 @@ if [ "$#" -eq 0 ]; then
     echo 'DMG packaging fixture' > "${FIXTURE_APP}/Contents/fixture"
     DMG="${WORK}/fixture.dmg"
     /bin/bash scripts/build-dmg.sh "${FIXTURE_APP}" "${DMG}"
+    # Without a whole icon source the builder stops instead of drawing another icon (make-icon.swift's fallback, or
+    # a cut-off PNG's black rows): a copy of it with everything else in place, given no source, a file that isn't an
+    # image, then the real source cut to half its own size (a fixed length would copy a small icon whole).
+    STRAY="${WORK}/no-icon-source"
+    mkdir -p "${STRAY}/scripts/dmg" "${STRAY}/packaging/dmg"
+    cp scripts/build-dmg.sh scripts/make-icon.swift "${STRAY}/scripts/"
+    cp scripts/dmg/make-background.swift "${STRAY}/scripts/dmg/"
+    cp packaging/dmg/DS_Store "${STRAY}/packaging/dmg/"
+    for source in missing unreadable cut-off; do
+        case "${source}" in
+            unreadable) echo 'version https://git-lfs.github.com/spec/v1' > "${STRAY}/packaging/icon-source-1024.png" ;;
+            cut-off)
+                SIZE="$(wc -c < packaging/icon-source-1024.png)"
+                head -c "$((SIZE / 2))" packaging/icon-source-1024.png > "${STRAY}/packaging/icon-source-1024.png"
+                ;;
+        esac
+        if /bin/bash "${STRAY}/scripts/build-dmg.sh" "${FIXTURE_APP}" "${WORK}/stray.dmg" 2>"${WORK}/stray.log"; then
+            echo "✗ build-dmg.sh built a DMG with a ${source} icon source" >&2
+            exit 1
+        fi
+        if ! grep -q 'icon-source-1024.png is missing, unreadable or cut off' "${WORK}/stray.log"; then
+            cat "${WORK}/stray.log" >&2
+            echo "✗ build-dmg.sh failed without naming the ${source} icon source" >&2
+            exit 1
+        fi
+    done
+    echo '✓ A missing, unreadable or cut-off icon source stops the DMG builder'
 else
     DMG="$1"
 fi

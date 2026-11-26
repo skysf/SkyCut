@@ -17,9 +17,14 @@
 
 2026-11-05 用户确定：浏览器图标复用 SkyCut 软件本身的正式图标，不另设绿色字母标志。
 `npm run build:favicons` 调用仓库现有 `scripts/make-icon.swift`，沿用
-`packaging/icon-source-1024.png` 与同一份透明边缘处理，输出 16 / 32 / 64 的 ICO、
-32 / 64 PNG 和 180 Apple touch icon；不改原图、不另写抠图实现。重建需要 macOS / Swift，
+`packaging/icon-source-1024.png` 与同一份透明边缘处理，输出 16 / 32 / 64 的 ICO 和
+32 / 64 PNG；不改原图、不另写抠图实现。重建需要 macOS / Swift，
 正常网站构建只复制已生成资源，Linux CI 不重建图标。
+The 180 px Apple touch icon is the exception (since 2026-11-26). iOS fills a touch icon's transparent pixels black and
+rounds its corners itself, so the app icon's transparent edge showed as a black frame
+([case](../bugfixes/2026-11-26-apple-touch-icon-black-frame.md)). It is the source's card instead, full-bleed and
+opaque: `sips` crops `make-icon.swift`'s square (834 px at (94, 87)) from the source, which has no alpha, and scales
+it to 180 px. `npm run check:seo` asserts it has no alpha channel.
 
 ## 设备语言与手动选择
 
@@ -824,3 +829,4 @@ JS 增加 4.7 kB（gzip），CSS 少 0.9 kB；静图一次访问只下一张（�
 720p 到 1080p 换源之后保持同一播放位置；真实手机 / iPad 硬件仍需最后验收。
 正式配置表格后由用户用自有邮箱核对实际新增、重复登记合并选择和退订 / 删除流程。
 品牌邮箱两域名实际收发另行验收；模拟测试不能当成真实写表或投递证据。
+On a real iPhone, add the site to the Home Screen: SkyCut's icon fills its rounded tile, with no black frame.

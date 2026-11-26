@@ -23,8 +23,8 @@ for (index, scale) in [1, 2].enumerated() {
 // 确认 2x 确实画了同一张完整图，而不是只有 2 倍尺寸、图稿却溢出画布。
 // 在两种表示的左上 wordmark 和中间箭头处都必须存在森林绿像素。
 // So must the step 2 badge near the bottom: the whole canvas carries artwork, not just its top.
-// The drag hint is probed only on its own ink (the arrow's shaft, the pointer's black), never on the faded
-// copies of SkyCut's icon, so a new app icon needs no edit here.
+// The drag hint is probed by colour only on its own ink (the arrow's shaft, the pointer's black); the faded
+// copies of SkyCut's icon only for showing any ink at all (below), so a new app icon needs no edit here.
 for index in 0..<2 {
     let bitmap = NSBitmapImageRep(cgImage: CGImageSourceCreateImageAtIndex(source, index, nil)!)
     let scale = index + 1
@@ -51,5 +51,22 @@ for index in 0..<2 {
             }
         }
     }
+    // The hint's icon copies must show real icon pixels: a transparent icon, or one cut off early, draws nothing
+    // and still builds. One function draws all three from one icon, so the last, most opaque copy (45 %) stands
+    // for them. Its inner square (x 372–408, y 146–182: clear of the 2 pt overlap), less the corner its pointer
+    // and shadow reach (x ≥ 386, y ≥ 160), must differ from the paper by more than 2 levels in at least 5 % of
+    // its pixels. No colour is pinned, so any icon passes: today's and the old blue one ink over 99 % of it,
+    // a blank one (transparent, or paper-coloured) under 1 %.
+    var inked = 0, total = 0
+    for y in (146 * scale)..<(182 * scale) {
+        for x in (372 * scale)..<(408 * scale) where x < 386 * scale || y < 160 * scale {
+            let pixel = y * row + x * step
+            total += 1
+            if (0..<3).contains(where: { abs(Int(data[pixel + $0]) - Int(paper[$0])) > 2 }) { inked += 1 }
+        }
+    }
+    require(inked * 20 >= total, "the drag hint's icon copies are blank (\(inked) of \(total) pixels inked "
+        + "in the last copy) in representation \(index)")
 }
-print("✓ Retina TIFF: 760×510 @72 dpi + 1520×1020 @144 dpi, complete opaque artwork, plain paper under the selection")
+print("✓ Retina TIFF: 760×510 @72 dpi + 1520×1020 @144 dpi, complete opaque artwork, the hint's icon copies,"
+    + " plain paper under the selection")

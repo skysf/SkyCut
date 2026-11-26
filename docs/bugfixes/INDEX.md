@@ -29,6 +29,7 @@
 - [2026-11-17 Every transparent still cost ~107 MB and showed late; a straight-alpha clip held the whole preview](2026-11-17-alpha-media-waits-and-oversized-stills.md) — An intra-only codec stores every repeated frame: repeat it in the sample table; a preview-only substitute is used when ready and swapped in while stopped, never waited for.
 - [2026-11-16 带透明的视频：预览当预乘、成片当直通](2026-11-16-alpha-video-premultiplied-or-straight.md) — 预乘还是直通要读文件里的标记，先弄清「没写」长什么样；平台没开关就换一份数据，不换合成器。
 - [2026-09-30 动画行的「In」「Out」从没进过字符串表](2026-09-30-animation-in-out-labels-never-localized.md) — 同一个教训撞第三次别再补清单：从声明里找 `LocalizedStringKey` 参数。
+- [2026-11-26 The website's Apple touch icon showed in a black frame on iOS](2026-11-26-apple-touch-icon-black-frame.md) — iOS fills a touch icon's transparency black and rounds it itself: make it opaque and full-bleed, not the macOS icon with its transparent grid edge.
 - [2026-10-06 挪了一段音频，画面挪了、声音还在原地](2026-10-06-audio-engine-replace-keeps-old-segment-positions.md) — 「结构没变」按开流时抄死了什么来定，不是按 id；自检要有「换配置」这一步。
 - [2026-08-12 渐入开头爆音](2026-08-12-audio-fade-in-pop.md) — 混音器的增益有 de-zipper：别拿常量提前量赌平台的平滑窗口，断言上移到结构不变量。
 - [2026-11-05 声音主时钟停住导致预览无法播放](2026-11-05-audio-master-clock-stops-playback.md) — 播放意图不代表音频图仍在运行：开播前和播放中恢复停图、重钉锚点。

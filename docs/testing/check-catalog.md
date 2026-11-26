@@ -642,6 +642,9 @@
 - 「连接」AI 客户端时第一次改配置前存的备份，一建出来就和原文件同样的权限（只有 `AIClientConfigWrite` 写 `.skycut-backup`、`AIClientSetup` 经过它）：
   `checks/client-config-backup.sh`；行为（600 的备份还是 600、照原文件不一律 600、链接按目标算、再改不动备份）在 `scripts/check-mcp.sh` 的 `ConfigBackupChecks`。
 - DMG 安装引导的接线 / 模板：`checks/dmg-packaging.sh`；真实组装、挂载和 Retina 背景：`scripts/check-dmg.sh`。
+  The background check also requires the drag hint's icon copies to show ink, without pinning the icon's colours (a
+  blank icon, transparent or cut off early, is red). Without a path, `check-dmg.sh` runs a copy of the builder with no icon
+  source, an unreadable one and a cut-off one: each must stop it, naming `packaging/icon-source-1024.png`.
 - User and release builds signed with the pinned Developer ID, the hardened runtime and notarization only through
   `scripts/signing/` (since 2026-11-26): `checks/release-signing.sh` and its sections in `checks/release-signing/`. It scans the
   build scripts' order (profile check before the compile; app signed and notarized before the DMG; DMG signed, then
