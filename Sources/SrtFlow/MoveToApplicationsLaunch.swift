@@ -35,8 +35,9 @@ enum MoveToApplicationsLaunch {
         // Who is running, taken here on the main thread: the move itself runs off it.
         let running = Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleURL.map(path) })
         mover.isRunning = { running.contains(path($0)) }
+        let moving = mover
         let (outcome, opened) = MoveToApplicationsAlerts.whileMoving(appName: appName) { () -> (AppBundleMover.Outcome, Opened) in
-            let outcome = mover.move(original)
+            let outcome = moving.move(original)
             guard case .moved(let installed) = outcome else { return (outcome, .notTried) }
             return (outcome, openNewInstance(installed))
         }

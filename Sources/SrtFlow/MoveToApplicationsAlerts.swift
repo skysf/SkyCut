@@ -70,7 +70,7 @@ enum MoveToApplicationsAlerts {
 
     /// Runs `work` off the main thread and returns its result. The progress panel appears only when it takes longer than
     /// 0.4 s (a warm image copies and checks 65 MB in about 0.1 s on an M1), so a quick move doesn't flash a window.
-    static func whileMoving<Result>(appName: String, _ work: @escaping () -> Result) -> Result {
+    static func whileMoving<Result>(appName: String, _ work: @escaping @Sendable () -> Result) -> Result {
         let finished = DispatchSemaphore(value: 0)
         let box = MoveResultBox<Result>()
         DispatchQueue.global(qos: .userInitiated).async {
