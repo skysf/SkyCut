@@ -596,6 +596,8 @@
   a slot test run's marker counts only when its head commit has exactly the merge's parents, and not from a dispatch
   on another branch, a red run, a commit that can't be read, another head or another main; the summary job leaves
   markers for pull requests and the slot's test runs. Reverse verification: each of those turned red when broken.
+  Since 2026-11-26 a batch's test run (its commit's parents: main, then several heads) never counts, so main runs in
+  full after a batch; red when the parents are compared only at both ends.
 - The merge slot (2026-11-20): `python3 checks/MergeSlot/MergeSlotChecks.py` runs `scripts/merge-slot.py` against an
   in-memory GitHub (`checks/MergeSlot/FakeGitHub.py`, no network). It merges only after a green run on the exact tree:
   the PR's own run while main hasn't moved, else its own test on `merge-slot/pr-<N>`, a green re-run of it, or a green
@@ -614,6 +616,24 @@
     never overlap, and the PR tested first merges first. Red with the slot from before the fix and with each of five
     mutations of `holder()` / `serve` (run with `PYTHONDONTWRITEBYTECODE=1`: an in-place mutation of the same size can
     otherwise run a stale `__pycache__`).
+  - Batches (2026-11-26, `checks/MergeSlot/BatchCases.py`, `scripts/merge-slot-batch.py`): two ready PRs are tested in
+    one run on a commit whose parents are main and their heads in label order, both merge in that order, main ends on
+    the tested tree and `checks.yml` runs on main once; one ready PR, or one next to a PR whose check is still running,
+    is tested alone as before; at most four in a batch (six ready: four, then two). A PR that conflicts only with the
+    one before it waits without a comment and is sent back once it conflicts with main; one that conflicts with main
+    alone is sent back at once; partners with a red or running check don't join. A red batch tests each member alone
+    from the oldest (four runs for three PRs), sends back only the culprit, and the workflow's next job carries that
+    on. A later member pushed or unlabeled mid-run: only the ones before it merge from that run. The first member
+    pushed or unlabeled, or main moved by a hand merge, mid-run: the run is cancelled and the next test waits until
+    it has stopped. A hand merge between the batch's merges sends the rest back to waiting; one in the second before
+    a merge is noticed by main's tree and stops the batch. The next job carries on mid-run (the batch branch isn't
+    swept), mid-merge, or with a batch built but never dispatched; a green batch run a day old merges nothing; GitHub's
+    own failure is re-run in place; refused merges keep the batch; a run past three hours is cancelled and its members
+    tested alone. A PR whose own test holds the slot and must be redone is never batched. Every scenario checks that no
+    two tests overlap and that each merge landed a tree a green run tested or the tested chain up to that member,
+    except the last-second hand merge, where landing an untested tree is the known window.
+    Reverse verification: 28 mutations each turned it red (build doc "Merge slot"); `checks/ci-verified-tree.sh` also
+    turns red when a batch run's marker would make main's run short.
   - Since 2026-11-20 the same check runs `checks/MergeSlot/InfraRerunCases.py`: the verdict of `scripts/ci-infra-rerun.py`
     on runs whose jobs are built from checks.yml's own step names and GitHub's own messages (`FakeJobs.py`). Re-run: a
     shard or check-all that never got a runner, a runner lost or shut down during a setup step that was the last to

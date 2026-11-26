@@ -58,9 +58,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   point: [Code review rounds](docs/testing/code-review.md).
 - Label the PR (`gh pr edit N --add-label merge-slot`) when it is ready to merge: as you open it if no review is
   pending, otherwise once the review (Codex, or the coordinator's read under `docs/testing/code-review.md`) clears it.
-  The merge slot merges labeled PRs one at a time (`--merge`), each after a green run on the exact tree that lands
-  (main + PR), and deletes the branch (build doc, "Merge slot"). Never merge it yourself, never squash; a task that
-  names who labels or merges wins.
+  The merge slot tests the labeled PRs (alone, or up to four together in one run on main + all of them), merges them
+  in order (`--merge`) after a green run and deletes the branches (build doc, "Merge slot"). Never merge it yourself,
+  never squash; a task that names who labels or merges wins.
 - Then don't push or merge main into it (a push restarts its checks) until the slot removes the label and comments why.
   Red: fix, push, label again. A known flake (perf ratchet, playback benchmark, `check-audio-fade` group 7b; see their
   docs): `gh run rerun <run> --failed` on the run it names, label again once green. Conflict: merge `origin/main`,
@@ -306,7 +306,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-waveform.sh` — 波形数据逐采样对账、很多文件同时读不死锁。
 - `scripts/check-web-motion.sh` — web-motion renderer: the page clock, nothing leaves a page, alpha, hostile pages, memory kills and backstops, identical renders.
 - `python3 checks/MCP/SmokeClientChecks.py` — 冒烟客户端的断线、协议错误、超时和退出码。
-- `python3 checks/MergeSlot/MergeSlotChecks.py` — the merge slot against an in-memory GitHub: only a tree a green run tested merges, one at a time, oldest label first; GitHub's own failures re-run (`rerun-infra.yml`); the workflows' wiring.
+- `python3 checks/MergeSlot/MergeSlotChecks.py` — the merge slot against an in-memory GitHub: only what a green run tested merges, one test at a time, oldest label first; batches of up to four, a red one retested one PR at a time; GitHub's own failures re-run (`rerun-infra.yml`); the workflows' wiring.
 
 ### 扫描守卫（`checks/*.sh`，都在 `check-all.sh` 里；秒级、不编译）
 
