@@ -208,10 +208,12 @@ dragging it is asked once to move it into Applications. Written in SkyCut, no th
   (`runsFromInstallerDisk`, the same rule whoever started it): a client's config would name the helper on the disk, gone
   once the disk is ejected. «Move SkyCut to the Applications folder first…».
 - **Before asking**, first in `applicationDidFinishLaunching`, before the AI channel or anything else starts
-  (`MoveToApplicationsLaunch`; every decision is `MoveToApplicationsFlow`'s, pure and checked): when anything runs from
-  the app of that name in Applications (`RunningBundleProbe`: every process whose executable lies inside it, the app or a
-  helper, any session, letter case ignored), SkyCut says so instead of asking, and this copy quits (one button, Quit), so
-  «quit it, then open the copy on the installer disk again» holds. The question never promises the Trash for a running app.
+  (`MoveToApplicationsLaunch`; every decision is `MoveToApplicationsFlow`'s, pure and checked): when the app of that name
+  in Applications is open (`RunningBundleProbe`: a process whose executable is in its `Contents/MacOS/`, any session,
+  letter case ignored), SkyCut says so instead of asking, and this copy quits (one button, Quit), so «quit it, then open
+  the copy on the installer disk again» holds. The question never promises the Trash for an open app. A helper running
+  from `Contents/Helpers/` doesn't count: an AI client keeps its `skycut-mcp` running while SkyCut is closed, and moving
+  the bundle to the Trash under it is harmless (a rename; it keeps running and opens the new copy at the same path next).
 - **The question**: «Move SkyCut to the Applications folder?» and its reason, «It's running from the installer disk, so it
   won't open once the disk is ejected.»; Move to Applications (Return) and Not Now (Escape), plus a line when a stopped app
   of that name there goes to the Trash. Not Now continues from the disk, and the next launch from the disk asks again:
@@ -222,8 +224,8 @@ dragging it is asked once to move it into Applications. Written in SkyCut, no th
   translocate the moved app, which would then ask again. The copy's signature is checked strictly against the original's
   designated requirement (`AppBundleSignature`; for the Developer ID, the team, so permissions recorded by team and
   identifier stay valid). Then:
-  - the running probe is asked again right before the Trash (an AI client may have started the app meanwhile); anything
-    running there: nothing is moved, SkyCut says so, and this copy quits;
+  - the probe is asked again right before the Trash (an AI client may have started the app meanwhile); the app open
+    there: nothing is moved, SkyCut says so, and this copy quits;
   - an app of that name that is not running goes to the Trash (recoverable) and the copy is renamed into place; if the
     rename fails, the old app is put back, and if that fails too, the alert says it is in the Trash;
   - a folder this user can't write: SkyCut says so and offers Show Applications Folder. It never asks for administrator rights;
@@ -246,6 +248,8 @@ dragging it is asked once to move it into Applications. Written in SkyCut, no th
   4. With SkyCut open from `/Applications`, open the disk's copy: no question; «SkyCut is open from the Applications
      folder», Quit, this copy quits, nothing changed.
   5. Running from the disk, Settings › Connect AI: refused with «Move SkyCut to the Applications folder first…».
+  6. With Claude or Codex open (its `skycut-mcp` running from `/Applications/SkyCut.app`) and SkyCut closed, open the disk's
+     copy: the question appears (not «SkyCut is open»), and Move replaces the app while the helper keeps running.
 
 ## 测试版（SkyCut Beta）
 
