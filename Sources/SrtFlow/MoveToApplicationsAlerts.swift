@@ -11,17 +11,23 @@ import AppKit
 
 @MainActor
 enum MoveToApplicationsAlerts {
-    /// «Move SkyCut to the Applications folder?» Move is the default button, Not Now the other.
+    /// «Move SkyCut to the Applications folder?» Move is the default button (Return), Not Now the other (Escape).
+    /// `replacing` only for an app of that name that is there and not running (MoveToApplicationsFlow.start).
     static func question(appName: String, replacing: Bool) -> NSAlert {
         let alert = NSAlert()
         alert.messageText = String(format: L10n("Move %@ to the Applications folder?"), appName)
-        var text = L10n("It's running from the installer disk, but updates and the permissions you give it expect it in the Applications folder.")
+        var text = L10n("It's running from the installer disk, so it won't open once the disk is ejected.")
         // On a line of its own: sentences in different languages don't join the same way (no space after 。).
         if replacing { text += "\n" + String(format: L10n("The %@ that's there now goes to the Trash."), appName) }
         alert.informativeText = text
         alert.addButton(withTitle: L10n("Move to Applications"))
-        alert.addButton(withTitle: L10n("Not Now"))
+        dismissesWithEscape(alert.addButton(withTitle: L10n("Not Now")))
         return alert
+    }
+
+    /// AppKit gives Escape only to a button titled Cancel: Not Now and the like get it here.
+    private static func dismissesWithEscape(_ button: NSButton) {
+        button.keyEquivalent = "\u{1b}"
     }
 
     /// The panel shown while the copy is made and checked, laid out like the alerts: the app's icon, the line, a bar.
@@ -88,12 +94,13 @@ enum MoveToApplicationsAlerts {
         return box.value!
     }
 
-    /// An app of that name is open from the Applications folder: never quit, nothing changed.
+    /// An app of that name is open from the Applications folder: it is never quit or touched; this copy quits instead, so
+    /// "open the copy on the disk again" holds. One button, Quit.
     static func running(appName: String) -> NSAlert {
         let alert = NSAlert()
         alert.messageText = String(format: L10n("%@ is open from the Applications folder"), appName)
-        alert.informativeText = L10n("Quit it, then open the copy on the installer disk again to replace it. Nothing was changed.")
-        alert.addButton(withTitle: L10n("OK"))
+        alert.informativeText = L10n("To replace it, quit it, then open the copy on the installer disk again. Nothing was changed, and this copy quits now.")
+        alert.addButton(withTitle: L10n("Quit"))
         return alert
     }
 
@@ -104,7 +111,7 @@ enum MoveToApplicationsAlerts {
         alert.informativeText = String(
             format: L10n("You don't have permission to change the Applications folder. Drag %@ into it in Finder instead."), appName)
         alert.addButton(withTitle: L10n("Show Applications Folder"))
-        alert.addButton(withTitle: L10n("Not Now"))
+        dismissesWithEscape(alert.addButton(withTitle: L10n("Not Now")))
         return alert
     }
 
@@ -123,15 +130,16 @@ enum MoveToApplicationsAlerts {
         return alert
     }
 
-    /// The copy is in place but macOS didn't open it. Show in Finder (default) or OK.
+    /// The copy is in place but macOS didn't open it; this copy goes on from the disk. Show in Finder (default) or OK.
     static func openFailed(appName: String, detail: String?) -> NSAlert {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = String(format: L10n("%@ was moved but didn't open"), appName)
-        alert.informativeText = [L10n("It's in the Applications folder now: open it from there."), detail ?? ""]
+        alert.informativeText = [L10n("It's in the Applications folder now: open it from there. This copy keeps running from the installer disk."),
+                                 detail ?? ""]
             .filter { !$0.isEmpty }.joined(separator: "\n")
         alert.addButton(withTitle: L10n("Show in Finder"))
-        alert.addButton(withTitle: L10n("OK"))
+        dismissesWithEscape(alert.addButton(withTitle: L10n("OK")))
         return alert
     }
 

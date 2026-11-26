@@ -6,7 +6,9 @@ import Foundation
 // is on a read-only disk image (SkyCut double-clicked in the DMG window instead of dragged) or under an App Translocation
 // path (a quarantined download macOS runs from a randomized read-only view). Never from /Applications or ~/Applications,
 // never for a dev, check, smoke or render bundle (other bundle identifiers; dist/, .build, /tmp, temporary folders), never
-// in a scripted run (SRTFLOW_* in the environment, CI). A pure function of `Facts`, so the checks feed it every case.
+// when the AI helper started it (SRTFLOW_AI_LAUNCH, set by skycut-mcp's `open`), never in a scripted run (SRTFLOW_* in the
+// environment, CI). Connect AI asks the same rule without the environment (`runsFromInstallerDisk`). A pure function of
+// `Facts`, so the checks feed it every case.
 // What it doesn't: gather the facts (MoveToApplicationsLaunch, InstallerDisk), ask or move (MoveToApplicationsAlerts,
 // AppBundleMover).
 // Rules: docs/build/build-and-packaging.md "Installing from the DMG".
@@ -14,6 +16,9 @@ import Foundation
 enum MoveToApplicationsOffer {
     /// The shipping app and the Beta. Dev, check, smoke and render bundles carry identifiers of their own.
     static let shippingBundleIdentifiers: Set<String> = ["com.srtflow.SrtFlow", "com.srtflow.SrtFlow.beta"]
+    /// Set by the AI helper on a launch it makes (`open -g --env SRTFLOW_AI_LAUNCH=1`, Sources/SrtFlowMCP/AppConnection.swift):
+    /// nobody may be there to answer, and the AI's call would wait behind the question.
+    static let aiLaunchKey = "SRTFLOW_AI_LAUNCH"
 
     /// What the launch knows about itself.
     struct Facts: Equatable, Sendable {
@@ -44,6 +49,8 @@ enum MoveToApplicationsOffer {
     }
 
     enum Reason: Equatable, Sendable {
+        /// The AI helper started this launch in the background.
+        case startedByAI
         /// A check, smoke, E2E or CI run.
         case scripted
         /// Not the shipping app or the Beta.
@@ -59,6 +66,7 @@ enum MoveToApplicationsOffer {
     }
 
     static func decide(_ facts: Facts) -> Decision {
+        if facts.environment[aiLaunchKey] != nil { return .skip(.startedByAI) }
         if isScripted(facts.environment) { return .skip(.scripted) }
         guard let identifier = facts.bundleIdentifier, shippingBundleIdentifiers.contains(identifier) else {
             return .skip(.otherBundle)
@@ -70,6 +78,14 @@ enum MoveToApplicationsOffer {
         if isTranslocated(path) { return .offer(.translocated) }
         if isDevelopmentFolder(path) { return .skip(.developmentFolder) }
         return facts.onReadOnlyDiskImage ? .offer(.diskImage) : .skip(.elsewhere)
+    }
+
+    /// Where the launch runs from would make it ask, whoever started it: Connect AI refuses then, since a client's config
+    /// would name the helper on the installer disk, gone once the disk is ejected (AIClientSetup).
+    static func runsFromInstallerDisk(_ facts: Facts) -> Bool {
+        var located = facts
+        located.environment = [:]
+        return decide(located).offers
     }
 
     /// Checks, smokes and the E2E suite set SRTFLOW_* variables; CI sets CI. A Finder launch has neither.

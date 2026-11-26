@@ -1,8 +1,10 @@
 #!/bin/bash
 # Moving SkyCut from the installer disk into Applications (docs/build/build-and-packaging.md "Installing from the DMG"):
-# the launch wiring (asked before anything starts, eject without -force, no administrator rights), the launch rule in every
-# case, the move against scratch folders (empty, replacing, running, unwritable, failing halfway) with ad-hoc signed
-# fixture bundles, the installer disk and its eject on real scratch disk images. Launches no App; never touches the real
+# the launch wiring (asked before anything starts, the flow's decisions performed as decided, the AI helper's launches
+# marked, Connect AI refused from the disk, eject without -force, no administrator rights), the launch rule and the flow's
+# decisions in every case, the alerts' buttons, the move against scratch folders (empty, replacing, running before or
+# during the copy, unwritable, failing halfway) with ad-hoc signed fixture bundles, the running probe on real processes,
+# the installer disk and its eject on real scratch disk images. Launches no App; never touches the real
 # /Applications, the Trash or a running SkyCut. Needs codesign and hdiutil (CI's macOS runners have both).
 set -euo pipefail
 . "$(dirname "$0")/native-arch.sh"
@@ -48,7 +50,34 @@ if [ "$(grep -c '"\$1" 2>/dev/null; do' "${EJECT}")" -ne 1 ] \
   || [ "$(grep -v '^[[:space:]]*//' "${EJECT}" | grep -c 'hdiutil')" -ne 1 ]; then
   fail "${EJECT}: the eject waits for the process, then runs hdiutil detach once, without -force"
 fi
-NEW_FILES="Sources/SrtFlow/MoveToApplicationsOffer.swift Sources/SrtFlow/MoveToApplicationsLaunch.swift Sources/SrtFlow/MoveToApplicationsAlerts.swift Sources/SrtFlow/AppBundleMover.swift Sources/SrtFlow/AppBundleSignature.swift Sources/SrtFlow/InstallerDisk.swift"
+# The flow's decisions are MoveToApplicationsFlow's (compiled and run below); the launch only performs them. Pinned here:
+# the live running probe before asking and in the mover, Not Now carrying on, and a launch that quits never carrying on.
+LAUNCH="Sources/SrtFlow/MoveToApplicationsLaunch.swift"
+for line in 'exists: mover.hasItem(at: destination), running: RunningBundleProbe.isRunning(destination))' \
+  'isRunning: RunningBundleProbe.isRunning,' \
+  'if MoveToApplicationsFlow.continuesAfter(answer) { return continueLaunch() }' \
+  'if end.continuesLaunch { continueLaunch() } else { NSApp.terminate(nil) }' \
+  'finish(MoveToApplicationsFlow.end(outcome, opened: opened, disk: disk, original: original), appName: appName,'; do
+  if [ "$(grep -cF -- "${line}" "${LAUNCH}")" -ne 1 ]; then
+    fail "${LAUNCH}: missing or repeated: ${line}"
+  fi
+done
+if [ "$(grep -c 'NSApp.terminate(' "${LAUNCH}")" -ne 1 ]; then
+  fail "${LAUNCH}: NSApp.terminate only where the end says the launch doesn't carry on"
+fi
+# An AI-started launch never asks (the helper marks it), and Connect AI refuses while SkyCut runs from the disk.
+HELPER="Sources/SrtFlowMCP/AppConnection.swift"
+if [ "$(grep -cF 'static let launchMarker = "SRTFLOW_AI_LAUNCH=1"' "${HELPER}")" -ne 1 ] \
+  || [ "$(grep -cF 'process.arguments = ["-g", "--env", Self.launchMarker, ' "${HELPER}")" -ne 2 ] \
+  || [ "$(grep -cF 'static let aiLaunchKey = "SRTFLOW_AI_LAUNCH"' Sources/SrtFlow/MoveToApplicationsOffer.swift)" -ne 1 ]; then
+  fail "${HELPER}: every launch the helper makes carries SRTFLOW_AI_LAUNCH=1, the variable MoveToApplicationsOffer.aiLaunchKey names"
+fi
+SETUP="Sources/SrtFlow/AIClientSetup.swift"
+if [ "$(grep -cF 'if let refusal = installerDiskRefusal { message = refusal; return }' "${SETUP}")" -ne 2 ] \
+  || [ "$(grep -cF 'MoveToApplicationsOffer.runsFromInstallerDisk(MoveToApplicationsLaunch.currentFacts().0)' "${SETUP}")" -ne 1 ]; then
+  fail "${SETUP}: Connect and the setup copies refuse while SkyCut runs from the installer disk"
+fi
+NEW_FILES="Sources/SrtFlow/MoveToApplicationsOffer.swift Sources/SrtFlow/MoveToApplicationsFlow.swift ${LAUNCH} Sources/SrtFlow/MoveToApplicationsAlerts.swift Sources/SrtFlow/AppBundleMover.swift Sources/SrtFlow/AppBundleSignature.swift Sources/SrtFlow/InstallerDisk.swift Sources/SrtFlow/RunningBundleProbe.swift"
 # shellcheck disable=SC2086
 if grep -nE 'AuthorizationExecuteWithPrivileges|AuthorizationCreate|SMJobBless|SMAppService|administrator privileges|/usr/bin/sudo|"sudo"' ${NEW_FILES}; then
   fail "moving to Applications never asks for administrator rights"
@@ -57,13 +86,19 @@ fi
 echo "==> build"
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -wmo \
   Sources/SrtFlow/MoveToApplicationsOffer.swift \
+  Sources/SrtFlow/MoveToApplicationsFlow.swift \
+  Sources/SrtFlow/MoveToApplicationsAlerts.swift \
   Sources/SrtFlow/AppBundleMover.swift \
   Sources/SrtFlow/AppBundleSignature.swift \
   Sources/SrtFlow/InstallerDisk.swift \
+  Sources/SrtFlow/RunningBundleProbe.swift \
   Sources/SrtFlow/Quarantine.swift \
   checks/MoveToApplications/main.swift \
   checks/MoveToApplications/Fixture.swift \
+  checks/MoveToApplications/FlowChecks.swift \
+  checks/MoveToApplications/AlertChecks.swift \
   checks/MoveToApplications/MoverChecks.swift \
+  checks/MoveToApplications/ProbeChecks.swift \
   checks/MoveToApplications/DiskChecks.swift \
   -o "${WORK}/check-move-to-applications"
 "${WORK}/check-move-to-applications" "${WORK}/scratch" || FAILED=1

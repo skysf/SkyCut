@@ -112,6 +112,9 @@ struct AppConnection {
         return response.result
     }
 
+    /// The variable SkyCut's MoveToApplicationsOffer.aiLaunchKey names.
+    static let launchMarker = "SRTFLOW_AI_LAUNCH=1"
+
     private struct ConnectionFailure: Error {
         let message: String
     }
@@ -137,13 +140,16 @@ struct AppConnection {
 
     /// `open -g`：在后台启动，不把用户正在打字的对话窗口挤下去。窗口由 App 自己在
     /// 开始剪的时候摆到前面来（不抢键盘，`AIEditorPresenter`）。
+    /// The launch is marked (`launchMarker`, only a fresh launch gets it): SkyCut started from the installer disk this way
+    /// never asks to move itself to Applications, where nobody may be there to answer and this call would wait behind the
+    /// question (MoveToApplicationsOffer.aiLaunchKey, docs/build/build-and-packaging.md "Installing from the DMG").
     private func launchApp() throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
         if let appURL {
-            process.arguments = ["-g", "-a", appURL.path]
+            process.arguments = ["-g", "--env", Self.launchMarker, "-a", appURL.path]
         } else {
-            process.arguments = ["-g", "-b", bundleIdentifier]
+            process.arguments = ["-g", "--env", Self.launchMarker, "-b", bundleIdentifier]
         }
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice

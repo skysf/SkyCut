@@ -108,7 +108,17 @@ final class AIClientSetup: ObservableObject {
 
     func connect(_ client: Client) async {
         guard let helper = helperURL else { return }
+        if let refusal = installerDiskRefusal { message = refusal; return }
         await change(client, connecting: true, helper: helper.path)
+    }
+
+    /// Not from the installer disk: a client's config would name the helper on the disk, gone once it is ejected, and each
+    /// AI call would start the disk's copy (docs/build/build-and-packaging.md "Installing from the DMG"). Connect and the
+    /// two copies of the setup (the prompt, the JSON) all refuse with this line.
+    private var installerDiskRefusal: String? {
+        guard MoveToApplicationsOffer.runsFromInstallerDisk(MoveToApplicationsLaunch.currentFacts().0) else { return nil }
+        return String(format: L10n("Move %@ to the Applications folder first: it's running from the installer disk, and the AI app couldn't find it once the disk is ejected."),
+                      Bundle.main.bundleURL.deletingPathExtension().lastPathComponent)
     }
 
     func disconnect(_ client: Client) async {
@@ -215,6 +225,7 @@ final class AIClientSetup: ObservableObject {
     }
 
     func copy(_ text: String, confirmation: String) {
+        if let refusal = installerDiskRefusal { message = refusal; return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         message = confirmation

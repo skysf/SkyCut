@@ -7,7 +7,8 @@ import Foundation
 // and it would ask again), checks the copy's signature against the original, moves an app of the same name that
 // is there and not running to the Trash, and renames the copy into place. Each step that fails stops the move and leaves
 // the destination as it was: an app already moved to the Trash is put back. An app of that name that is running is never
-// touched, and a folder this user can't write is reported, never elevated (no administrator rights are asked for).
+// touched: asked before the copy and again right before the Trash (an AI client may start it meanwhile). A folder this
+// user can't write is reported, never elevated (no administrator rights are asked for).
 // What it doesn't: ask (MoveToApplicationsAlerts), reopen or eject (MoveToApplicationsLaunch, InstallerDisk). Every outside
 // effect is injected, so the checks run it against scratch folders; SkyCut's own is MoveToApplicationsLaunch.mover.
 // Rules: docs/build/build-and-packaging.md "Installing from the DMG".
@@ -15,7 +16,8 @@ import Foundation
 struct AppBundleMover {
     /// Where the app goes: /Applications for SkyCut, a scratch folder in the checks.
     var destinationFolder: URL
-    /// Is the app at this path running? (SkyCut: the running applications, taken on the main thread before the move.)
+    /// Is anything running from the bundle at this path? Asked twice, the second time right before the Trash, off the main
+    /// thread (SkyCut: RunningBundleProbe, live).
     var isRunning: (URL) -> Bool
     /// Moves an item to the Trash and says where it went (SkyCut: the person's Trash; the checks: a scratch folder).
     var trash: (URL) throws -> URL
@@ -74,6 +76,8 @@ struct AppBundleMover {
 
         var trashed: URL?
         if replacing {
+            // Again, right before the Trash: the copy took time, and an AI client may have started the app there meanwhile.
+            if isRunning(destination) { return .runningAtDestination(destination) }
             do { trashed = try trash(destination) } catch {
                 return .failed(.trash, detail: Self.describe(error), oldAppInTrash: nil)
             }

@@ -6,7 +6,7 @@ import Foundation
 
 @main
 struct MoveToApplicationsChecks {
-    static func main() {
+    @MainActor static func main() {
         guard CommandLine.arguments.count == 2 else { fatalError("usage: check-move-to-applications <scratch folder>") }
         let root = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
         var failures = 0
@@ -16,10 +16,14 @@ struct MoveToApplicationsChecks {
             if !condition { failures += 1; print("FAIL: \(message)") }
         }
         decisions(check)
+        FlowChecks.run(check: check)
+        AlertChecks.run(check: check)
         do {
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
             print("==> the move against scratch folders")
             try MoverChecks.run(in: root, check: check)
+            print("==> the running probe on real processes")
+            try ProbeChecks.run(in: root, check: check)
             print("==> the installer disk on scratch images")
             try DiskChecks.run(in: root, check: check)
         } catch {
@@ -57,6 +61,8 @@ struct MoveToApplicationsChecks {
             (facts("/var/folders/x1/abc123/T/tmp.Q1/SkyCut.app", diskImage: true), .skip(.developmentFolder), "a temporary folder never asks"),
             (facts("/Users/someone/Downloads/SkyCut.app"), .skip(.elsewhere), "a folder the person chose (not translocated) never asks"),
             (facts("/Volumes/External/SkyCut.app"), .skip(.elsewhere), "a writable external drive never asks"),
+            (facts("/Volumes/SkyCut/SkyCut.app", diskImage: true, environment: ["SRTFLOW_AI_LAUNCH": "1"]), .skip(.startedByAI), "a launch the AI helper made never asks"),
+            (facts(translocated, environment: ["SRTFLOW_AI_LAUNCH": "1"]), .skip(.startedByAI), "a translocated launch the AI helper made never asks"),
             (facts("/Volumes/SkyCut/SkyCut.app", diskImage: true, environment: ["SRTFLOW_SMOKE_MUTE": "1"]), .skip(.scripted), "a smoke environment never asks"),
             (facts(translocated, environment: ["SRTFLOW_FFMPEG": "/x/ffmpeg"]), .skip(.scripted), "an E2E run never asks"),
             (facts("/Volumes/SkyCut/SkyCut.app", diskImage: true, environment: ["CI": "true"]), .skip(.scripted), "CI never asks"),
@@ -69,6 +75,13 @@ struct MoveToApplicationsChecks {
             let decision = MoveToApplicationsOffer.decide(facts)
             check(decision == expected, "\(label): expected \(expected), got \(decision)")
         }
+        // Connect AI refuses wherever the launch runs from the installer disk, whoever started it.
+        let disk = MoveToApplicationsOffer.runsFromInstallerDisk
+        check(disk(facts("/Volumes/SkyCut/SkyCut.app", diskImage: true, environment: ["SRTFLOW_AI_LAUNCH": "1"])), "Connect AI: an AI-started copy on the disk counts as on the disk")
+        check(disk(facts(translocated, environment: ["CI": "true"])), "Connect AI: a translocated copy counts as on the disk")
+        check(!disk(facts("/Applications/SkyCut.app")), "Connect AI: the installed copy connects")
+        check(!disk(facts("/Users/someone/Projects/SkyCut/dist/SkyCut.app", diskImage: true)), "Connect AI: a build in dist/ connects")
+        check(!disk(facts("/Volumes/SkyCut/SkyCut.app", diskImage: true, id: "com.srtflow.SrtFlow.movecheck")), "Connect AI: another bundle connects")
         check(MoveToApplicationsOffer.isTranslocated(translocated), "the translocation pattern")
         check(!MoveToApplicationsOffer.isTranslocated("/Users/someone/AppTranslocation/SkyCut.app"), "AppTranslocation outside the temporary folders is a folder name")
     }

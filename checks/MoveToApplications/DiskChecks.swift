@@ -48,9 +48,14 @@ enum DiskChecks {
         // Never opened, so normally never registered; unregistered anyway before its image goes.
         Tool.run(lsregister, ["-u", mounted.path])
         try ejectWaitsForExit(disk, mount: mount, check: check)
-        let attached = Tool.run("/usr/bin/hdiutil", ["info"]).output
+        // The volume goes first (about 0.05 s after the detach starts); the image leaves `hdiutil info` a little later
+        // (0.12 to 0.29 s measured, more under load): polled, up to 10 s.
         let imageTail = readOnly.pathComponents.suffix(4).joined(separator: "/")
-        check(!attached.contains(imageTail), "\(fileSystem): the whole image is detached, not just its volume")
+        let deadline = Date().addingTimeInterval(10)
+        while Tool.run("/usr/bin/hdiutil", ["info"]).output.contains(imageTail), Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        check(!Tool.run("/usr/bin/hdiutil", ["info"]).output.contains(imageTail), "\(fileSystem): the whole image is detached, not just its volume")
     }
 
     /// The eject waits while the given process runs, then detaches the image within seconds of its exit.

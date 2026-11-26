@@ -1,9 +1,10 @@
 import Foundation
 
 // AppBundleMover against scratch folders (scripts/check-move-to-applications.sh): an empty destination; an app of that name
-// that isn't running (to the scratch Trash, the new one in place and verified); one that is running (untouched); a folder
-// this user can't write (untouched); failures halfway (a copy that breaks off, a copy whose signature fails, a Trash that
-// refuses, an install that fails after the old app went to the Trash, with and without putting it back). After each one
+// that isn't running (to the scratch Trash, the new one in place and verified); one that is running, or starts running
+// while the copy is made (untouched either way); a folder this user can't write (untouched); failures halfway (a copy that
+// breaks off, a copy whose signature fails, a copy of another build, a Trash that refuses, an install that fails after the
+// old app went to the Trash, with and without putting it back). After each one
 // the staging folder is gone and the old app is where it was, or, only when it couldn't be put back, in the Trash.
 
 enum MoverChecks {
@@ -26,9 +27,11 @@ enum MoverChecks {
         try emptyDestination(root, check)
         try replacesStoppedApp(root, check)
         try leavesRunningApp(root, check)
+        try runningStartsDuringCopy(root, check)
         try unwritableDestination(root, check)
         try copyBreaksOff(root, check)
         try signatureFails(root, check)
+        try swappedCopyFails(root, check)
         try trashRefuses(root, check)
         try installFailsAndRestores(root, check)
         try installAndRestoreFail(root, check)
@@ -79,6 +82,22 @@ enum MoverChecks {
         check(Fixture.contents(of: scene.trash).isEmpty && Fixture.contents(of: scene.staging).isEmpty, "running: nothing copied, nothing trashed")
     }
 
+    /// Not running when asked, started (by an AI client, say) while the copy was made: asked again right before the Trash,
+    /// so the app is left where it is.
+    private static func runningStartsDuringCopy(_ root: URL, _ check: (Bool, String) -> Void) throws {
+        let scene = try MoveScene(root, name: "running-later")
+        let original = try Fixture.app(in: scene.source, marker: "new")
+        let existing = try Fixture.app(in: scene.applications, marker: "old")
+        var asked = 0
+        var mover = scene.mover()
+        mover.isRunning = { _ in asked += 1; return asked > 1 }
+        let outcome = mover.move(original)
+        check(plain(outcome) == plain(.runningAtDestination(existing)), "running later: refused right before the Trash (got \(outcome))")
+        check(asked == 2, "running later: asked before the copy and again before the Trash (asked \(asked) times)")
+        check(Fixture.marker(of: existing) == "old" && Fixture.codesignVerifies(existing), "running later: the app there is untouched")
+        check(Fixture.contents(of: scene.trash).isEmpty && Fixture.contents(of: scene.staging).isEmpty, "running later: nothing trashed, nothing left")
+    }
+
     private static func unwritableDestination(_ root: URL, _ check: (Bool, String) -> Void) throws {
         let scene = try MoveScene(root, name: "unwritable")
         let original = try Fixture.app(in: scene.source, marker: "new")
@@ -120,6 +139,23 @@ enum MoverChecks {
         if case .failed(.signature, _, nil) = outcome {} else { check(false, "signature: failed at the signature (got \(outcome))") }
         check(Fixture.marker(of: existing) == "old", "signature: the old app is untouched")
         check(Fixture.contents(of: scene.staging).isEmpty && Fixture.contents(of: scene.trash).isEmpty, "signature: nothing left, nothing trashed")
+    }
+
+    /// The copy that lands is validly signed but another build (the original swapped mid-copy, say): it must fail the
+    /// original's requirement, not merely its own.
+    private static func swappedCopyFails(_ root: URL, _ check: (Bool, String) -> Void) throws {
+        let scene = try MoveScene(root, name: "swapped")
+        let original = try Fixture.app(in: scene.source, marker: "new")
+        let existing = try Fixture.app(in: scene.applications, marker: "old")
+        let impostorFolder = scene.root.appendingPathComponent("impostor")
+        try FileManager.default.createDirectory(at: impostorFolder, withIntermediateDirectories: true)
+        let impostor = try Fixture.app(in: impostorFolder, marker: "other build")
+        var mover = scene.mover()
+        mover.copy = { _, staged in try FileManager.default.copyItem(at: impostor, to: staged) }
+        let outcome = mover.move(original)
+        if case .failed(.signature, _, nil) = outcome {} else { check(false, "swapped: failed at the signature (got \(outcome))") }
+        check(Fixture.marker(of: existing) == "old", "swapped: the app there is untouched")
+        check(Fixture.contents(of: scene.trash).isEmpty && Fixture.contents(of: scene.staging).isEmpty, "swapped: nothing trashed, nothing left")
     }
 
     private static func trashRefuses(_ root: URL, _ check: (Bool, String) -> Void) throws {
