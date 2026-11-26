@@ -12,7 +12,12 @@ try {
   execFileSync('swift',['scripts/make-icon.swift',iconset],{cwd:root,stdio:'inherit'});
   await copyFile(join(iconset,'icon_16x16@2x.png'),join(output,'favicon-32.png'));
   await copyFile(join(iconset,'icon_32x32@2x.png'),join(output,'favicon-64.png'));
-  execFileSync('/usr/bin/sips',['-z','180','180',join(iconset,'icon_128x128@2x.png'),'--out',join(output,'apple-touch-icon.png')],{stdio:'inherit'});
+  // The Apple touch icon is the source's card, full-bleed and opaque: iOS fills transparent pixels black and rounds the
+  // corners itself, so the app icon's transparent edge would show as a black frame. The square is make-icon.swift's
+  // IconSource crop: 834 px at (94, 87); the source has no alpha.
+  const card=join(temporary,'card.png');
+  execFileSync('/usr/bin/sips',['-c','834','834','--cropOffset','87','94',join(root,'packaging/icon-source-1024.png'),'--out',card],{stdio:'inherit'});
+  execFileSync('/usr/bin/sips',['-z','180','180',card,'--out',join(output,'apple-touch-icon.png')],{stdio:'inherit'});
   const sizes=[16,32,64];
   const files=['icon_16x16.png','icon_16x16@2x.png','icon_32x32@2x.png'];
   const images=await Promise.all(files.map(file=>readFile(join(iconset,file))));

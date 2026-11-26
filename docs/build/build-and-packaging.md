@@ -91,7 +91,9 @@ the Developer ID with the hardened runtime, see the signing section below) → t
 - These follow the source by themselves: the app's `SkyCut.icns`, SkyCut Beta (a re-signed copy of the app) and the
   DMG's drag hint (its copies are made from the source at build time).
 - The website's favicons and Apple touch icon are committed files: run `npm run build:favicons` in `website/`, commit
-  them, and they go live with the next website deploy. Recordings of real windows (the install guide's video and its
+  them, and they go live with the next website deploy. The touch icon is the source's card, full-bleed and opaque,
+  without the transparent edge: iOS shows transparent pixels black and rounds the corners itself
+  ([SkyCut 官网](../architecture/skycut-website.md)). Recordings of real windows (the install guide's video and its
   poster) keep the icon they were recorded with.
 - A new source keeps this geometry (`make-icon.swift`'s crop is measured from it). Then look at the icon at 16 and 32
   px and at the DMG window (below).

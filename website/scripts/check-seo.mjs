@@ -72,6 +72,8 @@ for(const [file,size] of [['favicon-32.png',32],['favicon-64.png',64],['apple-to
   assert.equal(bytes.readUInt32BE(16),size);assert.equal(bytes.readUInt32BE(20),size);
   assert.ok(root.includes(`href="/${file}"`));
 }
+// iOS fills a touch icon's transparent pixels black, so it must be opaque RGB (PNG colour type 2), full-bleed.
+assert.equal((await readFile(join(dist,'apple-touch-icon.png')))[25],2,'apple-touch-icon.png must have no alpha channel');
 const favicon=await readFile(join(dist,'favicon.ico'));
 assert.equal(favicon.readUInt16LE(2),1);assert.equal(favicon.readUInt16LE(4),3);
 assert.match(root,/<link rel="canonical" href="https:\/\/skycut.app\/en\/">/);
