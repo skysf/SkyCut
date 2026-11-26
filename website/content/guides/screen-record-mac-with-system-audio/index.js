@@ -7,7 +7,7 @@ import ja from './ja.js';
 export default {
   slug:'screen-record-mac-with-system-audio',
   type:'guide',
-  published:'2026-11-11',updated:'2026-11-11',
+  published:'2026-11-11',updated:'2026-11-26',
   asOf:'2026-11',
   sources:[],
   languages:{en,'zh-hant':traditional,ja},
