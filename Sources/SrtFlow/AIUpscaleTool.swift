@@ -64,6 +64,10 @@ enum AIUpscaleTool {
         } catch {
             throw AIToolError(message(error))
         }
+        // What is sent (the source by its bytes, the range): identical requests in a row are counted, the 5th asks (SkyStudioRepeatGuard).
+        let range = model.range(for: choice, tier: tier)
+        let sent = try await SkyStudioRequestDigest.identity(row.quote, files: [.init(role: "source", url: model.originalURL)],
+                                                             extra: ["from": .number(range.start), "to": .number(range.end)])
         // 问 Sky Studio 的这一两秒里工程可能换了、同一个原片可能被别的调用起了任务。
         guard project.documentGeneration == generation else {
             throw AIToolError("The project changed while SkyCut asked Sky Studio for the price; nothing was started. Call upscale_clip again.")
@@ -79,11 +83,12 @@ enum AIUpscaleTool {
             "clips": .array(request.range.coveredClipIDs.map(\.uuidString).sorted().map(JSONValue.string)),
             "project": .string(project.shortID)
         ])
+        let repeated = SkyStudioRepeatGuard.shared.check(.upscaleClip, project: project.documentGeneration, identity: sent, credits: quote.credits)
         let reservation: SkyStudioJobGate.Reservation
         switch try SkyStudioJobGate.decide(credits: quote.credits, summary: UpscaleJob.summary(of: request), identity: identity, args: args,
             reason: "Paid upscaling exceeds draft settings.",
             overrides: [.init(reason: "Paid upscaling exceeds draft settings.", names: AIOverrideQuote.upscaleNames)], project: (SkyStudioAccount.shared.stored?.me.account.id ?? "") + ":" + (project.documentURL?.path ?? project.shortID),
-            profile: AIDraftPolicy.profile(row.quote)) {
+            profile: AIDraftPolicy.profile(row.quote), repeated: repeated) {
         case .needsConfirmation(let ask): return ask
         case .reserved(let reserved): reservation = reserved
         }
@@ -112,6 +117,7 @@ enum AIUpscaleTool {
         // Download again (the task row's button): the same AI job runs again under its id until the result lands or fails again.
         job.onRetry = { _ in AIJobs.shared.reopen(aiJob) }
         UpscaleActivity.shared.add(job, opensCompare: false)
+        SkyStudioRepeatGuard.shared.started(repeated)
 
         let spend = SkyStudioSpendStore.shared
         let minutes = quote.typicalSeconds.map { CloudJobProgress.minutes($0) }
@@ -140,7 +146,7 @@ enum AIUpscaleTool {
             notes.append("The handles were shortened so the range fits Sky Studio's limit of \(Int((tier.maxSourceSeconds ?? 30).rounded(.down))) s per upscale.")
         }
         if !notes.isEmpty { result["note"] = .string(notes.joined(separator: " ")) }
-        return .ok(.object(result))
+        return SkyStudioRepeatWords.adding(repeated, to: .ok(.object(result)))
     }
 
     private static func refuseIfRunning(_ original: URL) throws {

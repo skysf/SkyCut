@@ -362,6 +362,8 @@ final class VoiceLibraryFixture {
         project.effectiveUndoManager?.removeAllActions()
         try FileManager.default.createDirectory(at: folder.appendingPathComponent("allowed"), withIntermediateDirectories: true)
         project.documentURL = folder.appendingPathComponent("library.skycut")
+        // Each scenario is a new opening of the project: its identical paid requests are its own run (SkyStudioRepeatGuard).
+        project.invalidateDocumentGeneration()
         VoiceLibraryHTTP.reset()
         // 设计 / 建 MiniMax 版的任务问 Sky Studio 的间隔不真等（排队的那几个场景）。
         SkyStudioVoiceLibraryJob.pollSleep = { _ in try await Task.sleep(nanoseconds: 20_000_000) }

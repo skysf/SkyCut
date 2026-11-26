@@ -32,25 +32,31 @@ enum SkyStudioVoiceDesignTool {
         let question = SkyStudioVoiceApproval.designQuestion(name: name, credits: credits, expected: quote.creditsExpected)
         let standing = SkyStudioVoiceStanding.shared
         let ask = await standing.voiceAsk(key: key, api: services.api)
+        // The same design sent again: counted, and the 5th in a row asks once, also under a standing grant (SkyStudioRepeatGuard).
+        let repeated = SkyStudioRepeatGuard.shared.check(.manageVoices, project: project.documentGeneration,
+                                                         identity: SkyStudioRequestDigest.identity(draft), credits: credits)
         switch try SkyStudioJobGate.voiceOneTime(credits: credits, action: action, question: question, token: try args.string("confirm_token"),
-                                                 ask: ask) {
+                                                 ask: ask, repeated: repeated) {
         case .needsConfirmation(let result):
             return priced(result, quote: quote)
         case .reserved(let reservation):
             await standing.recordAfterApproval(ask, key: key, api: services.api)
             let job = SkyStudioVoiceDesignOrder.start(draft, quote: quote, key: key, reservation: reservation, project: project, api: services.api)
+            SkyStudioRepeatGuard.shared.started(repeated)
             var result: [String: JSONValue] = [
                 "status": "started", "job_id": .string(job.id), "kind": .string(AIJobs.Kind.voiceDesign.rawValue), "provider": "Sky Studio",
                 "credits": .number(credits),
                 "next_step": "Designing the voice, a one-time fee. Wait with get_job; it reports the new voice and a sample_url to listen to."
             ]
             if ask == .standing {
-                result["full_access"] = .string("Full access: SkyCut started this without asking. Tell the user it designs the voice \"\(name)\" "
-                    + "for at most \(SkyStudioCredits.text(credits)) credits (get_job reports what was charged).")
+                if !repeated.asks {   // the 5th identical design asked even here
+                    result["full_access"] = .string("Full access: SkyCut started this without asking. Tell the user it designs the voice \"\(name)\" "
+                        + "for at most \(SkyStudioCredits.text(credits)) credits (get_job reports what was charged).")
+                }
                 standing.notify(String(format: L10n("Full access: SkyCut is designing the voice “%@” (at most %@ credits)."), name,
                                        SkyStudioCredits.text(credits)), project: project)
             }
-            return .ok(.object(result))
+            return SkyStudioRepeatWords.adding(repeated, to: .ok(.object(result)))
         }
     }
 

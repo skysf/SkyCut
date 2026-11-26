@@ -55,16 +55,25 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 \
   checks/VoiceRecovery/UpscaleJobDownloadChecks.swift checks/VoiceRecovery/OfficialRecoveryDownloadChecks.swift \
   checks/VoiceRecovery/OfficialFilmRunChecks.swift \
   checks/VoiceRecovery/PaidToolEntryChecks.swift \
+  checks/VoiceRecovery/RepeatRequestChecks.swift checks/VoiceRecovery/RepeatPanelChecks.swift \
   checks/VoiceRecovery/VoiceChangeBalanceChecks.swift checks/VoiceRecovery/VoiceChangeSettleChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" \
   -o "${APP}/Contents/MacOS/VoiceRecoveryCheck"
-# 外层看门狗不能放在 Swift 协作线程池里；脚本超时明确红。300 s (2026-11-26, was 180): the paid-download checks of PR #554 brought the
-# binary to ~150 s on this Mac and the whole step to 224 s on CI; a hang still ends red.
+# 外层看门狗不能放在 Swift 协作线程池里；脚本超时明确红。480 s (2026-11-26; was 300, before that 180): PR #554's paid-download checks
+# and PR #557's identical-request checks took the CI step from 213 to 240 s, the binary itself about 163 s on a local M1, and CI
+# runners differ by 34 s or more. The wrapper prints the binary's own seconds (also when it fails or times out), so each log shows
+# the margin; a hang still ends red, three minutes later. When it grows again, split the binary's run in two (FBR1 on PR #557).
 SRTFLOW_VOICE_RECOVERY_CHECK_DIR="${ROOT}/work" \
 SRTFLOW_FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}" \
 SRTFLOW_SMOKE_SCRIPT="${ROOT}/isolated" SRTFLOW_SMOKE_MUTE=1 \
 python3 - "${APP}/Contents/MacOS/VoiceRecoveryCheck" <<'PYTHON'
 import subprocess
 import sys
-subprocess.run([sys.argv[1]], timeout=300, check=True)
+import time
+WATCHDOG = 480
+start = time.monotonic()
+try:
+    subprocess.run([sys.argv[1]], timeout=WATCHDOG, check=True)
+finally:
+    print(f"voice-recovery binary: {time.monotonic() - start:.0f} s of the {WATCHDOG} s watchdog", flush=True)
 PYTHON

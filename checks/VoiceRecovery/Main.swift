@@ -43,6 +43,7 @@ import SrtFlowMCPKit
             try await runVoiceoverDownloadChecks(root)
             try await runUpscaleJobDownloadChecks(root)
             try await runPaidToolEntryChecks(root)   // last: it marks a key on the account
+            try await runRepeatRequestChecks(root)   // identical paid requests in a row (needs the key PaidToolEntryChecks marked)
             try await runOfficialRecoveryDownloadChecks(root)   // after it: the account verified against the fake /me
             try await runOfficialFilmRunChecks(root)
         } catch {

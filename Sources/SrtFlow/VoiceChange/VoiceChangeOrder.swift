@@ -111,10 +111,13 @@ enum VoiceChangeOrder {
                       notifies: Bool, services: VoiceChangeServices) -> AIJobs.Job {
         let origin = VoiceChangeLanding.Origin(clipID: clip.id, sourceURL: source.sourceURL, sourceStart: source.sourceStart,
                                                sourceDuration: source.seconds)
-        return VoiceChangeJob(
+        let job = VoiceChangeJob(
             origin: origin, source: source, draft: draft, quote: quote, target: target, clipName: clip.name, key: key,
             reservation: reservation, project: project, notifies: notifies, services: services
         ).start()
+        // The panel opened again on this clip finds this job by its own clip (SkyStudioPanelHeldDownload).
+        VoiceChangeActivity.shared.noteJob(job.id, clip: clip.id, generation: project.documentGeneration)
+        return job
     }
 
     /// 两个文件放哪：原素材的文件夹，写不进去退到工程的家、再退到下载（同 upscale）。

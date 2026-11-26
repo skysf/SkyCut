@@ -6,7 +6,8 @@
 #   - **AI 的 change_voice 和片段右键的面板是同一条路**：截声音只经 VoiceChangeSource.prepare、报价用的那一份只经 VoiceChangeOrder.draft、
 #     起任务只经 VoiceChangeOrder.start（VoiceChangeJob 别处不许造）；
 #   - **花钱只判每日硬预算、先过预算再起任务**（两处都是 reserveWithoutAsking 在 start 之前）；变声不是一次性费用，两种权限模式都不问：
-#     这一摊里不用确认码、不弹钥匙串框、不直接动积分的账；
+#     这一摊里不用确认码、不弹钥匙串框、不直接动积分的账（the one question, the 5th identical change in a row, is asked by the gate:
+#     SkyStudioJobGate.repeatConfirmation in VoiceChangeTool, 2026-11-26, pinned in repeat-requests.sh）；
 #   - **落地是一步撤销**：VoiceChangeJob 里恰好一次 perform、包在 AIUndoGrouping.step 里（checks/MCP/router-wiring.sh 的异步落账扫描
 #     钉着「上一行是 step」），落地的规则只有 VoiceChangeLanding.land 一份；路由只起任务、不在外面包撤销分组；
 #   - 上传用途只写在 SkyStudioVoiceUpload 一处；截声音的阻塞读只在 MediaReadQueue 上；

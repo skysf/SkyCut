@@ -396,6 +396,9 @@
    charge, not kept at the whole quote (item 12). Only the final charge moves the books (`SkyStudioJobStatus.finalCharge`;
    `VoiceChangeBilling.charge`, 2026-11-26). A bare top-level `credits_charged` of 0 with no bill is neither settled nor reported, and a
    result without its background keeps the reservation until a bill comes ([Sky Studio jobs](sky-studio-jobs.md) section 11).
+   The one question (2026-11-26): the 5th identical change_voice in a row in a project asks once in both modes (`confirm_token`), and a panel's
+   change is never counted ([Sky Studio jobs](sky-studio-jobs.md), "Identical paid requests in a row"). After a failed download the panel on that clip
+   offers Download again as its main button and "Make a new version" for the paid one.
 6. **落地**（`VoiceChangeLanding`，纯值）：原片段**静音、不删**；**新开两条音频轨**（接在现有音频轨后面），人声、背景各一段，放在原片段同一时间；
    带上原片段的变速、音量、渐入渐出、音量曲线（曲线锚在源时间上，平移到新文件自己的时间）、声音场景；三段同一个链接组（原片段本来就在组里就沿用）；
    人声比原片段长的那几毫秒（Chatterbox HD 实测长 5–35 ms）只在时间线上裁到原长、文件不动。两段都用原片段的音量、不另加增益（导出的限幅器兜底）。
