@@ -38,8 +38,8 @@ if [ -z "${COPY}" ] || [ -z "${SIGN_CALL}" ] || [ "${COPY}" -gt "${SIGN_CALL}" ]
   fail "scripts/build-app.sh must copy skycut-web-motion into Contents/Helpers before it calls sign-app.sh"
 fi
 SIGN="scripts/signing/sign-app.sh"
-SIGN_HELPER="$(line_of 'codesign --force "$@" --timestamp=none "${APP}/Contents/Helpers/skycut-web-motion"' "${SIGN}")"
-SIGN_OUTER="$(line_of 'codesign --force "$@" --timestamp=none "${APP}"' "${SIGN}")"
+SIGN_HELPER="$(line_of 'sign_code "${APP}/Contents/Helpers/skycut-web-motion"' "${SIGN}")"
+SIGN_OUTER="$(line_of 'sign_code --entitlements "${SIGNING_ENTITLEMENTS}" "${APP}"' "${SIGN}")"
 if [ -z "${SIGN_HELPER}" ] || [ -z "${SIGN_OUTER}" ] || [ "${SIGN_HELPER}" -gt "${SIGN_OUTER}" ]; then
   fail "${SIGN} must sign Contents/Helpers/skycut-web-motion before the outer bundle"
 fi

@@ -10,7 +10,9 @@ import Security
 /// 记录删掉、让系统重新问一次：`tccutil reset ScreenCapture <bundle id>`。
 ///
 /// 发布版改用固定的签名证书（`scripts/signing/sign-app.sh`）之后，升级不再让记录作废；这里兜的是改签之前留下的
-/// 旧记录，和没有那把证书的构建（自己编的、开发版）。见 docs/architecture/code-signing-and-permissions.md。
+/// 旧记录，和没有那把证书的构建（自己编的、开发版）。Since 2026-11-26 the fixed identity is the Developer ID of team
+/// 26TVX3S9FR: its first build finds the records the self-signed certificate left stale, and this removes them once.
+/// 见 docs/architecture/code-signing-and-permissions.md。
 ///
 /// 管什么：这一个构建删过没有、删。不管什么：请求授权、给用户的话（`ScreenRecordingPermissions`、
 /// `ScreenRecordingError.localizedText`）。

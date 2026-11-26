@@ -7,7 +7,7 @@
 # 这些名字用户看不见，「顺手把改名做彻底」正是最容易犯的错，所以钉住。
 #
 # 钉着：
-#   1. 身份：bundle id、测试版的 bundle id、UTType 标识、钥匙串 service、签名证书和它的目录；
+#   1. 身份：bundle id、测试版的 bundle id、UTType 标识、钥匙串 service (the signing team: checks/release-signing.sh)；
 #   2. 数据：Application Support / Caches / Logs 下的 SrtFlow 文件夹、fal 的两个 UserDefaults 键；
 #   3. 通道：小程序 ↔ App 的内部工具名和 /tmp 兜底的 socket 前缀；
 #   4. 看得见的：App 名、可执行文件、打包脚本的 APP_NAME、小程序的产品名、两处 MCP 服务器名都是 SkyCut / skycut；
@@ -42,8 +42,6 @@ for type in project srt ass ssa transition filter timeline-items audio-library-i
   require "${PLIST}" "<string>com.srtflow.${type}</string>" "老工程、老字幕、拖放载荷都按这个标识认"
 done
 require Sources/SrtFlow/SkyStudio/SkyStudioKey.swift '(Bundle.main.bundleIdentifier ?? "com.srtflow.SrtFlow") + ".skystudio"' "钥匙串里 Sky Studio Key 的 service（改了用户存的 Key 就找不到了）"
-require scripts/signing/common.sh 'SIGNING_IDENTITY_NAME="SrtFlow Signing"' "签名证书永不重建（AGENTS.md「打包与签名」）"
-require scripts/signing/common.sh '.config/srtflow/signing' "签名身份所在的目录"
 
 echo "==> 2. 数据文件夹与设置的键"
 require Sources/SrtFlow/AIRecipeStore.swift '"SrtFlow/Recipes"' "用户存的剪辑风格"
