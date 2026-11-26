@@ -56,7 +56,6 @@ import SwiftUI
     @MainActor
     private static func show(_ phase: AppUpdateState.Phase, decision: AppUpdateEligibility.Decision = .updates, automatic: Bool = true,
                              progress: Double? = nil, failed: Bool = false, asked: Bool = false) {
-        AppUpdater.shared.automatic = automatic
         var state = AppUpdateState()
         state.phase = phase
         state.offer = phase == .idle ? nil : feed
@@ -64,7 +63,7 @@ import SwiftUI
         state.downloadFailed = failed
         state.downloadAsked = asked
         let today = Calendar.current.date(bySettingHour: 10, minute: 42, second: 0, of: Date())
-        AppUpdater.shared.showForRender(state, decision: decision, running: running, lastUpToDate: today)
+        AppUpdater.shared.showForRender(state, decision: decision, automatic: automatic, running: running, lastUpToDate: today)
     }
 
     @MainActor

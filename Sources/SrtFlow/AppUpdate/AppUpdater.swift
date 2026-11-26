@@ -161,13 +161,20 @@ final class AppUpdater: ObservableObject {
         AppUpdateRestart.quitToRestart()
     }
 
-    /// The off-screen renders only (scripts/render-app-updates.sh): show `state` as a copy in `decision` would. Nothing runs.
-    func showForRender(_ state: AppUpdateState, decision: AppUpdateEligibility.Decision, running: AppUpdateVersion, lastUpToDate: Date?) {
+    /// The off-screen renders only (scripts/render-app-updates.sh): show `state` as a copy in `decision` would. From then on
+    /// nothing runs: no transition, no download, no file (the switch set here would otherwise start one).
+    func showForRender(_ state: AppUpdateState, decision: AppUpdateEligibility.Decision, automatic: Bool, running: AppUpdateVersion,
+                       lastUpToDate: Date?) {
+        renderOnly = true
+        self.automatic = automatic
         self.state = state
         self.decision = decision
         self.running = running
         self.lastUpToDate = lastUpToDate
     }
+
+    /// Set by showForRender: events change nothing and start nothing.
+    private var renderOnly = false
 
     // MARK: Quit
 
@@ -193,7 +200,7 @@ final class AppUpdater: ObservableObject {
     // MARK: Effects
 
     private func send(_ event: AppUpdateEvent) {
-        guard let mode else { return }
+        guard let mode, !renderOnly else { return }
         for effect in state.apply(event, mode: mode) { run(effect) }
     }
 
