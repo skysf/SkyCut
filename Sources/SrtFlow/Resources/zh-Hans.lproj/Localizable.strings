@@ -1729,13 +1729,13 @@
 
 /* Moving SkyCut from the installer disk into Applications (MoveToApplicationsAlerts, 2026-11-26). */
 "Move %@ to the Applications folder?" = "把 %@ 移到「应用程序」文件夹？";
-"It's running from the installer disk, so it won't open once the disk is ejected." = "它现在是从安装盘上运行的，推出安装盘后就打不开了。";
+"It's running from the installer disk, so it won't open once the disk is ejected." = "SkyCut 现在是直接从安装包里打开的，推出安装包后就打不开了。";
 "The %@ that's there now goes to the Trash." = "现在在那里的 %@ 会移到废纸篓。";
 "Move to Applications" = "移到「应用程序」";
 "Not Now" = "以后再说";
 "Moving %@ to the Applications folder…" = "正在把 %@ 移到「应用程序」文件夹…";
 "%@ is open from the Applications folder" = "「应用程序」文件夹里的 %@ 正开着";
-"To replace it, quit it, then open the copy on the installer disk again. Nothing was changed, and this copy quits now." = "要替换它，请先退出它，再重新打开安装盘上的这一份。什么都没有改动，这一份现在退出。";
+"To replace it, quit it, then open the copy on the installer disk again. Nothing was changed, and this copy quits now." = "要替换它，请先退出它，再从安装包里重新打开这一份。什么都没有改动，这一份现在退出。";
 "%@ can't be moved to the Applications folder" = "%@ 没法移到「应用程序」文件夹";
 "You don't have permission to change the Applications folder. Drag %@ into it in Finder instead." = "你没有更改「应用程序」文件夹的权限。请改为在访达里把 %@ 拖进去。";
 "Show Applications Folder" = "显示「应用程序」文件夹";
@@ -1748,6 +1748,6 @@
 "Nothing in the Applications folder was changed." = "「应用程序」文件夹里什么都没有改动。";
 "The %@ that was there before is in the Trash: put it back from there." = "原来在那里的 %@ 在废纸篓里：可以从那里放回原处。";
 "%@ was moved but didn't open" = "%@ 已经移过去了，但没能打开";
-"It's in the Applications folder now: open it from there. This copy keeps running from the installer disk." = "它现在在「应用程序」文件夹里：请从那里打开。这一份会继续从安装盘上运行。";
+"It's in the Applications folder now: open it from there. This copy keeps running from the installer disk." = "它现在在「应用程序」文件夹里：请从那里打开。这一份会继续从安装包里运行。";
 "Quit" = "退出";
-"Move %@ to the Applications folder first: it's running from the installer disk, and the AI app couldn't find it once the disk is ejected." = "请先把 %@ 移到「应用程序」文件夹：它现在是从安装盘上运行的，推出安装盘后 AI 应用就找不到它了。";
+"Move %@ to the Applications folder first: it's running from the installer disk, and the AI app couldn't find it once the disk is ejected." = "请先把 %@ 移到「应用程序」文件夹：它现在是直接从安装包里打开的，推出安装包后 AI 应用就找不到它了。";
