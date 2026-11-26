@@ -1726,3 +1726,26 @@
 "“%@” could not be fitted to this model's limits. Nothing was charged." = "“%@” no se pudo ajustar a los límites de este modelo. No se cobró nada.";
 "“%@” changed and is no longer a readable image. Nothing was charged." = "“%@” cambió y ya no es una imagen legible. No se cobró nada.";
 "The reference images are too large together for this model: at most %@ bytes for all of them. Send fewer or smaller images. Nothing was charged." = "Las imágenes de referencia son demasiado grandes en conjunto para este modelo: como máximo %@ bytes entre todas. Envía menos imágenes o más pequeñas. No se cobró nada.";
+
+/* Moving SkyCut from the installer disk into Applications (MoveToApplicationsAlerts, 2026-11-26). */
+"Move %@ to the Applications folder?" = "¿Mover %@ a la carpeta Aplicaciones?";
+"It's running from the installer disk, but updates and the permissions you give it expect it in the Applications folder." = "Se está ejecutando desde el disco de instalación, pero las actualizaciones y los permisos que le des esperan que esté en la carpeta Aplicaciones.";
+"The %@ that's there now goes to the Trash." = "La copia de %@ que hay ahora allí irá a la Papelera.";
+"Move to Applications" = "Mover a Aplicaciones";
+"Not Now" = "Ahora no";
+"Moving %@ to the Applications folder…" = "Moviendo %@ a la carpeta Aplicaciones…";
+"%@ is open from the Applications folder" = "%@ está abierto desde la carpeta Aplicaciones";
+"Quit it, then open the copy on the installer disk again to replace it. Nothing was changed." = "Ciérralo y vuelve a abrir la copia del disco de instalación para reemplazarlo. No se ha cambiado nada.";
+"%@ can't be moved to the Applications folder" = "%@ no se puede mover a la carpeta Aplicaciones";
+"You don't have permission to change the Applications folder. Drag %@ into it in Finder instead." = "No tienes permiso para modificar la carpeta Aplicaciones. Arrastra %@ a ella en el Finder.";
+"Show Applications Folder" = "Mostrar la carpeta Aplicaciones";
+"%@ wasn't moved to the Applications folder" = "%@ no se ha movido a la carpeta Aplicaciones";
+"It couldn't be copied there." = "No se ha podido copiar allí.";
+"The copy couldn't be cleared of the download quarantine." = "No se ha podido quitar la cuarentena de descarga de la copia.";
+"The copy didn't pass the code signature check." = "La copia no ha superado la comprobación de la firma de código.";
+"The %@ already there couldn't be moved to the Trash." = "La copia de %@ que ya estaba allí no se ha podido mover a la Papelera.";
+"The copy couldn't be put in place." = "No se ha podido colocar la copia en su sitio.";
+"Nothing in the Applications folder was changed." = "No se ha cambiado nada en la carpeta Aplicaciones.";
+"The %@ that was there before is in the Trash: put it back from there." = "La copia de %@ que había antes está en la Papelera: puedes recuperarla desde allí.";
+"%@ was moved but didn't open" = "%@ se ha movido, pero no se ha abierto";
+"It's in the Applications folder now: open it from there." = "Ahora está en la carpeta Aplicaciones: ábrelo desde allí.";
