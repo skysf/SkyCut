@@ -76,6 +76,7 @@
 - [2026-11-11 设计声音的报价说不出用哪个模型](2026-11-11-design-quote-model-name.md) — 假服务要照真回答的形状造（`model` 在 `voice_plan.selection` 里）。
 - [2026-11-11 设计声音连按下了好几单](2026-11-11-design-voice-ordered-twice.md) — 会花钱的按钮按下去就锁，同一件事只开一单。
 - [2026-11-17 Detached camera audio was treated as an added sound](2026-11-17-detached-audio-listening-provenance.md) — Retained picture metadata identifies camera sound after detachment; moving it to an audio track does not make it an added layer.
+- [2026-11-26 With hidden files shown, the DMG's background folder sat over the install steps](2026-11-26-dmg-hidden-background-icon-over-steps.md) — Place every item in a DMG's root, hidden ones too, and look at the window once with hidden files shown.
 - [2026-11-17 A docs-only merge cancels the only run checking an earlier code merge](2026-11-17-docs-only-main-cancels-unverified-code.md) — A replacement main run must check inherited code too; a docs-only PR marker proves only scans passed.
 - [2026-11-24 A paid result whose download lost its connection was never saved, and trying again meant paying again](2026-11-24-download-lost-connection-no-retry.md) — After payment, retry what a second GET can fix, keep only whole results, delete only your own files, and keep the result for its job's Download again; never submit again or hand an old result to a new request.
 - [2026-09-25 拖块 / 拉框每一拍整条时间线重算](2026-09-25-drag-session-in-timeline-state.md) — 拖动会话不进时间线的 `@State`：`TimelineDragBox` 持有不订阅。
