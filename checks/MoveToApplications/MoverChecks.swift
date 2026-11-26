@@ -62,7 +62,10 @@ enum MoverChecks {
         check(Fixture.marker(of: installed) == "new", "replace: the new app is in place")
         check(Fixture.codesignVerifies(installed), "replace: codesign accepts the new app")
         check((try? AppBundleSignature.verify(installed, matches: original)) != nil, "replace: the new app satisfies the original's requirement")
-        check(Fixture.marker(of: scene.trash.appendingPathComponent("SkyCut.app")) == "old", "replace: the old app is in the scratch Trash, whole")
+        let old = scene.trash.appendingPathComponent("SkyCut.app")
+        check(Fixture.marker(of: old) == "old", "replace: the old app is in the scratch Trash, whole")
+        // Signed too, but another build: it doesn't satisfy the original's requirement (its code hash, for ad-hoc).
+        check((try? AppBundleSignature.verify(old, matches: original)) == nil, "replace: another build does not pass as the original")
         check(Fixture.contents(of: scene.staging).isEmpty, "replace: the staging folder is removed")
     }
 

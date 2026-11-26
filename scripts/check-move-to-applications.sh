@@ -26,17 +26,18 @@ fail() { echo "FAIL: $1"; FAILED=1; }
 
 echo "==> launch wiring"
 APP_SWIFT="Sources/SrtFlow/SrtFlowApp.swift"
-LAUNCH_LINE="$(grep -n 'MoveToApplicationsLaunch.offer { \[self\] in startServices() }' "${APP_SWIFT}" | cut -d: -f1 || true)"
-DID_FINISH_LINE="$(grep -n 'func applicationDidFinishLaunching' "${APP_SWIFT}" | cut -d: -f1 || true)"
-SERVICES_LINE="$(grep -n 'private func startServices()' "${APP_SWIFT}" | cut -d: -f1 || true)"
-BRIDGE_LINE="$(grep -n 'AIBridgeServer.shared.start()' "${APP_SWIFT}" | cut -d: -f1 || true)"
+line_of() { grep -n "$1" "${APP_SWIFT}" | head -1 | cut -d: -f1 || true; }
+LAUNCH_LINE="$(line_of 'MoveToApplicationsLaunch.offer { \[self\] in startServices() }')"
+DID_FINISH_LINE="$(line_of 'func applicationDidFinishLaunching')"
+SERVICES_LINE="$(line_of 'private func startServices()')"
+BRIDGE_LINE="$(line_of 'AIBridgeServer.shared.start()')"
 if [ -z "${LAUNCH_LINE}" ] || [ -z "${DID_FINISH_LINE}" ] || [ -z "${SERVICES_LINE}" ] || [ -z "${BRIDGE_LINE}" ]; then
   fail "${APP_SWIFT}: applicationDidFinishLaunching must call MoveToApplicationsLaunch.offer { [self] in startServices() }, and startServices() start the AI channel"
 elif [ "${DID_FINISH_LINE}" -ge "${LAUNCH_LINE}" ] || [ "${LAUNCH_LINE}" -ge "${SERVICES_LINE}" ] || [ "${SERVICES_LINE}" -ge "${BRIDGE_LINE}" ]; then
   fail "${APP_SWIFT}: the offer comes first in applicationDidFinishLaunching, and the AI channel starts only in startServices()"
 fi
-if [ "$(grep -c 'startServices()' "${APP_SWIFT}")" -ne 2 ]; then
-  fail "${APP_SWIFT}: startServices() is called only by the offer (it never runs when SkyCut quits to reopen from Applications)"
+if [ "$(grep -c 'startServices()' "${APP_SWIFT}")" -ne 2 ] || [ "$(grep -c 'AIBridgeServer.shared.start()' "${APP_SWIFT}")" -ne 1 ]; then
+  fail "${APP_SWIFT}: startServices() is called only by the offer and is the one place the AI channel starts"
 fi
 EJECT="Sources/SrtFlow/InstallerDisk.swift"
 if [ "$(grep -c '"\$1" 2>/dev/null; do' "${EJECT}")" -ne 1 ] \
