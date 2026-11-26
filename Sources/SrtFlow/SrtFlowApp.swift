@@ -24,6 +24,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         #endif
+        // Opened straight from the installer disk: offer to move to Applications before anything starts; moving reopens
+        // SkyCut from there and quits this one (docs/build/build-and-packaging.md "Installing from the DMG").
+        MoveToApplicationsLaunch.offer { [self] in startServices() }
+    }
+
+    /// Everything a launch starts, the AI channel first. Not reached when SkyCut quits to reopen from Applications.
+    @MainActor private func startServices() {
         DevHooks.prepareIsolatedCache()
         AIBridgeServer.shared.start()
         startMainThreadWatchdog()
