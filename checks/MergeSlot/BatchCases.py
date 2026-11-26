@@ -202,7 +202,7 @@ def run_all(check, slot_module, world, serve, never_merged_untested):
     gh.after_merge = lambda g, n: order.append((n, len(batch_runs(g))))
     serve(slot, gh)
     check("a later member pushed mid-run: only the one before it merges from that run",
-          order[:1] == [(1, 1)] and tests(gh) == [BATCH, BATCH], (order, gh.dispatches))
+          order == [(1, 1), (2, 2), (3, 2)] and tests(gh) == [BATCH, BATCH], (order, gh.dispatches))
     check("…it and the one after it are tested again, its new head included",
           merged(gh) == [1, 2, 3] and gh.merged_heads.get(2) != heads[2]
           and not any("tree-head-2)" in tree for _, tree in gh.merged), gh.merged)
@@ -335,7 +335,8 @@ def run_all(check, slot_module, world, serve, never_merged_untested):
     gh.outcomes[BATCH] = "infra"  # a shard never got a runner; its re-run is green
     serve(slot, gh)
     check("a batch run GitHub's infrastructure failed: re-run in place, then merged (no fallback)",
-          merged(gh) == [1, 2] and tests(gh) == [BATCH] and gh.reruns == [batch_runs(gh)[0]["id"]], (gh.dispatches, gh.reruns))
+          merged(gh) == [1, 2] and tests(gh) == [BATCH] and gh.reruns == [r["id"] for r in batch_runs(gh)][:1],
+          (gh.dispatches, gh.reruns))
     never_merged_untested("infra re-run", gh)
 
     gh, slot = world()
