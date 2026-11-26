@@ -236,15 +236,16 @@ private func voiceLibraryGuideChecks() {
     check(map.contains("manage_voices (design;") && map.contains("list_voices"), "the paid line names manage_voices' design and lists list_voices as free")
 }
 
-/// 变声（声音 PR 9，SkyCut 声音方案 4.8、4.10）：参数名、名片必含、说明书必含、地图。只判每日硬预算：不收 confirm_token。
+/// 变声（声音 PR 9，SkyCut 声音方案 4.8、4.10）：参数名、名片必含、说明书必含、地图。只判每日硬预算；since 2026-11-26 the 5th identical
+/// change in a row asks once (SkyStudioRepeatGuard), so it takes confirm_token.
 private func voiceChangeGuideChecks() {
     let definition = MCPToolName.changeVoice.definition
     check(MCPArgumentCheck.problem(tool: .changeVoice, arguments: ["clip_id": "c1", "voice": "voice_x", "language": "en", "project": "p1",
                                                                    "skip_separation": true]) == nil,
           "change_voice takes clip_id, voice, language, project and skip_separation")
     checkEqual(definition.inputSchema["properties"]?["skip_separation"]?["type"], "boolean", "skip_separation is a boolean (the direct change)")
-    check(MCPArgumentCheck.problem(tool: .changeVoice, arguments: ["clip_id": "c1", "voice": "voice_x", "confirm_token": "t"]) != nil,
-          "change_voice never asks, so it takes no confirm_token")
+    checkEqual(MCPArgumentCheck.problem(tool: .changeVoice, arguments: ["clip_id": "c1", "voice": "voice_x", "confirm_token": "t"]), nil,
+               "change_voice asks at the 5th identical change in a row, so the confirmed retry with confirm_token passes")
     check(MCPArgumentCheck.problem(tool: .changeVoice, arguments: ["clip": "c1", "voice": "voice_x"]) != nil,
           "the clip parameter is clip_id, like every other tool")
     checkEqual(definition.inputSchema["required"], .array(["clip_id", "voice"]), "change_voice requires the clip and the voice")
@@ -254,10 +255,10 @@ private func voiceChangeGuideChecks() {
     let card = definition.description
     for phrase in ["Paid (Sky Studio credits)", "Returns job_id; wait with get_job", "two new linked audio tracks", "original clip is muted",
                    "with skip_separation, the voice alone on one",
-                   "One undo step", "The daily credit limit always applies", "Read skycut_guide topic=change_voice before the first call."] {
+                   "One undo step", "The daily credit limit always applies", "a 5th identical change in a row: needs_confirmation",
+                   "Read skycut_guide topic=change_voice first."] {
         check(card.contains(phrase), "the change_voice card says \"\(phrase)\"")
     }
-    check(!card.contains("needs_confirmation"), "the change_voice card promises no question: the daily limit is the only gate")
     let skip = definition.inputSchema["properties"]?["skip_separation"]?["description"]?.stringValue ?? ""
     for phrase in ["skips separation", "clean voice", "AI/TTS", "no music or noise", "costs less"] {
         check(skip.contains(phrase), "the skip_separation description says \"\(phrase)\" (when to use it)")
@@ -268,7 +269,7 @@ private func voiceChangeGuideChecks() {
     let text = topic.sections.map(\.text).joined(separator: "\n")
     for phrase in ["list_voices mine", "untested", "daily_budget_exceeded", "split_clip", "muted, not deleted", "one undo step",
                    "voice_clip_id", "background_clip_id", "landed is false", "ISO 639-1", "target_language", "check get_job first",
-                   "voice_library_unavailable"] {
+                   "voice_library_unavailable", "The one question is the 5th identical change in a row"] {
         check(text.contains(phrase), "the change_voice topic says \"\(phrase)\"")
     }
     // The direct change (2026-11-21): when to use it, its price and one-track result, and what separation_failed asks of the AI.

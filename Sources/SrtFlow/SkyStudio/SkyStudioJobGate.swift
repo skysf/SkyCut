@@ -8,6 +8,8 @@ import Foundation
 // 价格一律是 /quote 报的（不会有「不知道多少钱」）。upscale_clip（AIUpscaleTool）、generate_media（SkyStudioGenerateTool）走 decide；
 // 不问、只守每日硬上限的走 reserveWithoutAsking：配旁白（整段一次）、变声，和面板 / 按钮起的 upscale、设计声音（按下去就是确认）。
 // 声音库的授权、一次性费用、删声音（声音 PR 6）也在这里，不另开确认入口。
+// The 5th identical paid request in a row (SkyStudioRepeatGuard, 2026-11-26) asks here too: inside decide's / voiceOneTime's
+// question when SkyCut asks that anyway, else alone (repeatConfirmation, for change_voice and add_voiceover), in every mode.
 // 不管什么：报价（/quote）、退款（各任务自己：没花出去的退回）。
 
 @MainActor
@@ -41,10 +43,12 @@ enum SkyStudioJobGate {
     /// overrides 是每一项越档和它的名字；不给就按 reason 算一项、没有能点名的写法（带了原话就算）。
     /// `now` is the one moment the check, the booking and the refund's day use (a reservation that crosses midnight must not
     /// be refunded from the next day: MSG1 review, 2026-11-25).
+    /// `repeated`: where this request stands among identical ones in a row (SkyStudioRepeatGuard). The 5th asks in every mode, as one
+    /// question with the draft question when that is asked too; a yes approves its run (the identical-request question only).
     static func decide(credits: Double, summary: String, identity: String, args: AIToolArguments,
                        store: SkyStudioSpendStore? = nil, access: AIAccessStore? = nil,
                        reason: String? = nil, overrides: [AIOverrideQuote.Item]? = nil, project: String? = nil, profile: String = "",
-                       now: Date = Date()) throws -> Decision {
+                       now: Date = Date(), repeated: SkyStudioRepeatGuard.Check? = nil) throws -> Decision {
         let store = store ?? SkyStudioSpendStore.shared
         let access = access ?? AIAccessStore.shared
         let scope = try args.choice("approval_scope", from: ["once", "project"]) ?? "once"
@@ -62,16 +66,28 @@ enum SkyStudioJobGate {
             + (priceChange.map { [AIOverrideQuote.Item(reason: $0, names: [])] } ?? [])
         let unnamed = userRequested ? AIOverrideQuote.unnamed(items, in: userWords) : items
         let userNamedIt = userRequested && unnamed.isEmpty
-        if let reason = approvalReason, access.mode == .ask, !userNamedIt, !access.allows(project: project, profile: profile, credits: credits) {
-            let action = identity + ":approval_scope:" + scope
+        let draftReason = approvalReason.flatMap { reason in
+            access.mode == .ask && !userNamedIt && !access.allows(project: project, profile: profile, credits: credits) ? reason : nil
+        }
+        let repeatAsks = repeated.flatMap { $0.asks ? $0 : nil }
+        if draftReason != nil || repeatAsks != nil {
+            let action = identity + (draftReason == nil ? "" : ":approval_scope:" + scope) + (repeatAsks.map(SkyStudioRepeatWords.tokenSuffix) ?? "")
             let redemption = AIConfirmations.shared.redeem(try args.string("confirm_token"), for: action)
             guard redemption == .accepted else {
+                if draftReason == nil, let repeatAsks {
+                    let question = SkyStudioRepeatWords.question(summary: summary, repeatAsks)
+                    return .needsConfirmation(SkyStudioRepeatWords.asking(
+                        AIConfirmations.shared.ask(question, action: action, refused: redemption.refusal), repeatAsks, draft: nil))
+                }
+                let next = "Ask in the conversation language before proceeding; offer once or project approval. Keep the scope unchanged when redeeming its token. Never treat the assistant's own plan as user approval."
+                // A project-scope yes approves the draft for the identical requests after it too (approved below); a once yes only this one.
+                let stillApproved = scope != "project" || project == nil
                 var result = AIConfirmations.shared.ask(
-                    "Sky Studio · \(summary) — \(SkyStudioCredits.text(credits)) credits. \(reason) Approve \(scope == "project" ? "this model/specification for this project up to this price per task" : "this task")?",
+                    "Sky Studio · \(summary) — \(SkyStudioCredits.text(credits)) credits. \(draftReason ?? "")\(repeatAsks.map { " " + SkyStudioRepeatWords.sentence($0, stillApproved: stillApproved) } ?? "") Approve \(scope == "project" ? "this model/specification for this project up to this price per task" : "this task")?",
                     action: action, refused: redemption.refusal)
                 if case .object(var value) = result.payload {
                     value["approval_scope"] = .string(scope)
-                    value["next_step"] = "Ask in the conversation language before proceeding; offer once or project approval. Keep the scope unchanged when redeeming its token. Never treat the assistant's own plan as user approval."
+                    value["next_step"] = .string(next)
                     if userRequested {
                         // 说清楚为什么 user_requested_overrides 没免掉这一问：叫它去问用户，别编一段原话再试。
                         value["overrides_not_applied"] = .string((userWords ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -80,10 +96,13 @@ enum SkyStudioJobGate {
                     }
                     result.payload = .object(value)
                 }
-                return .needsConfirmation(result)
+                // One question, not two: the draft question carries the identical-request sentence and its token answers both.
+                return .needsConfirmation(repeatAsks.map { SkyStudioRepeatWords.asking(result, $0, draft: next) }
+                                          ?? SkyStudioRepeatWords.adding(repeated, to: result))
             }
-            if scope == "project", let project { access.approve(project: project, profile: profile, credits: credits) }
-        } else if userNamedIt, scope == "project", let project {
+            if let repeatAsks { SkyStudioRepeatGuard.shared.approve(repeatAsks) }
+        }
+        if draftReason != nil || userNamedIt, scope == "project", let project {
             access.approve(project: project, profile: profile, credits: credits)
         }
         return .reserved(record(store, credits, now: now))
@@ -127,6 +146,24 @@ enum SkyStudioJobGate {
         return record(store, credits, now: now)
     }
 
+    /// The 5th identical paid request in a row of a tool that asks nothing else (change_voice, add_voiceover; SkyStudioRepeatGuard),
+    /// before its reservation: the question when it asks and `token` is not this question's. nil when it does not ask, when the user
+    /// said yes (the rest of the run goes through), or when the daily budget refuses it anyway (the caller's reservation says so;
+    /// no question first). Every permission mode.
+    static func repeatConfirmation(_ repeated: SkyStudioRepeatGuard.Check?, summary: String, token: String?,
+                                   store: SkyStudioSpendStore? = nil, now: Date = Date()) -> AIToolResult? {
+        guard let repeated, repeated.asks,
+              case .allow = (store ?? SkyStudioSpendStore.shared).decide(credits: repeated.credits, now: now) else { return nil }
+        let action = SkyStudioRepeatWords.action(repeated)
+        let redemption = AIConfirmations.shared.redeem(token, for: action)
+        guard redemption == .accepted else {
+            return SkyStudioRepeatWords.asking(AIConfirmations.shared.ask(SkyStudioRepeatWords.question(summary: summary, repeated),
+                                                                          action: action, refused: redemption.refusal), repeated, draft: nil)
+        }
+        SkyStudioRepeatGuard.shared.approve(repeated)
+        return nil
+    }
+
     // MARK: 声音库的三件事（SkyCut 声音方案 4.5；令牌绑什么、问句怎么写在 SkyStudioVoiceApproval）
     //
     // 用录音建声音的授权和一次性费用（建 MiniMax 版、设计）照 `VoiceAsk`（SkyStudioVoiceStanding.voiceAsk 读出来的）：请求批准模式照问；
@@ -157,21 +194,30 @@ enum SkyStudioJobGate {
     }
 
     /// 一次性费用：每日硬预算先判（超了回 daily_budget_exceeded、不发码、不记账）；全部权限 + 长期授权直接记账，别的点过头才记。
+    /// `repeated` (manage_voices design): the 5th identical request in a row asks also under a standing grant, as one question with
+    /// the fee question when that is asked too (SkyStudioRepeatGuard); a yes approves its run (the identical-request question only).
     static func voiceOneTime(credits: Double, action: String, question: String, token: String?, ask: VoiceAsk,
-                             store: SkyStudioSpendStore? = nil, now: Date = Date()) throws -> Decision {
+                             store: SkyStudioSpendStore? = nil, now: Date = Date(), repeated: SkyStudioRepeatGuard.Check? = nil) throws -> Decision {
         let store = store ?? SkyStudioSpendStore.shared
         guard credits.isFinite, credits >= 0 else { throw AIToolError("Sky Studio returned an invalid price; nothing was started.") }
         guard case .allow = store.decide(credits: credits, now: now) else {
             return .needsConfirmation(budgetBlocked(credits: credits, store: store, now: now))
         }
-        if ask != .standing {
-            let (action, question) = asking(action, question, ask)
+        let repeatAsks = repeated.flatMap { $0.asks ? $0 : nil }
+        if ask != .standing || repeatAsks != nil {
+            let (asked, text) = asking(action, question, ask)
+            let action = asked + (repeatAsks.map(SkyStudioRepeatWords.tokenSuffix) ?? "")
             let redemption = AIConfirmations.shared.redeem(token, for: action)
             guard redemption == .accepted else {
-                return .needsConfirmation(voiceQuestion(AIConfirmations.shared.ask(question, action: action, refused: redemption.refusal),
-                    next: "Ask the user in their language, with the price. Only if they agree, repeat the same call with confirm_token. "
-                        + "Never treat your own plan as the user's approval."))
+                let next = "Ask the user in their language, with the price. Only if they agree, repeat the same call with confirm_token. "
+                    + "Never treat your own plan as the user's approval."
+                // In ask mode the fee is asked again for each identical request; once the standing grant is recorded (.once) it is not.
+                let sentence = repeatAsks.map { " " + SkyStudioRepeatWords.sentence($0, stillApproved: ask == .ask) } ?? ""
+                let result = voiceQuestion(AIConfirmations.shared.ask(text + sentence, action: action, refused: redemption.refusal), next: next)
+                return .needsConfirmation(repeatAsks.map { SkyStudioRepeatWords.asking(result, $0, draft: next) }
+                                          ?? SkyStudioRepeatWords.adding(repeated, to: result))
             }
+            if let repeatAsks { SkyStudioRepeatGuard.shared.approve(repeatAsks) }
         }
         return .reserved(record(store, credits, now: now))
     }

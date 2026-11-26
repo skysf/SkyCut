@@ -41,6 +41,10 @@ if [ -z "${VERSION:-}" ]; then
   fi
 fi
 
+# Before the compile: no Developer ID of the team (unless SKYCUT_ALLOW_ADHOC=1, a build for oneself), an expired or unknown
+# certificate, or a notary profile notarytool cannot use stops the build here.
+scripts/signing/notarize.sh --check
+
 echo "==> swift build -c release (arm64, -O)"
 swift build -c release --arch arm64
 BUILD_DIR="$(swift build -c release --arch arm64 --show-bin-path)"
@@ -50,7 +54,24 @@ BUILD_DIR="$(swift build -c release --arch arm64 --show-bin-path)"
 scripts/debug-hook-probe.sh "$BUILD_DIR/$PRODUCT"
 
 APP="$DIST/$APP_NAME.app"
+DMG="$DIST/$APP_NAME-$VERSION-arm64.dmg"
+# A run that fails after it began writing dist/ deletes what it wrote (FBS1 6): no unsigned or un-notarized app or DMG
+# stays there under a release's name.
+WROTE_APP=0
+WROTE_DMG=0
+discard_unfinished() {
+  if [ "$1" -ne 0 ] && [ "${WROTE_APP}" = 1 ]; then
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u "$PWD/$APP" \
+      >/dev/null 2>&1 || true
+    rm -rf "$APP"
+  fi
+  if [ "$1" -ne 0 ] && [ "${WROTE_DMG}" = 1 ]; then
+    rm -f "$DMG"
+  fi
+}
+trap 'discard_unfinished $?' EXIT
 echo "==> 组装 $APP"
+WROTE_APP=1
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
@@ -110,16 +131,22 @@ swift scripts/make-icon.swift "$ICONSET" >/dev/null
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/SkyCut.icns"
 rm -rf "$(dirname "$ICONSET")"
 
-# 签名只经 sign-app.sh 一处（嵌套的先签、外层最后签）：有发布用的签名身份就用它，系统里给过的录屏、麦克风、
-# 下载文件夹、钥匙串权限跨版本有效；没有就退回 ad-hoc 并警告（docs/architecture/code-signing-and-permissions.md）。
+# Signing only through scripts/signing/ (docs/architecture/code-signing-and-permissions.md): the pinned Developer ID with
+# the hardened runtime, nested code first (ad-hoc only with SKYCUT_ALLOW_ADHOC=1). Then notarized and stapled, so the
+# app inside the DMG opens directly, offline too.
 echo "==> codesign"
 scripts/signing/sign-app.sh "$APP"
+echo "==> notarize the app"
+scripts/signing/notarize.sh "$APP"
 
 # DMG: the real App / Applications icons, the six-language install background and the fixed Finder layout (no Finder
-# automation).
+# automation); then signed, notarized and stapled itself.
 echo "==> 生成 DMG"
-DMG="$DIST/$APP_NAME-$VERSION-arm64.dmg"
+WROTE_DMG=1
 /bin/bash scripts/build-dmg.sh "$APP" "$DMG"
+echo "==> sign and notarize the DMG"
+scripts/signing/sign-dmg.sh "$DMG"
+scripts/signing/notarize.sh "$DMG"
 
 echo
 echo "完成："

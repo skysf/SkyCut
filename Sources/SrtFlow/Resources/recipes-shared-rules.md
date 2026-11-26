@@ -31,10 +31,11 @@
     rules for paid work. Keep in mind while you edit: tell the user the price before making anything (quote_only=true);
     draft video with the low-cost draft SkyCut picks for the model (leave resolution out) and remake only the shots you
     keep, quoting first and going by what each call returns. needs_confirmation, whatever the reason: ask the user the
-    result's question in the chat and call again with confirm_token only if they agree. daily_budget_exceeded is the
-    daily hard credit limit: stop there, as nothing started or was charged and no token or permission mode gets past it;
-    tell the user they can raise it in SkyCut Settings → Sky Studio, change it with set_settings only when they ask you
-    to, and never split or shrink a request to get under it.
+    result's question in the chat and call again with confirm_token only if they agree. The same paid request sent again is
+    a new paid version: the result says so from the 2nd in a row, and the 5th returns needs_confirmation.
+    daily_budget_exceeded is the daily hard credit limit: stop there, as nothing started or was charged and no token or
+    permission mode gets past it; tell the user they can raise it in SkyCut Settings → Sky Studio, change it with
+    set_settings only when they ask you to, and never split or shrink a request to get under it.
 12. Sound effects, in this order: first find_audio kind=sound_effect for a recorded or produced one (whooshes, impacts,
     risers, wind, ice, water, mechanical…; place it with add_clips library_id and hit_at); when nothing fits, add_clips
     sound_effect makes one on this Mac (whoosh, swoosh, suction, riser, downlifter, impact, boom, hit, pop, click, tick,

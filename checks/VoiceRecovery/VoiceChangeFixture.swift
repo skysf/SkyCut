@@ -247,6 +247,9 @@ final class VoiceChangeFixture {
         project.effectiveUndoManager?.removeAllActions()
         try FileManager.default.createDirectory(at: folder.appendingPathComponent("media"), withIntermediateDirectories: true)
         project.documentURL = folder.appendingPathComponent("change.skycut")
+        // Each scenario is a new opening of the project (an empty timeline, another file): its identical changes are its own run
+        // (SkyStudioRepeatGuard counts per opening; one deterministic source changed in every scenario once reached the 5th).
+        project.invalidateDocumentGeneration()
         project.notice = nil
         VoiceChangeHTTP.reset()
         SkyStudioCatalogCache.shared.forget()

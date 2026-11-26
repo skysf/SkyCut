@@ -77,8 +77,10 @@ private let pilotNature: [MCPToolName: [String]] = [
     // 声音库的写：服务器上的事，不改工程、没有撤销（名片写明 no undo）；设计花积分、回任务号；授权 / 一次性费用 / 删除会问。
     .manageVoices: ["no undo", "Paid (Sky Studio credits)", "needs_confirmation", "daily credit limit", "wait with get_job",
                     "skycut_guide topic=manage_voices"],
-    // 变声（声音 PR 9）：花积分、回任务号、做完那一下是一步撤销；只判每日硬预算，不问（名片里没有 needs_confirmation、不收 confirm_token）。
-    .changeVoice: ["Paid (Sky Studio credits)", "One undo step", "daily credit limit", "wait with get_job", "skycut_guide topic=change_voice"],
+    // 变声（声音 PR 9）：花积分、回任务号、做完那一下是一步撤销；只判每日硬预算。Its one question is the 5th identical change in a row
+    // (2026-11-26, SkyStudioRepeatGuard): needs_confirmation and confirm_token.
+    .changeVoice: ["Paid (Sky Studio credits)", "One undo step", "daily credit limit", "wait with get_job", "needs_confirmation",
+                   "skycut_guide topic=change_voice"],
     // 第二批（2026-11-10）：只读的 Read-only、改工程的 One undo step、会问的 needs_confirmation，外加各检查和扫描守卫要的说法
     // （get_status 的 screen recording 和 cloud_tasks、get_timeline 的 edit_limits、list_characters 的 compact summaries / 1 KiB、
     // recipes 的 which one you follow、delete_items 的 Linkage on:、convert_subtitles 的 or in folder）。

@@ -265,7 +265,9 @@ calibration and loading three pages.
 
 `scripts/build-app.sh` copies `skycut-web-motion` into `SkyCut.app/Contents/Helpers/` (next to ffmpeg and `skycut-mcp`);
 `scripts/signing/sign-app.sh` refuses to sign without it and signs it before the outer bundle (only through `sign-app.sh`,
-[code signing](code-signing-and-permissions.md)). No entitlements: the helper needs none (no camera, no network).
+[code signing](code-signing-and-permissions.md)). No entitlements: the helper needs none (no camera, no network). Since
+2026-11-26 it runs under the hardened runtime like every piece of the app: the pages' JavaScript runs in WebKit's own
+processes, and a Developer-ID, hardened build rendered the E2E reference motion with all six checks passed.
 
 ## 13. Checks and guards
 

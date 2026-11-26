@@ -9,8 +9,8 @@ BUILD_SCRIPT="scripts/build-app.sh"
 SIGN_SCRIPT="scripts/signing/sign-app.sh"
 COPY_LINE="$(grep -n 'cp "$BUILD_DIR/skycut-mcp" "$APP/Contents/Helpers/skycut-mcp"' "${BUILD_SCRIPT}" | cut -d: -f1 || true)"
 CALL_SIGN="$(grep -n '^scripts/signing/sign-app.sh "$APP"$' "${BUILD_SCRIPT}" | cut -d: -f1 || true)"
-SIGN_HELPER="$(grep -n 'codesign --force "$@" --timestamp=none "${APP}/Contents/Helpers/skycut-mcp"' "${SIGN_SCRIPT}" | cut -d: -f1 || true)"
-SIGN_APP="$(grep -n 'codesign --force "$@" --timestamp=none "${APP}"$' "${SIGN_SCRIPT}" | cut -d: -f1 || true)"
+SIGN_HELPER="$(grep -n '^sign_code "${APP}/Contents/Helpers/skycut-mcp"$' "${SIGN_SCRIPT}" | cut -d: -f1 || true)"
+SIGN_APP="$(grep -n '^sign_code --entitlements "${SIGNING_ENTITLEMENTS}" "${APP}"$' "${SIGN_SCRIPT}" | cut -d: -f1 || true)"
 if [ -z "${COPY_LINE}" ] || [ -z "${CALL_SIGN}" ] || [ -z "${SIGN_HELPER}" ] || [ -z "${SIGN_APP}" ]; then
   echo "✗ ${BUILD_SCRIPT} 没把 skycut-mcp 拷进 Contents/Helpers，或 ${SIGN_SCRIPT} 没签它：AI 客户端配置里写的那个路径会不存在" >&2
   exit 1

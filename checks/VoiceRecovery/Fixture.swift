@@ -323,6 +323,9 @@ final class VoiceRecoveryFixture {
         project.effectiveUndoManager?.removeAllActions()
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         project.documentURL = folder.appendingPathComponent("recovery.skycut")
+        // Each scenario is a new opening of the project (an empty timeline, another file): its identical narrations are its own run
+        // (SkyStudioRepeatGuard counts per opening; "Hello world." narrated in scenario after scenario once reached the 5th).
+        project.invalidateDocumentGeneration()
         VoiceRecoveryHTTP.reset(cap: cap)
         SkyStudioCatalogCache.shared.forget()
         SkyStudioSpendStore.shared.setDailyLimit(1_000)

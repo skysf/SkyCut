@@ -170,6 +170,9 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioSpend.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioApproval.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobGate.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioRepeatGuard.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioRepeatWords.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioRequestDigest.swift \
   Sources/SrtFlow/SkyStudio/SkyCutDailyLimit.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioBalanceRefusal.swift \
   Sources/SrtFlow/SettingsCategory.swift \
@@ -257,6 +260,7 @@ xcrun swiftc \
   checks/SkyStudio/JobRunChecks.swift \
   checks/SkyStudio/SpendChecks.swift \
   checks/SkyStudio/ApprovalChecks.swift \
+  checks/SkyStudio/RepeatGuardChecks.swift \
   checks/SkyStudio/AccessChecks.swift \
   checks/SkyStudio/DailyLimitChecks.swift \
   checks/SkyStudio/BalanceRefusalChecks.swift \

@@ -64,13 +64,15 @@ Claude Code 里 PATH 上的 bash 是原生的 5.x，命令 shell 也是原生的
 
 ## 打包流程（scripts/build-app.sh）
 
-Release 构建 → 手写 Info.plist 组装 `dist/SkyCut.app`（SwiftPM 的可执行产品 `SrtFlow` 拷成 `Contents/MacOS/SkyCut`，产品名与代码名见 [产品名与代码名](../architecture/product-name.md)） → 拷入 SwiftPM 资源包、
+The notary profile is checked first (`scripts/signing/notarize.sh --check`: one notarytool cannot use stops the build
+before the compile) → Release 构建 → 手写 Info.plist 组装 `dist/SkyCut.app`（SwiftPM 的可执行产品 `SrtFlow` 拷成 `Contents/MacOS/SkyCut`，产品名与代码名见 [产品名与代码名](../architecture/product-name.md)） → 拷入 SwiftPM 资源包、
 vendor/ffmpeg 和 AI 客户端启动的 MCP 小程序 `skycut-mcp`（都在 `Contents/Helpers/`，
 见 [AI 接口（MCP）](../architecture/ai-control-mcp.md)）, and the web-motion renderer `skycut-web-motion` (also in
 `Contents/Helpers/`, [web-motion renderer](../architecture/web-motion-renderer.md)) → 生成图标 → 签名（只经 `scripts/signing/sign-app.sh`：
 **先签嵌套二进制再签外层**，顺序反了外层签名立即失效，`scripts/check-mcp.sh` 钉着 skycut-mcp 这一条，`checks/web-motion-wiring.sh` 钉着 skycut-web-motion；
-用固定的签名身份签，见下方签名一节）→ `scripts/build-dmg.sh` 生成 Retina 引导背景、复制 Finder 布局模板，
-再由 `hdiutil` 生成 DMG（HFS+、卷名仍是 `SkyCut`）。
+the Developer ID with the hardened runtime, see the signing section below) → the app notarized and its ticket stapled
+(`notarize.sh`) → `scripts/build-dmg.sh` 生成 Retina 引导背景、复制 Finder 布局模板，
+再由 `hdiutil` 生成 DMG（HFS+、卷名仍是 `SkyCut`）→ the DMG signed (`sign-dmg.sh`), notarized and stapled (`notarize.sh`).
 
 产物：`dist/SkyCut.app`（0.18.66 约 68 MB）、`dist/SkyCut-<版本>-arm64.dmg`（2026-10-18 改名之前叫 `SrtFlow.app`、`SrtFlow-<版本>-arm64.dmg`）。
 
@@ -153,23 +155,31 @@ Finder 的真实渲染属于人工回归，每次改图稿 / 模板后以及发�
 3. 截图只存 `/private/tmp` 并在交接写路径，不入库；关闭本次开的窗口，卸载本次测试卷。
 4. 删除测试 DMG 和同版 `dist/SkyCut.app`，避免未发布版本留在 `dist/`；不安装、不上传、不发版。
 
-## 签名：一把固定的自签名证书（2026-10-03 起）
+## Signing and notarization: the Developer ID (since 2026-11-26)
 
-macOS 的录屏、麦克风、下载文件夹、钥匙串权限按签名认。ad-hoc 签名每出一个新版本就是「另一个 App」，用户给过的
-权限全部作废，录屏那条在系统设置里拨开关都救不回来。所以发布版和测试版都用同一把自签名证书「SrtFlow Signing」签，
-designated requirement 是「bundle id + 这把证书」，换版本不变。来龙去脉和规矩见
-[签名与系统权限](../architecture/code-signing-and-permissions.md)。
+macOS keys its permissions (screen recording, microphone, Downloads, Automation, the keychain) to the signature: an
+ad-hoc build is another app every time. Release and Beta builds are therefore signed with the Developer ID
+`Developer ID Application: TIANYU LU (26TVX3S9FR)` (from 2026-10-03 to 11-26: the self-signed «SrtFlow Signing»), whose
+designated requirement names the team, so new builds and a renewed certificate keep every permission; the hardened
+runtime is on and Apple notarizes them, so a download opens directly. The rules, the entitlements and their proof:
+[签名与系统权限](../architecture/code-signing-and-permissions.md).
 
-- **私钥在仓库外** `~/.config/srtflow/signing/`（专用钥匙串 + 密码文件）；仓库里只钉证书的 SHA-1
-  （`packaging/signing-identity.sha1`）。**备份这个目录；换机器把它整个拷过去，别重新建**：换证书 = 每个用户
-  再授权一次，`sign-app.sh` 发现证书和钉着的不是一把会拒签。
-- 第一次（以后不用再跑）：`scripts/signing/create-identity.sh`，已经有了就拒绝。
-- 没有签名身份的机器（CI、自己编着用的人）退回 ad-hoc 并打一段 ⚠️ 警告：**这样的包别拿去发版**。
-- 签名那几秒 `sign-app.sh` 会把专用钥匙串挂上钥匙串搜索列表、签完原样放回（codesign 只在列表里找身份）。
+- **The identity** is in the login keychain; `packaging/signing-identity.sha1` pins its SHA-1 and `sign-app.sh` signs with
+  nothing else (an expired pin or another certificate of the team: it refuses). Renew before 2027-12-25 and update the
+  pin; the team keeps every permission.
+- **The notary profile** `notary-26TVX3S9FR` (one for all of the user's apps) is in the login keychain too. The user creates
+  it once, in Terminal: `xcrun notarytool store-credentials notary-26TVX3S9FR --apple-id <Apple ID> --team-id 26TVX3S9FR`
+  (it asks for an app-specific password from appleid.apple.com). Scripts never ask for, read or print the password; a
+  build without a usable profile stops before the compile and prints this command.
+- `build-app.sh` notarizes twice: the app (zipped), stapled before the DMG is made, then the signed DMG, stapled too.
+- A Mac with no Developer ID of the team, or a shell whose `security` cannot reach the keychain, stops the build before
+  the compile. Someone building SkyCut for themselves from source runs `SKYCUT_ALLOW_ADHOC=1 scripts/build-app.sh`: ad-hoc,
+  not notarized, with ⚠️ warnings, and **such a build never goes to a user or a release**.
+- A build that fails after it began writing `dist/` deletes the app and DMG it wrote (`build-beta-app.sh` its Beta).
 
 ## 测试版（SkyCut Beta）
 
-没合并的功能要给用户在自己机器上实测时：`VERSION=x.y.z scripts/build-app.sh && scripts/build-beta-app.sh`，得到 `dist/SkyCut Beta.app`。换了名字和 bundle id（`com.srtflow.SrtFlow.beta`：bundle id 沿用旧名），设置、AI 的通道都和正式版分开；每种文档类型都只做「备选」，双击工程文件仍由正式版打开。`build-app.sh` 会顺手打一个同版本号的 DMG、覆盖 `dist/SkyCut.app` —— 只出测试版时记得把它们删掉 / 换回去，别让 `dist/` 里留着贴了未发布版本号的包。
+没合并的功能要给用户在自己机器上实测时：`VERSION=x.y.z scripts/build-app.sh && scripts/build-beta-app.sh`，得到 `dist/SkyCut Beta.app`（re-signed with the same Developer ID and notarized on its own）。换了名字和 bundle id（`com.srtflow.SrtFlow.beta`：bundle id 沿用旧名），设置、AI 的通道都和正式版分开；每种文档类型都只做「备选」，双击工程文件仍由正式版打开。`build-app.sh` 会顺手打一个同版本号的 DMG、覆盖 `dist/SkyCut.app` —— 只出测试版时记得把它们删掉 / 换回去，别让 `dist/` 里留着贴了未发布版本号的包。
 
 ## Installed copies on the developer Mac
 
@@ -182,10 +192,10 @@ enough; don't install so many versions on this Mac). So the Mac keeps exactly tw
   then deleted outright: no backup copy, nothing left in the Trash.
 - **A local install** happens only when the user asks for one, and the beta is replaced only when the user asks for a beta.
   - Build with `VERSION=x.y.z scripts/build-app.sh` (official), then `scripts/build-beta-app.sh` for the beta, signed with
-    the fixed identity: a build that fell back to ad-hoc is never installed (signing section above).
+    the Developer ID and notarized: a build that fell back to ad-hoc is never installed (signing section above).
   - Only while the copy being replaced isn't running. Never quit the user's SkyCut or SkyCut Beta: wait, and ask.
   - Move the old bundle aside, put the new one at the same path and verify it (version, `codesign --verify --deep --strict`,
-    the pinned certificate leaf: acceptance checklist below); if it fails, put the old one back and stop. Then unregister
+    the team and notarization: acceptance checklist below); if it fails, put the old one back and stop. Then unregister
     and delete the old bundle and the build's `dist/*.app`. `dist/` keeps only the newest DMG; after a beta-only build
     its DMG goes too (previous section).
 - **Test, smoke and probe bundles** (`SrtFlowDev.app`, harness and check bundles, `.skystudiosmoke` and measurement apps,
@@ -220,9 +230,12 @@ The release records below that moved old bundles to the Trash or kept a backup p
 - `dist/SkyCut.app/Contents/Helpers/skycut-web-motion` is there, arm64 and signed like the app; fed `{}` on stdin it prints
   one result line saying the request could not be read and exits with code 2
 - `strings ... | grep <新增字符串>` → 命中
-- 脚本自带 `codesign --verify --deep --strict` → "签名校验通过"
-- `codesign -d -r- dist/SkyCut.app` → `certificate leaf = H"<packaging/signing-identity.sha1 里那一行>"`，
-  不是 `cdhash H"…"`（是的话就是退回了 ad-hoc，别发）
+- The build log says «Signature verified (developer-id, hardened runtime)» and, for the app and the DMG, «notarized, ticket
+  stapled, Gatekeeper accepts it»; a «⚠️ No Developer ID on this Mac» anywhere means ad-hoc: don't ship it
+- `codesign -dvvv` on the app and each helper → `TeamIdentifier=26TVX3S9FR`, `flags=0x10000(runtime)`, a `Timestamp=`;
+  `codesign -d -r- dist/SkyCut.app` names `certificate leaf[subject.OU] = "26TVX3S9FR"`, not `cdhash H"…"`
+- `spctl --assess --type execute -vv dist/SkyCut.app` and `spctl --assess --type open --context context:primary-signature
+  -vv dist/SkyCut-<版本>-arm64.dmg` → `source=Notarized Developer ID`; `xcrun stapler validate` passes on both
 - `swift run --arch arm64 SrtFlowCoreChecks` → "All 184 checks passed."
   （断言数会随功能增长，以当次输出为准）
 - DMG：`/bin/bash scripts/check-dmg.sh dist/SkyCut-<版本>-arm64.dmg` 通过；按上节真开 Finder 验背景、图标位置和 Retina。
@@ -243,7 +256,8 @@ the newest, or re-run that commit's run (a re-run cancels nothing) and wait for 
 the full checks too, so their own green `check-all` is sufficient. For commits using the earlier scan-only main
 workflow, a docs-only release commit also needs its newest code ancestor's green main run; re-run it if cancelled.
 
-流程：从已通过 CI 的干净 main 显式指定 `VERSION` 打包，用原固定身份验签；核对包内版本、
+流程：从已通过 CI 的干净 main 显式指定 `VERSION` 打包（since 2026-11-26 signed with the Developer ID and notarized: verify
+the team and Gatekeeper's «Notarized Developer ID» per the acceptance checklist）；核对包内版本、
 arm64、MCP 初始化与 ffmpeg 可运行，挂载 DMG 核对实际携带的 App。再复用 `scripts/r2.py`
 上传新版本对象（凭证位置见该文件开头），从公开地址完整读回，比对大小与 SHA-256 后，
 才在个人站隔离分支修改两条重定向，检查、PR 合并并等待 Cloudflare Pages 发布。

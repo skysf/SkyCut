@@ -415,8 +415,24 @@
     rule, the wholeness check, placement only through ExclusivePlacement (nothing at the name replaced or removed), the image check
     before the name, `renew:` on every paid download, holding until the result came down (an output folder that cannot be made too),
     the key in a request's identity as read, final bills only (upscale, voice change, refreshed by get_job), a voice change's files
-    given up by identity, no lookup of a held job by parameters and no Download again on the panels, tools or inspector, the rows, the
+    given up by identity, no lookup of a held job by parameters and no Download again on the tools or inspector, the rows, the
     hook's fence and the probe. Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
+- Identical paid requests in a row (2026-11-26, backlog B47 / B51): `scripts/check-sky-studio.sh` → `RepeatGuardChecks` (counting per
+  project + tool, only what started counts, other tools and projects do not break a run, a different request starts one, the 5th
+  asks and a yes covers only its run; the line and notes; identities: the canvas aspect, language, voice, options, model, prompt,
+  a character's revision, a source range, files by their bytes (a copy is the same, a changed file is not), never the key or price
+  cap, large files by samples; the gate: the 5th asks in full access and as one question with the draft reason in ask mode, a
+  draft-only token refused, the daily limit first, the lone question, design under a standing grant and its yes approving the run,
+  what a yes covers in each question: a once approval or a fee in ask mode still asked for each identical request, a project
+  approval or a standing grant not).
+  `scripts/check-voice-recovery.sh` → `RepeatRequestChecks` / `RepeatPanelChecks` (the tool entries with POSTs counted: generate_media
+  2nd–4th lines, the 5th asking before any POST, the same question when unanswered, the token, the 6th / 7th, an earlier job's key,
+  another project, 9:16 then 16:9, ask mode; upscale_clip's one merged question; add_voiceover's 5th asking before any reservation
+  or POST and its token starting it; change_voice's own question, another language or voice; panels never counted; the panels'
+  Download again for their own clip after a failed download, not for another project, and not once a later upscale of the clip
+  landed).
+  `checks/sky-studio-wiring/repeat-requests.sh` (sourced from download-retry.sh) pins where each tool counts, asks and adds the line,
+  that only the gate approves, that nothing on the panels' path counts, and how the panels find a held job.
 - Reference-image fitting: `scripts/check-sky-studio.sh` → `ReferenceFitChecks` (which records allow fitting, also on Sky
   Studio's own records; the strictest limits of a chain, each limit met exactly / one over / one under, refusals naming the
   limit, the exact copy size inside the aspect range, the chain, the reference check, the refusal listing each model's limit,
@@ -626,9 +642,21 @@
 - 「连接」AI 客户端时第一次改配置前存的备份，一建出来就和原文件同样的权限（只有 `AIClientConfigWrite` 写 `.skycut-backup`、`AIClientSetup` 经过它）：
   `checks/client-config-backup.sh`；行为（600 的备份还是 600、照原文件不一律 600、链接按目标算、再改不动备份）在 `scripts/check-mcp.sh` 的 `ConfigBackupChecks`。
 - DMG 安装引导的接线 / 模板：`checks/dmg-packaging.sh`；真实组装、挂载和 Retina 背景：`scripts/check-dmg.sh`。
-- 发布版用固定的签名身份签（打包脚本只经 `scripts/signing/sign-app.sh`、它有身份就用并核对钉着的证书、ad-hoc 只在没有身份那一支、
-  `packaging/signing-identity.sha1` 钉着正好一把），录自定义区域请求授权之前先删钉着旧签名的记录、`tccutil` 只在一处、文案不再叫人
-  「关掉再打开」：`checks/release-signing.sh`。建签名身份 `scripts/signing/create-identity.sh` 是一次性的、**不在 `check-all.sh` 里**。
+- User and release builds signed with the pinned Developer ID, the hardened runtime and notarization only through
+  `scripts/signing/` (since 2026-11-26): `checks/release-signing.sh` and its sections in `checks/release-signing/`. It scans the
+  build scripts' order (profile check before the compile; app signed and notarized before the DMG; DMG signed, then
+  notarized; the Beta signed, then notarized), the one signing command with `--options runtime`, the timestamped identity
+  only when `signing_mode` says developer-id, entitlements only on the app, the pin (one SHA-1), the team and the notary
+  profile name, notarytool only with the keychain profile (never a password), staple, `stapler validate` and Gatekeeper's
+  verdict. It feeds `signing_mode_from` listings (pinned valid → developer-id; expired pin, another certificate of the team →
+  refused with the right advice; other teams only or nothing → ad-hoc), checks `packaging/SkyCut.entitlements` against
+  Info.plist's usage descriptions (no `com.apple.security.cs.*` exception). Steps are matched as whole lines (commented out
+  or made conditional is red) and every failure branch must end the run. With stub `security`, `xcrun` and `codesign` it
+  runs the real scripts: they refuse a failing `security`, an expired pin, no Developer ID without `SKYCUT_ALLOW_ADHOC=1`,
+  an unusable notary profile and another leaf certificate; with the opt-out `sign-app.sh` signs a fixture app ad-hoc
+  (runtime on all four pieces, entitlements on the app only, stray code refused). The older sections stay:
+  录自定义区域请求授权之前先删钉着旧签名的记录、`tccutil` 只在一处、文案不再叫人「关掉再打开」. Reverse verification (48
+  sabotages after the FBS1 review, each red): [the Developer ID report](../reports/2026-11-26-developer-id-signing.md).
 - 产品名与代码名（看得见的叫 SkyCut；bundle id、UTType、数据文件夹、钥匙串、AI 通道这些身份沿用 SrtFlow，改了就丢用户的授权、设置和数据）：
   `checks/product-name.sh`。
 - 工程不再是单例（全仓没有 `VideoEditProject.shared`、工程只由 `OpenProjects` 建、撤销不退到键窗口、工程代号全 App 一个计数、
