@@ -771,6 +771,83 @@ Install:
 
 No git tag and no GitHub release, as before.
 
+2026-11-26, publish **0.18.68**, the first public build signed with the Developer ID and notarized by Apple. The user's
+OK that day, after installing the notarized build by hand: 「都没有问题了。 更新下 网页的下载链接，还有网页也要是新的icon，」.
+Release and verification facts by Claude.
+
+Build:
+- Source: main `d3a6c9712ecd93c805e40029e8b2fc7197430285` (#562). Its main run 45794684793 was green (all five shards and
+  `check-all`); it was the short run, the tree verified by the merge slot's run 45791520022 on `merge-slot/pr-562`.
+  Client changes since 0.18.67, PRs #547–#562, in short:
+  - signing: the Developer ID of team 26TVX3S9FR, the hardened runtime and notarization (#556);
+  - installing: the DMG window without the Open Anyway step, no halos and a still drag hint (#558, #560); SkyCut offers
+    to move itself into Applications when it runs from the installer disk (#559); the forest-green app icon (#561);
+    zh-Hans names Finder 访达 like Apple (#562);
+  - Sky Studio: change a voice directly and `separation_failed` (#548); interrupted uploads retried (#549); reference
+    images fitted to the model's published limits, one total shared among them (#550, #551); a paid result's interrupted
+    download resumed, never paid twice (#554); which limit stopped a paid request (#555); asking once at the 5th
+    identical paid request in a row (#557).
+- `VERSION=0.18.68 arch -arm64 /bin/bash scripts/build-app.sh` in the main checkout: R13 had built this commit there that
+  afternoon, so the Release compile had nothing to do (0.6 s) and the script's time went to the two notarizations.
+
+Product:
+- `SkyCut-0.18.68-arm64.dmg`, 42,431,367 bytes; SHA-256
+  `b37d9f1070772869e9b9c6e0e359cc9c994e149e976d080cd5cc40e6db70f3f8`; the App's CDHash `0367be21…`.
+- Notarization: the App, submission `3310946b-05f5-49d0-9d69-949daddcc1c1`; the DMG, submission
+  `575c292f-7b58-49aa-8866-d8524d34e015`; both Accepted and stapled.
+
+Checks:
+- Package:
+  - `hdiutil verify` passes;
+  - Info.plist version `0.18.68` (build 1);
+  - the main binary, ffmpeg, `skycut-mcp` and `skycut-web-motion` are all arm64;
+  - the App in the mounted DMG is byte for byte the same as `dist/SkyCut.app` (`diff -r`).
+- Signing:
+  - the App and its three helpers: `Developer ID Application: TIANYU LU (26TVX3S9FR)` → Developer ID Certification
+    Authority → Apple Root CA, `TeamIdentifier=26TVX3S9FR`, `flags=0x10000(runtime)`, a secure timestamp; the designated
+    requirement names `certificate leaf[subject.OU] = "26TVX3S9FR"`;
+  - the deep, strict signature check passes locally and in the mounted DMG; the build log says «Signature verified
+    (developer-id, hardened runtime)» and has no ad-hoc warning;
+  - `spctl` gives `source=Notarized Developer ID` for the App, the DMG and the mounted App; `xcrun stapler validate`
+    passes on the App and the DMG.
+- Running:
+  - the mounted `skycut-mcp` initializes as `skycut` / `0.18.68` (socket pointed at a missing path, not allowed to launch
+    the App); the catalog has 64 tools, `skycut_guide` first;
+  - ffmpeg 8.1 runs;
+  - names from this batch are in the main binary: `separation_failed`, `fit_images`, `max_total_image_bytes`,
+    `RepeatGuard`, `MoveToApplications`; the zh-Hans strings say 在访达中显示.
+- DMG: `scripts/check-dmg.sh <dmg>` passes. The background TIFF read out of the mounted DMG shows the green ghost copies
+  of the icon and the black pointer; the App's `SkyCut.icns` is the forest icon. No Finder window was opened.
+- Not done: the manual checklists that need a real mouse were not run for this release (the user installed and used
+  the same commit's notarized build that day).
+
+Publish:
+- Public object: `skycut/SkyCut-0.18.68-b37d9f107077-arm64.dmg`, immutable cache.
+- Uploaded first (9.5 s), then read back in full from the public direct link with `--url`: the same size and SHA-256.
+- Personal site [skystudio PR #23](https://github.com/skysf/skystudio/pull/23) (merge commit `ac6b57f`) switched both
+  entries and replaced the founder page's SkyCut icon with the forest one (256 px, the app's own `make-icon` crop; the
+  two pages that show it stamp `?v=20261126-forest` against the 7-day image cache). Cloudflare Pages deployed it.
+- Without `--url`, the full download through the stable entry matches; the trailing-slash entry 302s to the same object.
+- The SkyCut website went out the same day with the new favicons (Vercel deployment `dpl_J93vHnKtGzW8tTkpRiQN7M6PNQTd`;
+  [SkyCut 官网](../architecture/skycut-website.md) 「运行与部署」).
+
+Tool vocabulary for Sky Studio:
+- `VERSION=0.18.68 scripts/export-tool-vocabulary.sh skycut-0.18.68.json` from the same commit: 64 tools, 69 guide
+  topics, 792 known names, sources not dirty; in the content root's `vocab/` folder beside `skycut-0.18.67.json`.
+
+Install:
+- Not replaced by this release: the user had installed the same commit's notarized build by hand earlier that day
+  (`0.18.67-local.20261126.d3a6c971`). That local DMG was deleted once the release DMG passed. The Beta was not asked for.
+
+Permissions after upgrading:
+- This is the first public build under the Developer ID. Anyone coming from 0.18.67 or older (self-signed) grants
+  SkyCut's permissions once more (screen recording, microphone, Downloads, Automation), and the first read of the Sky
+  Studio Key asks again: click the banner's 「允许…」, enter the login password and choose 「始终允许」. Builds after this
+  one are expected to keep every grant, since the signature names the team
+  ([签名与系统权限](../architecture/code-signing-and-permissions.md)).
+
+No git tag and no GitHub release, as before.
+
 ## CI（.github/workflows/checks.yml）
 
 CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runner 上并行跑。
