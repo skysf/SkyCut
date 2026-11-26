@@ -193,8 +193,8 @@ dragging it is asked once to move it into Applications. Written in SkyCut, no th
   and the next launch from the disk asks again: nothing is remembered. Words in every UI language (`MoveToApplicationsAlerts`).
 - **The move** (`AppBundleMover`): the running bundle, the translocated view if that is where it runs, is copied under its own
   name (SkyCut Beta keeps its name) into a staging folder on the Applications folder's volume. The copy's download
-  quarantine is cleared: copies from a quarantined image carry `com.apple.quarantine` (0281, measured), and macOS would
-  translocate the moved app and it would ask again. The copy's signature is checked strictly against the original's
+  quarantine is cleared: copies from a quarantined image carry `com.apple.quarantine` (0281, measured), and macOS could
+  translocate the moved app, which would then ask again. The copy's signature is checked strictly against the original's
   designated requirement (`AppBundleSignature`; for the Developer ID, the team, so permissions recorded by team and
   identifier stay valid). Then:
   - an app of that name that is running is never quit or touched: SkyCut says so and stops;

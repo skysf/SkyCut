@@ -3,8 +3,8 @@ import Foundation
 // MARK: - Moving the running app bundle into the Applications folder
 //
 // What it does: copies the running bundle (the disk image's, or the translocated view of a download) into a new folder on
-// the destination's volume, clears the download quarantine on the copy (a copy SkyCut makes itself would otherwise be
-// translocated again and ask again), checks the copy's signature against the original, moves an app of the same name that
+// the destination's volume, clears the download quarantine on the copy (macOS could otherwise translocate the moved copy,
+// and it would ask again), checks the copy's signature against the original, moves an app of the same name that
 // is there and not running to the Trash, and renames the copy into place. Each step that fails stops the move and leaves
 // the destination as it was: an app already moved to the Trash is put back. An app of that name that is running is never
 // touched, and a folder this user can't write is reported, never elevated (no administrator rights are asked for).
@@ -99,7 +99,7 @@ struct AppBundleMover {
             return .failed(.copy, detail: Self.describe(error), oldAppInTrash: nil)
         }
         // A copy of a quarantined disk image's app carries `com.apple.quarantine` (measured: 0281 on every item). Left
-        // on, macOS would translocate the moved copy and it would ask again on every launch.
+        // on, macOS could translocate the moved copy, and it would then ask again on every launch.
         Quarantine.removeFlagRecursively(at: staged)
         if Quarantine.isFlagged(atPath: staged.path) { return .failed(.quarantine, detail: nil, oldAppInTrash: nil) }
         do { try verify(staged, original) } catch {
