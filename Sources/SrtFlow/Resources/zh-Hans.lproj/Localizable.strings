@@ -1737,7 +1737,7 @@
 "%@ is open from the Applications folder" = "「应用程序」文件夹里的 %@ 正开着";
 "To replace it, quit it, then open the copy on the installer disk again. Nothing was changed, and this copy quits now." = "要替换它，请先退出它，再重新打开安装盘上的这一份。什么都没有改动，这一份现在退出。";
 "%@ can't be moved to the Applications folder" = "%@ 没法移到「应用程序」文件夹";
-"You don't have permission to change the Applications folder. Drag %@ into it in Finder instead." = "你没有更改「应用程序」文件夹的权限。请改为在 Finder 里把 %@ 拖进去。";
+"You don't have permission to change the Applications folder. Drag %@ into it in Finder instead." = "你没有更改「应用程序」文件夹的权限。请改为在访达里把 %@ 拖进去。";
 "Show Applications Folder" = "显示「应用程序」文件夹";
 "%@ wasn't moved to the Applications folder" = "%@ 没有移到「应用程序」文件夹";
 "It couldn't be copied there." = "没能把它拷贝过去。";
