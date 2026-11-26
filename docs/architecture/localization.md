@@ -90,6 +90,8 @@ popover、自建宿主同步接入[界面主题](app-themes.md)。语言 Store �
 技术标识（`1080p`、`24 fps`、`SRT`、x264 的 `medium`）**进表走恒等**，不进豁免清单：
 进表是数据，以后想改随时能改；进豁免清单就成了守卫的盲点。
 
+**Apple's names in Chinese** (user, 2026-11-26): zh-Hans text names macOS apps and places the way Apple's own Simplified Chinese does (访达, never "Finder"; 系统设置, 隐私与安全性, 录屏与系统录音, 应用程序, 废纸篓, 终端…), and the coverage check enforces it: an English name or a known non-Apple spelling in a zh-Hans value fails with the line and the name to use (`checks/LocalizationCoverage/AppleNames.swift`, which would list a deliberate exception with its reason).
+
 ## 二、`L10n(…)` 与 `Text(LocalizedStringKey)` 分工
 
 - **SwiftUI 里的文案**用 `Text("…")` 这类字面量，跟着环境 locale 走，切语言立刻变。

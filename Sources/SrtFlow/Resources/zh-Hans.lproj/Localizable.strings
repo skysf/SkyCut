@@ -60,7 +60,7 @@
 "Same folder as source" = "与源文件同一目录";
 "Choose…" = "选择…";
 "Reset" = "重置";
-"Show in Finder" = "在 Finder 中显示";
+"Show in Finder" = "在访达中显示";
 "Cancel" = "取消";
 "Remove from list" = "从列表移除";
 "Stop All" = "全部停止";
@@ -496,7 +496,7 @@
 /* 视频编辑：导出 */
 "Cancel the export" = "取消这次导出";
 "Close the export panel" = "关闭导出面板";
-"Reveal the exported file in Finder" = "在 Finder 中显示导出的文件";
+"Reveal the exported file in Finder" = "在访达中显示导出的文件";
 
 /* 录屏 */
 "Close without recording" = "不录制，直接关闭";
@@ -580,7 +580,7 @@
 "Not enough free space: %@ needed, %@ available." = "空间不够：需要 %@，可用 %@。";
 "The disk ran out of space while recording." = "录制过程中磁盘空间用尽。";
 "The disk ran out of space, so the recording is incomplete." = "磁盘空间用尽，这段录制不完整。";
-"SkyCut doesn’t have permission to record the screen yet. Turn SkyCut on in System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording, then quit and reopen SkyCut." = "SkyCut 还没有录屏权限。到「系统设置 ▸ 隐私与安全性 ▸ 屏幕与系统音频录制」里打开 SkyCut，再退出并重新打开 SkyCut。";
+"SkyCut doesn’t have permission to record the screen yet. Turn SkyCut on in System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording, then quit and reopen SkyCut." = "SkyCut 还没有录屏权限。到「系统设置 ▸ 隐私与安全性 ▸ 录屏与系统录音」里打开 SkyCut，再退出并重新打开 SkyCut。";
 "SkyCut doesn’t have microphone permission, so narration wasn’t recorded. The screen recording itself is fine." = "SkyCut 没有麦克风权限，旁白没录上。录屏画面本身没问题。";
 "SkyCut couldn’t hide its own recording controls from the capture, so it didn’t start. Try again." = "SkyCut 没能把自己的录制控制条从画面里藏掉，所以没有开始录。请再试一次。";
 "SkyCut couldn’t tell which display you picked (two look identical). Record a window or a custom region instead, or update to macOS 15.2 or later." = "SkyCut 分不清你选的是哪块屏幕（有两块完全一样）。改成录窗口或自定义区域，或者升级到 macOS 15.2 及以上。";
@@ -873,7 +873,7 @@
 "“%@” is already in this folder. Exporting will replace it." = "这个文件夹里已经有「%@」了，导出会替换它。";
 "Replace “%@”?" = "替换「%@」？";
 "A file with this name is already in “%@”. Replacing it overwrites that file." = "「%@」里已经有同名的文件了。替换会覆盖那个文件。";
-"Choose the folder to export into, or drag a folder here from Finder" = "选择导出到哪个文件夹，也可以从 Finder 把文件夹拖到这里";
+"Choose the folder to export into, or drag a folder here from Finder" = "选择导出到哪个文件夹，也可以从访达把文件夹拖到这里";
 "Choose" = "选择";
 "Choose a folder in the macOS window. If that window stops responding, close it here." = "请在 macOS 的窗口里选文件夹。那个窗口没反应的话，可以在这里关掉它。";
 "Close It" = "关掉它";
@@ -891,8 +891,8 @@
 "“%@” is on a drive macOS can only read from (an NTFS drive, for example). Choose a folder on another drive." = "「%@」所在的磁盘在 macOS 上只能读不能写（比如 NTFS 格式的磁盘）。请换一个其他磁盘上的文件夹。";
 "SkyCut can't write into “%1$@” (%2$@). Choose another folder, or check its permissions." = "SkyCut 无法写入「%1$@」（%2$@）。请换一个文件夹，或者检查它的权限。";
 "The drive with “%@” is not responding. It may be asleep or disconnected, or macOS may be asking for permission." = "「%@」所在的磁盘没有响应：可能在休眠、已经断开，或者 macOS 正在弹窗请求权限。";
-"Last time SkyCut had to be closed while the macOS folder window was open. Type the folder's path below, or drag a folder here from Finder." = "上次 macOS 的文件夹窗口开着的时候，SkyCut 不得不被强制关闭。请在下面输入文件夹的路径，或者从 Finder 把文件夹拖到这里。";
-"The macOS folder window did not work. Type the folder's path below, or drag a folder here from Finder." = "macOS 的文件夹窗口没能正常工作。请在下面输入文件夹的路径，或者从 Finder 把文件夹拖到这里。";
+"Last time SkyCut had to be closed while the macOS folder window was open. Type the folder's path below, or drag a folder here from Finder." = "上次 macOS 的文件夹窗口开着的时候，SkyCut 不得不被强制关闭。请在下面输入文件夹的路径，或者从访达把文件夹拖到这里。";
+"The macOS folder window did not work. Type the folder's path below, or drag a folder here from Finder." = "macOS 的文件夹窗口没能正常工作。请在下面输入文件夹的路径，或者从访达把文件夹拖到这里。";
 "Saving the video into the export folder…" = "正在把视频存进导出文件夹…";
 "A file with this name is already in “%@”. Replacing it overwrites its contents." = "「%@」里已经有同名文件，替换会覆盖它的内容。";
 "Same as project (%d×%d)" = "跟随工程（%d×%d）";
@@ -1658,8 +1658,8 @@
 "Discard this draft and load the clip's current parameters" = "放弃这份草稿，载入片段当前的参数";
 "Re-render" = "重新渲染";
 "Render these parameters and replace this motion in one undo step" = "按这些参数重新渲染并替换动效，一步即可撤销";
-"Show Page in Finder" = "在 Finder 中显示网页";
-"Show this motion's saved page and parameters in Finder" = "在 Finder 中显示这套动效保存的网页和参数";
+"Show Page in Finder" = "在访达中显示网页";
+"Show this motion's saved page and parameters in Finder" = "在访达中显示这套动效保存的网页和参数";
 "Render length" = "动效总长";
 "Hit within motion" = "动效内的落点";
 "Duration and hit are measured within the full motion; the clip's timeline start stays in place" = "总长和落点都从完整动效内部计算；片段在时间线上的起点不变";
@@ -1712,12 +1712,12 @@
 "Close the macOS window" = "关掉 macOS 的窗口";
 "Open the macOS window again" = "再打开一次 macOS 的窗口";
 "Save Here" = "存到这里";
-"Last time SkyCut had to be closed while a macOS file window was open. Type the file's full path below, or drag the file here from Finder." = "上次 macOS 的文件窗口开着的时候，SkyCut 不得不被强制关闭。请在下面输入文件的完整路径，或者从 Finder 把文件拖到这里。";
-"The macOS file window did not work. Type the file's full path below, or drag the file here from Finder." = "macOS 的文件窗口没能正常工作。请在下面输入文件的完整路径，或者从 Finder 把文件拖到这里。";
-"Last time SkyCut had to be closed while a macOS file window was open. Type the folder's path below, or drag a folder here from Finder." = "上次 macOS 的文件窗口开着的时候，SkyCut 不得不被强制关闭。请在下面输入文件夹的路径，或者从 Finder 把文件夹拖到这里。";
-"The macOS file window did not work. Type the folder's path below, or drag a folder here from Finder." = "macOS 的文件窗口没能正常工作。请在下面输入文件夹的路径，或者从 Finder 把文件夹拖到这里。";
-"Last time SkyCut had to be closed while a macOS file window was open. Type the full path to save to below, or drag a folder here from Finder." = "上次 macOS 的文件窗口开着的时候，SkyCut 不得不被强制关闭。请在下面输入要存到的完整路径，或者从 Finder 把文件夹拖到这里。";
-"The macOS file window did not work. Type the full path to save to below, or drag a folder here from Finder." = "macOS 的文件窗口没能正常工作。请在下面输入要存到的完整路径，或者从 Finder 把文件夹拖到这里。";
+"Last time SkyCut had to be closed while a macOS file window was open. Type the file's full path below, or drag the file here from Finder." = "上次 macOS 的文件窗口开着的时候，SkyCut 不得不被强制关闭。请在下面输入文件的完整路径，或者从访达把文件拖到这里。";
+"The macOS file window did not work. Type the file's full path below, or drag the file here from Finder." = "macOS 的文件窗口没能正常工作。请在下面输入文件的完整路径，或者从访达把文件拖到这里。";
+"Last time SkyCut had to be closed while a macOS file window was open. Type the folder's path below, or drag a folder here from Finder." = "上次 macOS 的文件窗口开着的时候，SkyCut 不得不被强制关闭。请在下面输入文件夹的路径，或者从访达把文件夹拖到这里。";
+"The macOS file window did not work. Type the folder's path below, or drag a folder here from Finder." = "macOS 的文件窗口没能正常工作。请在下面输入文件夹的路径，或者从访达把文件夹拖到这里。";
+"Last time SkyCut had to be closed while a macOS file window was open. Type the full path to save to below, or drag a folder here from Finder." = "上次 macOS 的文件窗口开着的时候，SkyCut 不得不被强制关闭。请在下面输入要存到的完整路径，或者从访达把文件夹拖到这里。";
+"The macOS file window did not work. Type the full path to save to below, or drag a folder here from Finder." = "macOS 的文件窗口没能正常工作。请在下面输入要存到的完整路径，或者从访达把文件夹拖到这里。";
 "Type the full path of a file SkyCut can open here, starting with “/”." = "请输入一个 SkyCut 在这里能打开的文件的完整路径，以「/」开头。";
 "Type the full path to save to, starting with “/”." = "请输入要存到的完整路径，以「/」开头。";
 "“%1$@” is too small for this model: each side must be at least %2$@ px. Nothing was charged." = "「%1$@」对这个模型来说太小：每条边至少要 %2$@ 像素。没有扣积分。";
