@@ -2,9 +2,12 @@
 """Checks for the merge slot (scripts/merge-slot.py, .github/workflows/merge-slot.yml).
 
 1. The slot against an in-memory GitHub (FakeGitHub.py): it merges only after a green checks run on the exact tree
-   that lands (the pull request's own run while main hasn't moved, else its own test on merge-slot/pr-<N>), one at a
-   time, oldest label first; red, conflicts, drafts, forks and refused merges leave the slot with a comment and the
+   that lands (the pull request's own run while main hasn't moved, else its own test on merge-slot/pr-<N>), one test
+   at a time, oldest label first; red, conflicts, drafts, forks and refused merges leave the slot with a comment and the
    next pull request goes on; a human merge or a new head during a test means testing again, never merging.
+   Batches (BatchCases.py, BatchLandingCases.py): ready pull requests tested together in one run; a green batch lands
+   whole, in label order, or not at all (main rests on part of one only on the rare path a scenario injects on purpose);
+   a red batch falls back to one at a time; any member or main changing mid-run cancels the run.
 2. The workflows' wiring: merge-slot.yml's triggers, one job-level slot that waits instead of cancelling, the token's
    permissions, main's script only (pull_request_target never checks out the pull request); checks.yml takes the
    slot's dispatches and skips every shard on a dispatch elsewhere, so check-all fails there.
@@ -50,11 +53,51 @@ def tested_trees(gh):
     return {name[len("verified-tree-"):] for name in gh.markers}
 
 
-def never_merged_untested(name, gh):
+def green_batches(gh):
+    """Each green batch run, its members' numbers and its chain [(head, tree main must have right after that head
+    merged)]. The chain is worked out here from the batch commit's parents (main, then the heads), not from the slot's
+    own message; the numbers (only for the comments) come from the message."""
+    found = []
+    for run in gh.runs.values():
+        if run["head_branch"] != "merge-slot/pr-batch" or run["conclusion"] != "success":
+            continue
+        commit = gh.commits[run["head_sha"]]
+        tree, chain = gh.commits[commit["parents"][0]]["tree"], []
+        for head in commit["parents"][1:]:
+            tree = gh.merged_tree_of(tree, head)
+            chain.append((head, tree))
+        check("a batch commit's tree is main + its heads, merged in that order", tree == commit["tree"], commit)
+        found.append((run, [int(n) for n in re.findall(r"^#(\d+) ", commit["message"], re.M)], chain))
+    return found
+
+
+def never_merged_untested(name, gh, partial=False):
+    """After a scenario: never two tests at once; every landed tree tested. A green batch lands whole or not at all:
+    one of its trees counts only when the batch landed from it to its end, and part of a batch only where the scenario
+    breaks it on purpose (partial), where each member that didn't merge from it was told why. checks.yml is dispatched
+    on main once after each landing (a single merge, the last of a batch's merges), never between a batch's merges."""
     check(name, not gh.overlaps, f"a second slot test started while another ran: {gh.overlaps}")
-    proven = tested_trees(gh)
-    for number, tree in gh.merged:
-        check(name, tree in proven, f"#{number} landed tree {tree} that no green run tested")
+    proven, batches = tested_trees(gh), green_batches(gh)
+    landed = [(gh.merged_heads.get(number), tree) for number, tree in gh.merged]
+    for (number, tree), entry in zip(gh.merged, landed):
+        mine = [(run, numbers, chain) for run, numbers, chain in batches if entry in chain]
+        if tree in proven or any(all(e in landed for e in chain[chain.index(entry):]) for _, _, chain in mine):
+            continue
+        check(name, partial and mine, f"#{number} landed tree {tree}, which no green run tested"
+              + (" (part of a batch: main rests on it)" if mine else ""))
+        for run, numbers, chain in mine:
+            for other, (head, other_tree) in zip(numbers, chain):
+                if (head, other_tree) not in landed:
+                    check(name, any(run["html_url"] in c or "refused the merge three times" in c
+                                    for c in gh.comments.get(other, [])),
+                          f"#{other} wasn't told why its batch {run['html_url']} stopped: {gh.comments.get(other)}")
+    for at in range(len(landed)):
+        within = at + 1 < len(landed) and any(chain[i:i + 2] == landed[at:at + 2]
+                                               for _, _, chain in batches for i in range(len(chain) - 1))
+        check(name, gh.main_after.count(at + 1) == (0 if within else 1),
+              f"checks.yml dispatched on main {gh.main_after.count(at + 1)} times after #{gh.merged[at][0]} merged "
+              f"({'between two merges of a batch' if within else 'want one'}): {gh.main_after}")
+    check(name, 0 not in gh.main_after, f"checks.yml dispatched on main before anything merged: {gh.main_after}")
 
 
 # ---- 1. behaviour ----
@@ -86,7 +129,7 @@ never_merged_untested("main moved", gh)
 gh, slot = world()
 gh.open_pull(1, labeled_minutes=0)
 gh.open_pull(2, labeled_minutes=1)
-gh.outcomes["merge-slot/pr-1"] = "failure"
+gh.breaking.add(gh.pulls[1]["head"]["sha"])  # #1 breaks the build: their batch is red, then each is tested alone
 serve(slot, gh)
 check("red test: #1 not merged, #2 merged", [n for n, _ in gh.merged] == [2], gh.merged)
 check("red test: label removed", not any(l["name"] == "merge-slot" for l in gh.pulls[1]["labels"]), gh.pulls[1]["labels"])
@@ -131,7 +174,7 @@ gh.open_pull(3, labeled_minutes=3)
 gh.human_merge()  # all three need a slot test
 serve(slot, gh)
 check("oldest label first", [n for n, _ in gh.merged] == [2, 3, 1], gh.merged)
-check("one at a time: every merge was tested on the main it landed on", len(gh.merged) == 3, gh.merged)
+check("every merge landed what a green run tested", len(gh.merged) == 3, gh.merged)
 never_merged_untested("order", gh)
 
 gh, slot = world()
@@ -288,6 +331,12 @@ gh.outcomes["merge-slot/pr-1"] = "cancelled"
 serve(slot, gh)
 check("a cancelled test is not green", not gh.merged and any("cancelled" in c for c in gh.comments.get(1, [])), gh.comments)
 
+# ---- batches ----
+import BatchCases  # noqa: E402
+import BatchLandingCases  # noqa: E402
+BatchCases.run_all(check, slot_module, world, serve, never_merged_untested)
+BatchLandingCases.run_all(check, slot_module, world, serve, never_merged_untested)
+
 # ---- 3. runs GitHub's infrastructure failed ----
 import InfraRerunCases  # noqa: E402
 InfraRerunCases.run_all(check, slot_module, world, serve, never_merged_untested)
@@ -325,6 +374,7 @@ if FAILURES:
     for failure in FAILURES:
         print(f"✗ merge slot: {failure}", file=sys.stderr)
     sys.exit(1)
-print(f"✓ merge slot: {CASES} cases (merges only a tree a green run tested, one at a time, oldest label first; red, "
-      "conflicts, drafts, forks and refusals leave with a comment; only GitHub's infrastructure failures are re-run, at "
-      "most twice, never a check's; workflow wiring)")
+print(f"✓ merge slot: {CASES} cases (merges only what a green run tested, one test at a time, oldest label first; "
+      "ready PRs batched, up to four, and a green batch lands whole or not at all; a red batch falls back to one at a "
+      "time; red, conflicts, drafts, forks and refusals leave with a comment; only GitHub's infrastructure failures are "
+      "re-run, at most twice, never a check's; workflow wiring)")

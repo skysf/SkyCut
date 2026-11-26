@@ -228,7 +228,7 @@ run_check "move-to-applications (the launch rule, the move against scratch folde
 run_check "sound-labels (macOS's sound classifier for listen describe=true: one window per 3 s, every label's own score)" scripts/check-sound-labels.sh
 run_check "SrtFlowCoreChecks（核心库）" swift run --arch arm64 SrtFlowCoreChecks
 run_check "mcp-smoke-client（冒烟客户端断线、协议错误、超时和日志退出码）" python3 checks/MCP/SmokeClientChecks.py
-run_check "merge-slot (merges only a tree a green run tested, one at a time; re-runs only GitHub's own failures; against an in-memory GitHub)" python3 checks/MergeSlot/MergeSlotChecks.py
+run_check "merge-slot (merges only what a green run tested, one test at a time, a batch whole or not at all; re-runs only GitHub's own failures; against an in-memory GitHub)" python3 checks/MergeSlot/MergeSlotChecks.py
 run_check "localization-coverage（界面文案两表配齐）" scripts/check-localization-coverage.sh
 # 提示面板落点（scripts/check-instant-tooltip-panel.sh）**故意不在这里**：它要建
 # 真实的 NSWindow/NSPanel，没有图形会话就会假红。按本文件开头的约定，真实窗口

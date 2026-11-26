@@ -18,7 +18,8 @@
 #      stay keyed by PR number, and a re-run keeps a per-commit group.
 #   6. The merge slot (2026-11-20): its dispatch on main is a main run; a marker may come from its test run on
 #      merge-slot/pr-<N> only when that run's head commit has exactly HEAD's parents; a dispatch elsewhere is not a
-#      main run. The summary job leaves markers for pull requests and for the slot's test runs.
+#      main run. The summary job leaves markers for pull requests and for the slot's test runs. A batch's test run
+#      (2026-11-26: its commit's parents are main and several heads) never counts, so main runs in full after a batch.
 #
 # 用法：checks/ci-verified-tree.sh [workflow 路径 [判断脚本路径]]   # 两个路径只给反向验证用
 set -euo pipefail
@@ -175,6 +176,11 @@ expect "a dispatch run on a branch that isn't the slot's" false
 slot_run "${BASE}" "${PR_HEAD}"
 run_record run-77.json "${GOOD_PATH}" workflow_dispatch completed '"failure"' "${SLOT_HEAD}" o/r o/r "${NOW}" merge-slot/pr-7
 expect "a red slot test run" false
+slot_run "${BASE}" "${PR_HEAD}"
+run_record run-77.json "${GOOD_PATH}" workflow_dispatch completed '"success"' "${SLOT_HEAD}" o/r o/r "${NOW}" merge-slot/pr-batch
+printf '{"parents":[{"sha":"%s"},{"sha":"%s"},{"sha":"%s"}]}\n' "${BASE}" 0000000000000000000000000000000000000000 "${PR_HEAD}" \
+  >"${FAKE_DIR}/commit-${SLOT_HEAD}.json"
+expect "a batch's test run (main, then several heads): main runs in full after a batch" false
 if [ "${CASES}" -lt 30 ]; then
   fail "判断的用例只跑了 ${CASES} 个（应该 30 个以上）：少了就是这条守卫自己没跑全"
 fi
