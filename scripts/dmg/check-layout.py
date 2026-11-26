@@ -2,7 +2,7 @@
 """只读校验仓库的单叶 Finder 模板；只用标准库，不被正式打包调用。
 
 解码真实的 Buddy 分配表 / DSDB 叶记录，避免只搜到残留字符串就误判布局有效。
-它刻意只支持本模板的六条记录，不是通用 .DS_Store 编辑器。
+它刻意只支持本模板的七条记录，不是通用 .DS_Store 编辑器。
 """
 import plistlib
 import struct
@@ -40,7 +40,7 @@ def check(path):
     pos = block(uint(superblock))
     assert uint(pos) == 0, "unexpected internal node"
     records = uint(pos + 4)
-    assert records == uint(superblock + 8) == 6, "expected exactly six layout records"
+    assert records == uint(superblock + 8) == 7, "expected exactly seven layout records"
     pos += 8
     decoded = {}
     for _ in range(records):
@@ -60,7 +60,7 @@ def check(path):
         pos += length
 
     window = plistlib.loads(decoded[".", b"bwsp"])
-    assert window["WindowBounds"] == "{{120, 120}, {760, 776}}", "window bounds drifted"
+    assert window["WindowBounds"] == "{{120, 120}, {760, 598}}", "window bounds drifted"
     for key in ("ShowSidebar", "ShowToolbar", "ShowStatusBar", "ShowPathbar", "ShowTabView"):
         assert window[key] is False, f"{key} must stay hidden"
     icons = plistlib.loads(decoded[".", b"icvp"])
@@ -72,6 +72,12 @@ def check(path):
     assert b"/Users/" not in alias and b"/Volumes/" not in alias, "developer path leaked into alias"
     for name, point in (("SkyCut.app", (200, 164)), ("Applications", (560, 164))):
         assert struct.unpack(">II", decoded[name, b"Iloc"][:8]) == point, f"{name} moved"
+    # The hidden .background folder must sit below the whole window: a Finder that shows hidden files would otherwise
+    # put its 128 pt icon over the steps (docs/bugfixes/2026-11-26-dmg-hidden-background-icon-over-steps.md). Its top
+    # edge, centre y − 64, is tied to the window height read above, so growing the canvas without moving it goes red.
+    window_height = int(window["WindowBounds"].rsplit(", ", 1)[1].rstrip("}"))
+    _, folder_y = struct.unpack(">II", decoded[".background", b"Iloc"][:8])
+    assert folder_y - 64 >= window_height, f".background's icon top ({folder_y - 64}) is inside the {window_height} pt window"
     print("✓ Finder template: fixed window, icons and volume-relative background")
 
 

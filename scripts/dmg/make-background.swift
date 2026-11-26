@@ -1,9 +1,10 @@
 // The DMG install background, the one source of its artwork: system fonts with AppKit / Core Text,
 // written as 1x and 2x PNGs of one logical size (scripts/build-dmg.sh joins them into the Retina TIFF).
 // It doesn't draw the App / Applications icons (the real files Finder shows) or make the window layout
-// (packaging/dmg/DS_Store). Steps 1 and 2 are in six languages, English first; step 3 names the one
-// guide link. Every run carries its language, so Core Text draws Traditional Chinese and Japanese in
-// their own faces (PingFang TC, Hiragino) instead of falling back to Simplified Chinese glyphs.
+// (packaging/dmg/DS_Store). Step 1 is in six languages, English first; step 2 names the one guide link.
+// Since 2026-11-26 builds are notarized and open directly, so the old step 2 (System Settings › Open
+// Anyway) is gone. Every run carries its language, so Core Text draws Traditional Chinese and Japanese
+// in their own faces (PingFang TC, Hiragino) instead of falling back to Simplified Chinese glyphs.
 import AppKit
 import CoreText
 
@@ -17,7 +18,7 @@ try FileManager.default.createDirectory(atPath: output, withIntermediateDirector
 // The canvas is a contract: the Finder window is this plus 88 pt for its title, path and status bars
 // (scripts/dmg/make-layout.py), and scripts/dmg/check-background.swift pins both pixel sizes.
 let width = 760
-let height = 688
+let height = 510
 func color(_ hex: UInt32) -> NSColor {
     NSColor(srgbRed: CGFloat((hex >> 16) & 255) / 255,
             green: CGFloat((hex >> 8) & 255) / 255,
@@ -29,11 +30,8 @@ let ink = color(0x19221d)
 let secondary = color(0x505b4a)
 let separator = color(0xa3a897)
 
-// The copy. macOS names are the system's own strings (macOS 26.5.2): the Applications folder, System
-// Settings, Privacy & Security and its Open Anyway button. Spanish gives Spain's names, then Latin
-// America's (es_419) as the alternative; Russian is too wide for one line, so its path hangs below.
-struct Line { let language: String; let text: String; var indent: CGFloat = 0 }
-let hang: CGFloat = 16
+// The copy. The Applications folder's name is the system's own string in each language (macOS 26.5.2).
+struct Line { let language: String; let text: String }
 let steps: [[Line]] = [
     [
         Line(language: "en", text: "Drag SkyCut to Applications"),
@@ -42,18 +40,6 @@ let steps: [[Line]] = [
         Line(language: "es", text: "Arrastra SkyCut a Aplicaciones"),
         Line(language: "ja", text: "SkyCut を「アプリケーション」にドラッグ"),
         Line(language: "ru", text: "Перетащите SkyCut в «Программы»"),
-    ],
-    [
-        Line(language: "en", text: "Blocked on first open? System Settings › Privacy & Security › Open Anyway"),
-        Line(language: "zh-Hans", text: "第一次打开被拦下：系统设置 › 隐私与安全性 › 仍要打开"),
-        Line(language: "zh-Hant", text: "第一次打開被擋下：系統設定 › 隱私權與安全性 › 強制打開"),
-        Line(language: "es", text: "¿Bloqueado al abrir? Ajustes del Sistema › Privacidad y seguridad › Abrir igualmente"),
-        Line(language: "es-419", text: "o: Configuración del Sistema › Privacidad y seguridad › Abrir de todos modos",
-             indent: hang),
-        Line(language: "ja", text: "初回起動がブロックされたら：システム設定 › プライバシーとセキュリティ › このまま開く"),
-        Line(language: "ru", text: "Заблокировано при запуске?"),
-        Line(language: "ru", text: "Системные настройки › Конфиденциальность и безопасность › Все равно открыть",
-             indent: hang),
     ],
 ]
 let guideLabel = [("en", "Video guide"), ("zh-Hans", "视频教程"), ("zh-Hant", "影片教學"),
@@ -144,7 +130,7 @@ func artwork() {
         badge(index + 1, baseline: baseline)
         for (row, entry) in lines.enumerated() {
             line([(entry.language, entry.text, entry.language == "en" ? ink : secondary)],
-                 x: textX + entry.indent, baseline: baseline)
+                 x: textX, baseline: baseline)
             if row < lines.count - 1 { baseline += pitch + (row == 0 ? englishGap : 0) }
         }
         baseline += stepGap

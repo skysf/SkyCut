@@ -28,7 +28,7 @@ with DSStore.open(str(path), "w+") as store:
     store["."]["bwsp"] = {
         "ShowSidebar": False, "ContainerShowSidebar": False, "ShowToolbar": False,
         "ShowStatusBar": False, "ShowPathbar": False, "ShowTabView": False,
-        "WindowBounds": "{{120, 120}, {760, 776}}", "PreviewPaneVisibility": False,
+        "WindowBounds": "{{120, 120}, {760, 598}}", "PreviewPaneVisibility": False,
     }
     store["."]["icvp"] = {
         "viewOptionsVersion": 1, "backgroundType": 2,
@@ -41,4 +41,7 @@ with DSStore.open(str(path), "w+") as store:
     }
     store["SkyCut.app"]["Iloc"] = (200, 164)
     store["Applications"]["Iloc"] = (560, 164)
+    # Out of sight below the 510 pt canvas: a Finder that shows hidden files would otherwise drop this folder's icon
+    # on the first free spot, over the steps (seen 2026-11-26). Finder hides it by default either way.
+    store[".background"]["Iloc"] = (380, 800)
 print(f"wrote {path}")
