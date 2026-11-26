@@ -1,9 +1,10 @@
 import Foundation
 
 // InstallerDisk on real scratch disk images (scripts/check-move-to-applications.sh): a compressed read-only image with the
-// app at its top is found, with its mount point and whole disk; a writable image and a plain folder are not; the eject
-// waits for the process it was given to exit, then detaches the image. Images are attached with -nobrowse at a scratch
-// mount point, so Finder never shows them; the script detaches anything left on exit.
+// app at its top, HFS+ like SkyCut's installer and APFS, is found with its mount point and whole disk; a writable image and
+// a plain folder are not; the eject waits for the process it was given to exit, then detaches the whole image. Images are
+// attached with -nobrowse at a scratch mount point, so Finder never shows them; each is detached on the way out, and the
+// script detaches anything still left on exit.
 
 enum DiskChecks {
     static func run(in root: URL, check: (Bool, String) -> Void) throws {
@@ -14,22 +15,9 @@ enum DiskChecks {
         let app = try Fixture.app(in: content, marker: "disk")
 
         check(InstallerDisk.containing(app) == nil, "a plain folder is not a disk image")
-
-        let readOnly = folder.appendingPathComponent("installer.dmg")
-        let mount = folder.appendingPathComponent("mount")
-        try image(["create", "-quiet", "-srcfolder", content.path, "-volname", "SkyCutMoveCheck", "-format", "UDZO", readOnly.path])
-        try image(["attach", "-quiet", "-nobrowse", "-noautoopen", "-noverify", "-readonly", "-mountpoint", mount.path, readOnly.path])
-        let mounted = mount.appendingPathComponent("SkyCut.app")
-        let disk = InstallerDisk.containing(mounted)
-        check(disk != nil, "a read-only disk image is found")
-        if let disk {
-            check(disk.mountPoint.standardizedFileURL.path == mount.standardizedFileURL.path, "the image's mount point (got \(disk.mountPoint.path))")
-            check(disk.wholeDisk.range(of: #"\A/dev/disk[0-9]+\z"#, options: .regularExpression) != nil, "the image's whole disk (got \(disk.wholeDisk))")
-            check(disk.holdsAtTop(mounted), "the app at the image's top counts as at its top")
-            check(!disk.holdsAtTop(mount.appendingPathComponent("Folder/SkyCut.app")), "an app in a subfolder of the image does not")
-            // Never opened, so normally never registered; unregistered anyway before its image goes.
-            Tool.run(lsregister, ["-u", mounted.path])
-            try ejectWaitsForExit(disk, mount: mount, check: check)
+        // HFS+ like SkyCut's own installer (scripts/build-dmg.sh), and APFS, hdiutil's default.
+        for fileSystem in ["HFS+", "APFS"] {
+            try readOnlyImage(of: content, fileSystem: fileSystem, in: folder, check: check)
         }
 
         let writable = folder.appendingPathComponent("writable.dmg")
@@ -40,6 +28,31 @@ enum DiskChecks {
         check(InstallerDisk.containing(writableMount) == nil, "a writable disk image is not the installer disk")
     }
 
+    /// A compressed read-only image with the app at its top: found, its mount point and whole disk, and the eject.
+    private static func readOnlyImage(of content: URL, fileSystem: String, in folder: URL, check: (Bool, String) -> Void) throws {
+        let name = fileSystem == "HFS+" ? "hfs" : "apfs"
+        let readOnly = folder.appendingPathComponent("installer-\(name).dmg")
+        let mount = folder.appendingPathComponent("mount-\(name)")
+        try image(["create", "-quiet", "-srcfolder", content.path, "-fs", fileSystem, "-volname", "SkyCutMoveCheck", "-format", "UDZO",
+                   readOnly.path])
+        try image(["attach", "-quiet", "-nobrowse", "-noautoopen", "-noverify", "-readonly", "-mountpoint", mount.path, readOnly.path])
+        defer { if isMounted(mount) { Tool.run("/usr/bin/hdiutil", ["detach", "-quiet", "-force", mount.path]) } }
+        let mounted = mount.appendingPathComponent("SkyCut.app")
+        let disk = InstallerDisk.containing(mounted)
+        check(disk != nil, "\(fileSystem): a read-only disk image is found")
+        guard let disk else { return }
+        check(disk.mountPoint.standardizedFileURL.path == mount.standardizedFileURL.path, "\(fileSystem): the image's mount point (got \(disk.mountPoint.path))")
+        check(disk.wholeDisk.range(of: #"\A/dev/disk[0-9]+\z"#, options: .regularExpression) != nil, "\(fileSystem): the image's whole disk (got \(disk.wholeDisk))")
+        check(disk.holdsAtTop(mounted), "\(fileSystem): the app at the image's top counts as at its top")
+        check(!disk.holdsAtTop(mount.appendingPathComponent("Folder/SkyCut.app")), "\(fileSystem): an app in a subfolder of the image does not")
+        // Never opened, so normally never registered; unregistered anyway before its image goes.
+        Tool.run(lsregister, ["-u", mounted.path])
+        try ejectWaitsForExit(disk, mount: mount, check: check)
+        let attached = Tool.run("/usr/bin/hdiutil", ["info"]).output
+        let imageTail = readOnly.pathComponents.suffix(4).joined(separator: "/")
+        check(!attached.contains(imageTail), "\(fileSystem): the whole image is detached, not just its volume")
+    }
+
     /// The eject waits while the given process runs, then detaches the image within seconds of its exit.
     private static func ejectWaitsForExit(_ disk: InstallerDisk, mount: URL, check: (Bool, String) -> Void) throws {
         let waitedOn = Process()
@@ -48,11 +61,11 @@ enum DiskChecks {
         try waitedOn.run()
         disk.ejectAfterExit(of: waitedOn.processIdentifier)
         Thread.sleep(forTimeInterval: 1)
-        check(isMounted(mount), "the eject waits while the process runs")
+        check(isMounted(mount), "\(mount.lastPathComponent): the eject waits while the process runs")
         waitedOn.waitUntilExit()
         let deadline = Date().addingTimeInterval(20)
         while isMounted(mount), Date() < deadline { Thread.sleep(forTimeInterval: 0.2) }
-        check(!isMounted(mount), "the image is detached after the process exits")
+        check(!isMounted(mount), "\(mount.lastPathComponent): the image is detached after the process exits")
     }
 
     static let lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"

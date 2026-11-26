@@ -9,7 +9,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 . scripts/test-app-cleanup.sh
 WORK="$(mktemp -d "${TMPDIR:-/tmp/}srtflow-move.XXXXXX")"
+# The physical path (/private/var/…): `mount` lists mount points that way, and the cleanup below matches on it.
+WORK="$(cd "${WORK}" && pwd -P)"
 cleanup() {
+  case "${WORK}" in */srtflow-move.*) ;; *) return ;; esac
   # Images a failed run left attached under the scratch folder; the fixture bundles unregistered (they are never opened,
   # so normally never registered); then the folder, a locked fixture file included.
   mount | awk -v root="${WORK}" 'index($0, " on " root) { print $1 }' | while read -r device; do
