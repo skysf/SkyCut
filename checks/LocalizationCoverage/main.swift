@@ -315,6 +315,9 @@ failures += tableFailures
 // 少一张，那种语言的用户在权限弹窗里看到的就是英文。
 failures += verifyTables(named: "InfoPlist.strings", languages: languages, resources: resources).failures
 
+// zh-Hans names macOS apps and places the way Apple does (访达, not Finder): AppleNames.swift.
+failures += appleNameFailures(tables: ["Localizable.strings", "InfoPlist.strings"], resources: resources)
+
 let direct = scan(swiftFiles(under: sources))
 let occurrences = direct + dynamicKeys(in: swiftFiles(under: sources))
 let scannable = occurrences.filter { !$0.key.contains("\\(") && !exempt.contains($0.key) }
@@ -362,5 +365,6 @@ if failures == 0 {
     print("  · 缺文案：每张表都要补 —— en 填原文，其余各填那种语言的译文。")
     print("  · 重复键：一个键只能有一个含义，把其中一处改成更具体的键（如 Font size）。")
     print("  · 确实不需要翻译的（单位、符号）：加进 checks/LocalizationCoverage/main.swift 的 exempt，并写清为什么。")
+    print("  · Apple names in zh-Hans: use the Chinese name the line gives; one that must stay as it is goes in appleNameExceptions (AppleNames.swift) with the reason.")
     exit(1)
 }
