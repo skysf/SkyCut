@@ -129,4 +129,20 @@ they were not run at night. Ready for the morning:
   microphone service and entitlement as the recording's narration and is in the first real install's checklist
   ([code signing](../architecture/code-signing-and-permissions.md) section 五, item 4).
 
-Results: not run yet (as of the night of 2026-11-26); they are added here after the run with the user.
+Results, 2026-11-26 10:09–10:16 local time, with the user at the Mac (the bundle staged again, Developer ID, hardened):
+- Run 1: `record_screen` answered that macOS had just asked for Screen & System Audio Recording, and recorded nothing. The
+  user granted it in System Settings with «+»: the list never showed the bundle (see the finding below).
+- Run 2, with `--finder`: the screen recording ran (22 frames, 720×450). The microphone question came during the
+  recording and the user allowed it, so the microphone started 1 s late (2.7 s, mean −64.7 dB). Finder's selection
+  (Apple Events): OK after the user's OK.
+- Run 3, both grants in place, the user speaking: recording started at once, with no question. The microphone file held
+  3.7 s of speech (mean −25.9 dB, max −14.0 dB). Finder OK.
+- SkyCut records narration to its own `<name>-Mic.m4a` next to the `.mov`. The script measured only the `.mov`, so its
+  «MICROPHONE: SILENT OR MISSING» line was a false negative; the numbers above are from the `-Mic.m4a` files.
+- Afterwards the bundle, its preferences and caches were removed, and the three grants reset. Both TCC databases hold no
+  record for the test identity.
+
+Finding: a test bundle under `/private/tmp` is not listed in System Settings' privacy lists, and `tccutil reset` cannot
+resolve its bundle id (OSStatus −10814) even after `lsregister -f`. The «+» button still records the grant. The reset
+worked through a stub bundle with the same id in a normal folder, registered for the moment and then removed. The
+manual-testing note is in [code signing](../architecture/code-signing-and-permissions.md) section 五.

@@ -136,6 +136,11 @@ What no check reaches (system dialogs, System Settings, TCC.db needs Full Disk A
    access where service='kTCCServiceScreenCapture' and client='com.srtflow.SrtFlow'"` decodes (`xxd -r -p` → `csreq -r -
    -t`) to the team requirement (`certificate leaf[subject.OU] = "26TVX3S9FR"`), not `certificate leaf = H"…"` or a `cdhash`.
 
+Testing permissions with a test bundle (seen 2026-11-26): give it its own bundle id and stage it in a normal folder if you
+can. One under `/private/tmp` is not listed in System Settings' privacy lists, so the user adds it with «+», which records
+the grant. `tccutil reset <service> <id>` cannot resolve its id (−10814): reset through a stub bundle with that id in a
+normal folder (`lsregister -f`, reset, `lsregister -u`, delete). Proof run: [the report](../reports/2026-11-26-developer-id-signing.md) section 5.
+
 ## History: the self-signed certificate (2026-10-03 to 2026-11-26)
 
 Kept as it was written; none of it is in use any more.
