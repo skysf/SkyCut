@@ -918,3 +918,56 @@
   key only with a record, round trips, a broken record dropped), `scripts/check-parameter-limits.sh` → `EditingStyleAppChecks` (a real
   edit_clip records it in the same undo step; another session, a user edit or a no-op records nothing; get_timeline reports it) and
   `RecipeSkyStudioChecks` (`newer_version`, recipes takes project). Rule: [project file](../architecture/video-edit-project-file.md).
+- SkyCut updates itself (2026-11-27): `scripts/check-app-update.sh` (check-all) and `checks/app-update-wiring.sh` (scan guard).
+  - **The feed** (`AppUpdateFeed`): a valid feed read field for field; unknown fields ignored; refused, each on its own: the
+    schema (2, a string, a boolean, a fraction, missing), another bundle id, a version that isn't plain `x.y.z`, a build that
+    isn't dotted digits, the minimum macOS, a DMG URL that is http, the redirect, another host, a `.zip`, with credentials,
+    a fragment or loopback without the test hook, a size of 0, negative, over 1 GiB, a string or a fraction, a SHA-256 in
+    capitals or of the wrong length, notes without English, empty, a line break, over 8 lines or 300 characters, and
+    anything over 64 KB. Versions order by number (0.18.100 > 0.18.99); the same or an older version, or one needing a newer
+    macOS, is never offered. The test hook: https anywhere or http on loopback; anything else falls back to production; the
+    DMG may come from the hook's own origin only. Notes fall back by language, then to English. The staged record, the
+    installed marker and the reopen record read back as written (a marker going backwards, relative paths, stale or future
+    reopen records refused).
+  - **Who updates** (`AppUpdateEligibility.decide`): 27 cases: the release app updates (an AI-started launch too); the
+    installer disk, a translocated download, an unwritable folder or bundle, a volume without atomic swaps and staging on
+    another volume only tell; SkyCut Beta, check bundles, ad-hoc or another team's signature, a local version, `dist/`,
+    `.build`, `/tmp`, temporary folders, a bare executable, `CI` and `SRTFLOW_*` never check (unless the test hook is
+    loopback).
+  - **The state machine** (`AppUpdateState`): background checks and downloads show nothing and are never answered; a
+    check the person started is answered (up to date, failed, found); auto install: download, Update, the same release
+    changes nothing, a newer one replaces the staged copy, "up to date" removes a withdrawn one; auto off: New Version,
+    Download and Install, a failed asked download says so; the switch stops a background download and keeps a staged copy
+    from installing by itself; can't update: never downloads; launch states (a staged copy, the marker, Updated going away
+    once viewed); the popover's content; what a restart waits for, in order, and which cloud kinds don't hold it; the
+    Settings status line (today, yesterday, a date, checking, failed, downloading, ready).
+  - **Over loopback** (python3's http.server on 127.0.0.1, never the network): the feed (offer, up to date, 404, a 301 not
+    followed, over 64 KB, malformed); the DMG (whole with progress to 100%; a wrong SHA-256, a size off by one either way, a
+    404, a redirect and a cancelled download each leave no file).
+  - **Staging from real images** (hdiutil, `-nobrowse`): the copy is the new app, intact, without quarantine, its record
+    written, only the newest kept, the image detached; refused without touching the earlier staged copy: another version,
+    another build, not newer, a failed signature, another bundle id, two apps. The production verifier refuses an ad-hoc
+    copy (not notarized), Gatekeeper rejects it (when assessments are on), and `gatekeeperAccepts` reads spctl's lines.
+    A killed run's attached image is detached at the next launch; the launch cleanup trashes the replaced app and removes
+    everything but the staged copy its record names.
+  - **The install** (`AppUpdateInstaller`) against scratch folders: the new app in place and intact, the old one in the
+    scratch Trash only after the new one was in place, the marker 1.0.0 → 1.1.0, the record gone; untouched and reported:
+    nothing staged, not newer, a copy changed since it was verified (removed), another instance running (kept staged), a
+    failing swap (kept), the destination gone, a staged copy on another volume (EXDEV).
+  - **Killed swaps**: 24 times, a child process swapping the two bundles in a loop is killed with SIGKILL 1–40 ms after it
+    started swapping; after every kill both paths hold a whole app that `codesign --verify --deep --strict` accepts.
+  - **The feed writer** (`scripts/update-feed/FeedWriter.swift`) on fixture values: writes a release's feed and a loopback
+    test feed with `--test-feed`; refuses another host, the redirect, a development version, a SHA-256 in capitals, a size of
+    0, notes without Spanish or with an empty line, a loopback DMG in a release feed and a test feed address SkyCut refuses.
+  - **The wiring guard**: one feed address and test-hook key; `renamex_np` / `RENAME_SWAP` in the app only in the installer,
+    which moves nothing else onto the destination and keeps the default swap at quit; the updater started once in
+    `startServices()`, the install last in `applicationWillTerminate`, the menu item after About, the Settings section, the
+    pill between the AI badge and the cloud tasks and on the tools' toolbar; a cancelled quit cancelling the restart (the hook
+    set before `NSApp.terminate`); staging on `AppUpdateWork`'s queue; no administrator rights; the release team equal to
+    `scripts/signing/common.sh`; `SrtFlow.`-prefixed keys; the check's binary taking only a 127.0.0.1 server and only
+    FlowChecks.swift transferring.
+  - **Reverse verification** (2026-11-27): a two-rename replace instead of the swap turns every kill red (the destination
+    missing) and the cross-volume case; before their fixes, a download cancelled before it started and a failed re-stage of
+    the same version were red; dropping the AI-launch exception and the withdrawal are red; 16 wiring sabotages are red.
+    Off-screen images: `scripts/render-app-updates.sh <folder>` (graphical session, **not in `check-all.sh`**). The live feed
+    at release: `python3 scripts/check-release-download.py <dmg> --feed`. Rules: [App updates](../architecture/app-updates.md).

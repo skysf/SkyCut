@@ -203,6 +203,7 @@ run_check "ci-docs-only（CI 的「只改了文档」快速通道只在真的只
 run_check "ci-verified-tree（合并之后 main 上那一轮只在树已经原样验过时才不跑检查）" checks/ci-verified-tree.sh
 run_check "native-local-checks（扫描守卫：本地跑检查的入口都换成原生 arm64、起检查用 /bin/bash）" checks/native-local-checks.sh
 run_check "release-signing（扫描守卫：发布版用固定签名身份签、录屏的旧授权记录 App 自己删）" checks/release-signing.sh
+run_check "app-update-wiring (scan guard: one feed address, the atomic swap only, wired at start / quit / menu / Settings / toolbars, no network in the check)" checks/app-update-wiring.sh
 run_check "product-name（扫描守卫：看得见的名字是 SkyCut，bundle id、数据文件夹、钥匙串、通道这些身份沿用 SrtFlow）" checks/product-name.sh
 run_check "shell-var-boundary（扫描守卫）" checks/shell-var-boundary.sh
 run_check "shell-pipe-grep-q（扫描守卫）" checks/shell-pipe-grep-q.sh
@@ -225,6 +226,7 @@ run_check "test-app-cleanup (scratch bundles are unregistered on exit)" checks/t
 run_check "test-defaults-cleanup (checks leave no preferences in the login home: scratch suites, staged apps' domains)" checks/test-defaults-cleanup.sh
 run_check "engine-probe (bounded discovery, output and native child lifecycle)" scripts/check-engine-probe.sh
 run_check "move-to-applications (the launch rule, the move against scratch folders, the disk image and its eject)" scripts/check-move-to-applications.sh
+run_check "app-update (the feed, who updates, the state machine; a loopback feed and DMG, real images, the install at quit and swaps killed at random against scratch folders)" scripts/check-app-update.sh
 run_check "sound-labels (macOS's sound classifier for listen describe=true: one window per 3 s, every label's own score)" scripts/check-sound-labels.sh
 run_check "SrtFlowCoreChecks（核心库）" swift run --arch arm64 SrtFlowCoreChecks
 run_check "mcp-smoke-client（冒烟客户端断线、协议错误、超时和日志退出码）" python3 checks/MCP/SmokeClientChecks.py
