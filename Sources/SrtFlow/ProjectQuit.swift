@@ -32,6 +32,8 @@ enum ProjectQuit {
     private static var replies: [@MainActor (Bool) -> Void] = []
     /// How the person is asked while a drive does not answer (a seam: the checks answer for them).
     static var askAboutDrive: @MainActor (VideoEditProject) async -> DriveChoice = { waitForDrive($0) }
+    /// Told when a quit stops because a project stayed: Restart and Update then no longer restarts (AppUpdateRestart).
+    static var quitCancelled: (@MainActor () -> Void)?
 
     /// applicationShouldTerminate: `.terminateNow` when nothing needs writing or asking; otherwise `.terminateLater`, and
     /// AppKit gets the answer once every project is settled.
@@ -54,6 +56,7 @@ enum ProjectQuit {
             let waiting = replies
             replies = []
             for reply in waiting { reply(ready) }
+            if !ready { quitCancelled?() }
         }
     }
 

@@ -374,6 +374,24 @@ checked against the build users have. Rules: [AI interface (MCP)](../architectur
 CDN 缓存属于外部状态，每次发布都要执行这条真实网络检查；反向验证见
 [新下载地址的 404 缓存](../bugfixes/2026-11-05-release-download-cached-404.md)。
 
+**The update feed** (since 2026-11-27, [App updates](../architecture/app-updates.md)): SkyCut finds a new release through
+`https://skylu.ai/updates/skycut.json`, so every release publishes it, in this order:
+
+1. Notes: 3–5 short lines per language in a JSON file, `{"zh-Hans": [...], "en": [...], "es": [...]}`; the user approves
+   the Chinese, the AI writes English and Spanish.
+2. After the DMG is uploaded and read back in full (above):
+   `scripts/write-update-feed.sh <verified.dmg> <its immutable URL on downloads.skylu.ai> notes.json skycut.json`. It reads
+   the version, build and minimum macOS from the DMG's app, wants Gatekeeper's «Notarized Developer ID» for both, and
+   writes only a feed SkyCut's own parser reads back field for field. Never the `/download/skycut` redirect.
+3. The personal-site PR that moves the two `/download/skycut` redirects also adds `skycut.json` at `/updates/skycut.json`,
+   with a no-cache `_headers` rule for `/updates/*`: the feed and the download entry go live together.
+4. Once Cloudflare Pages has deployed it: `python3 scripts/check-release-download.py <verified.dmg> --feed` (the live feed,
+   read as SkyCut reads it, names this DMG, which downloads whole with its size and SHA-256).
+
+Pulling a bad release: publish the feed of the previous version again; copies that staged the bad one remove it at their
+next check and never install it. 0.18.68 has no updater: its users download the next release from the website, and the
+updater works from that release on.
+
 2026-11-05，用户明确授权替换旧下载包，发布 **0.18.57**：
 
 - 构建源码：已通过 CI 的 main `6aa24d2de7479504edeb044e9748c2cefb105be2`。

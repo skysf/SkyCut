@@ -62,4 +62,37 @@ enum Snapshot {
         window.close()
         print("rendered \(file.lastPathComponent) \(Int(host.bounds.width))x\(Int(host.bounds.height))")
     }
+
+    /// An AppKit window as it is (an NSAlert's, laid out), the same way: behind every window at the main screen's
+    /// bottom-left, captured by its number; drawn with cacheDisplay under SRTFLOW_RENDER_DRAW_FALLBACK=1. Added 2026-11-27
+    /// for scripts/render-app-updates.sh (the move-to-Applications render keeps its own copy).
+    static func takeWindow(_ window: NSWindow, to file: URL, appearance: NSAppearance? = NSAppearance(named: .aqua)) async throws {
+        window.appearance = appearance
+        window.ignoresMouseEvents = true
+        window.setFrameOrigin(NSScreen.main?.visibleFrame.origin ?? .zero)
+        window.orderBack(nil)
+        for _ in 0..<4 {
+            try await Task.sleep(nanoseconds: 80_000_000)
+            window.displayIfNeeded()
+        }
+        let shot = Process()
+        shot.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        shot.arguments = ["-l", String(window.windowNumber), "-o", "-x", file.path]
+        try shot.run()
+        shot.waitUntilExit()
+        if shot.terminationStatus != 0 || !FileManager.default.fileExists(atPath: file.path) {
+            guard ProcessInfo.processInfo.environment["SRTFLOW_RENDER_DRAW_FALLBACK"] == "1",
+                  let view = window.contentView?.superview ?? window.contentView,
+                  let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+                throw AIToolError("screencapture could not capture \(file.lastPathComponent); the terminal needs Screen Recording "
+                    + "permission (or set SRTFLOW_RENDER_DRAW_FALLBACK=1 to draw it without)")
+            }
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+            guard let png = bitmap.representation(using: .png, properties: [:]) else { throw AIToolError("could not encode \(file.lastPathComponent)") }
+            try png.write(to: file)
+            print("drew \(file.lastPathComponent) without screencapture (SRTFLOW_RENDER_DRAW_FALLBACK)")
+        }
+        window.orderOut(nil)
+        print("rendered \(file.lastPathComponent) \(Int(window.frame.width))x\(Int(window.frame.height))")
+    }
 }

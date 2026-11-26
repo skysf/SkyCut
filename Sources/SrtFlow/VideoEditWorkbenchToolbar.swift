@@ -65,6 +65,7 @@ struct VideoEditWorkbenchToolbar: ToolbarContent {
         .workbenchChrome()
         ToolbarItemGroup(placement: .primaryAction) {
             AIActivityBanner(project: project)
+            AppUpdatePill(project: project).equatable()
             CloudTasksButton(project: project).equatable()
             if exporter.isExporting && exporter.belongs(to: project) {
                 ProgressView(value: exporter.progress)

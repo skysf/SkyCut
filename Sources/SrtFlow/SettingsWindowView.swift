@@ -101,5 +101,6 @@ private struct GeneralSettingsSection: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        AppUpdateSettingsSection()
     }
 }

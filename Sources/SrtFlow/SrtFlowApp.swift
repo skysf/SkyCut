@@ -43,6 +43,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         StillCacheSweep.startAtLaunch()
         // 上次崩溃 / 强退留在临时目录里的声音样本（新建声音的录音、参考录音、语言探针）：后台清掉一天以前的。
         MediaReadQueue.analysis.addOperation { VoiceLibraryTemp.sweepResidue() }
+        // Checks about a minute later, off the main thread; reopens what a Restart and Update left open
+        // (docs/architecture/app-updates.md).
+        AppUpdater.shared.start()
     }
 
     /// 优化媒体的缓存：30 天没有任何工程用到的块删掉（docs/architecture/optimized-media.md 第二节第 6 条）。
@@ -60,6 +63,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainThreadWatchdog.shared.stop()
         // A Compress / Burn In encode still running: its ffmpeg stopped and its own unfinished file removed (EncodeJob).
         MainActor.assumeIsolated { EncodeJob.stopAllForQuit() }
+        // Last: every project was settled by the quit flow. A staged update goes in (one atomic swap), then Restart and
+        // Update relaunches (docs/architecture/app-updates.md "Installing").
+        MainActor.assumeIsolated { AppUpdater.shared.installAtQuit() }
     }
 
     /// 主线程卡顿日志（docs/testing/main-thread-stalls.md）：主线程卡过阈值就记时长、在哪一栏 / 在不在播、
@@ -224,6 +230,8 @@ struct SrtFlowApp: App {
         .defaultSize(width: 1180, height: 760)
         .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .commands {
+            // SkyCut › Check for Updates… after About (docs/architecture/app-updates.md).
+            CommandGroup(after: .appInfo) { AppUpdateMenuItem() }
             CommandGroup(after: .newItem) {
                 ProjectCommands()
                 Divider()

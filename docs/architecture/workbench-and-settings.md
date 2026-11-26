@@ -5,6 +5,9 @@
 ## 布局与入口
 
 - `VideoEditWorkbenchToolbar`：左边素材库、录屏、字幕；中间工程菜单；右边 AI 活动、云端任务、导出、设置、更多。主窗口和工程窗口复用，工程由调用方给，不能假设只有 primary。
+  Since 2026-11-27 the update pill (`AppUpdatePill`) sits between the AI activity and the cloud tasks, and before Settings on
+  the other tools' pages; it shows only once an update is ready, a new version is to be told about, or SkyCut was just
+  updated ([App updates](app-updates.md)).
 - 主窗口和工程窗口都用原生紧凑工具栏；工程菜单依据实际窗口宽度与 AI 状态预算，窄时先缩短工程名，保住常用操作。
 - 常用按钮只显示图标，名字和说明用现有 `instantHelp`，保留辅助功能标签。素材库选中态跟主题（经典色中性浅灰、森林色浅绿），导出不染强调色。macOS 26 的分组背景通过 `sharedBackgroundVisibility(.hidden)` 去掉；旧系统用原生工具栏。
 - `WorkbenchMoreMenu` 保留压缩、烧字幕、转字幕；有后台 / AI 工程时出现「AI 工程」。浮层里复用 `AIProjectsSidebarSection` 的 List 行，不套 `.equatable()`，停止 / 打开 / 关闭规则不另做一份。
@@ -26,7 +29,7 @@ The paid panels' Change Limit… (2026-11-24) edits the limit's own row in a pop
 
 | 稳定分类 id | 分类 | 复用组件与数据 |
 | --- | --- | --- |
-| general | 通用 | AppLanguagePicker / AppLanguageStore；AppThemePicker / AppThemeStore |
+| general | 通用 | AppLanguagePicker / AppLanguageStore；AppThemePicker / AppThemeStore；AppUpdateSettingsSection / AppUpdater (Software Update, [App updates](app-updates.md)) |
 | ai | 连接 AI | AIConnectSection / AIClientSetup / AIReadGrants |
 | editing | 剪辑与声音 | AIRecipesList / AIRecipeLibrary (every editing style with its source: presets, Sky Studio's, the user's own; [AI control](ai-control-mcp.md) item 32)；KokoroVoiceSettingsRow / KokoroVoicePack；VoiceLibrarySettingsSection / VoiceLibraryStore（声音库：我的声音、新建 / 设计、浏览预设，见[声音库](voice-library.md)第九节） |
 | cache | 媒体缓存 | OptimizedMediaSettingsSection / OptimizedMediaCacheSettings |
