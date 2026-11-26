@@ -15,7 +15,10 @@ ROOT="${WORK}/root"
 mkdir -p "${ROOT}/.background" "${WORK}/art"
 cp -R "${APP}" "${ROOT}/SkyCut.app"
 ln -s /Applications "${ROOT}/Applications"
-swift -module-cache-path .build/dmg-module-cache scripts/dmg/make-background.swift "${WORK}/art"
+# The art's drag hint shows SkyCut's icon: made by the app icon's own generator, from packaging/icon-source-1024.png.
+swift -module-cache-path .build/dmg-module-cache scripts/make-icon.swift "${WORK}/icon.iconset" >/dev/null
+swift -module-cache-path .build/dmg-module-cache scripts/dmg/make-background.swift "${WORK}/art" \
+    "${WORK}/icon.iconset/icon_512x512@2x.png"
 tiffutil -cathidpicheck "${WORK}/art/background.png" "${WORK}/art/background@2x.png" \
     -out "${ROOT}/.background/background.tiff"
 cp packaging/dmg/DS_Store "${ROOT}/.DS_Store"

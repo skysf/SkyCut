@@ -16,6 +16,8 @@ for source in (app, build):
         assert forbidden not in code, f'packaging must not use {forbidden}'
 for required in (
     'scripts/dmg/make-background.swift', 'tiffutil -cathidpicheck',
+    # The drag hint's icon copies come from the app icon's own generator, so they follow a new icon.
+    'scripts/make-icon.swift "${WORK}/icon.iconset"', '"${WORK}/icon.iconset/icon_512x512@2x.png"',
     'cp packaging/dmg/DS_Store "${ROOT}/.DS_Store"',
     '"${ROOT}/.background/background.tiff"', 'ln -s /Applications',
     'hdiutil create -volname SkyCut -fs HFS+',
