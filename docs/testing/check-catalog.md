@@ -679,8 +679,9 @@
     - a tampered original, or a copy of another build;
     - a Trash that refuses;
     - a failed install, with and without putting the old app back.
-  - **`RunningBundleProbe`** on real processes (copies of `/bin/sleep`): a helper inside the bundle counts, by any letter
-    case, until it exits; a sibling folder's process doesn't.
+  - **`RunningBundleProbe`** on real processes (copies of `/bin/sleep`): only a helper running is not open, and the move
+    goes ahead over it with the live probe (the helper still running); the app's `Contents/MacOS/` executable running is
+    open, by any letter case, until it exits, and the move is refused; a sibling folder's app doesn't count.
   - **`InstallerDisk`** on real scratch images: compressed read-only ones, HFS+ like the installer and APFS, are found with
     their mount point and whole disk; a writable one and a folder are not. The eject waits for the given process, then the
     whole image is gone (polled in `hdiutil info`: the volume goes first).
