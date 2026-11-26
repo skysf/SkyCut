@@ -81,6 +81,21 @@ the Developer ID with the hardened runtime, see the signing section below) → t
 以前这里是写死的默认值，发到 0.4.1 了还停在 0.3.0，打出过贴错版本号的包，
 见 [bugfixes/2026-08-06-build-version-and-shell-traps.md](../bugfixes/2026-08-06-build-version-and-shell-traps.md)。
 
+## App icon
+
+- One source, `packaging/icon-source-1024.png`: 1024 px sRGB with no alpha, the rounded square at (94, 87), 834 px
+  wide, corner 200. `scripts/make-icon.swift` crops that square onto the 824 px grid with a transparent edge, and
+  `build-app.sh` joins its sizes into `SkyCut.icns` with `iconutil`.
+- Forest green since 2026-11-26 (the user's pick of four mockups): the blue icon recoloured with the same geometry,
+  its third clip amber, its card warm white.
+- These follow the source by themselves: the app's `SkyCut.icns`, SkyCut Beta (a re-signed copy of the app) and the
+  DMG's drag hint (its copies are made from the source at build time).
+- The website's favicons and Apple touch icon are committed files: run `npm run build:favicons` in `website/`, commit
+  them, and they go live with the next website deploy. Recordings of real windows (the install guide's video and its
+  poster) keep the icon they were recorded with.
+- A new source keeps this geometry (`make-icon.swift`'s crop is measured from it). Then look at the icon at 16 and 32
+  px and at the DMG window (below).
+
 ## DMG 安装窗口（2026-11-06 起）
 
 根目录只显示 `SkyCut.app` 和指向 `/Applications` 的 `Applications` 软链。首次打开说明直接在
@@ -95,7 +110,9 @@ English first: English, 简体中文, 繁體中文, Español, 日本語, Рус�
 
 - 图稿唯一来源：`scripts/dmg/make-background.swift`，只用系统 AppKit / Core Text / Core Graphics 和系统字体。
   Its one input is SkyCut's icon for the drag hint: `build-dmg.sh` makes it with the app icon's own generator,
-  `scripts/make-icon.swift` (from `packaging/icon-source-1024.png`), so the hint follows a new icon.
+  `scripts/make-icon.swift` (from `packaging/icon-source-1024.png`), so the hint follows a new icon. A missing,
+  unreadable or cut-off source stops `build-dmg.sh` (since 2026-11-26): `make-icon.swift` would quietly draw its
+  code-drawn fallback instead, and ImageIO draws a cut-off PNG's missing rows black.
   配色是暖白 `#f3f0e8`、森林绿 `#123f32`、深色正文；所有像素使用自己的不透明底色，不跟随系统深浅色变色。
   每次打包现生成 760×510（72 dpi）和 1520×1020（144 dpi）的 PNG，再用
   `tiffutil -cathidpicheck` 合成 `/.background/background.tiff` 的两种分辨率。
@@ -116,8 +133,10 @@ English first: English, 简体中文, 繁體中文, Español, 日本語, Рус�
   then the arrowhead on a short shaft, all within x 284–458. The pointer is a fixed outline, traced once from macOS 26's
   arrow cursor, so the build needs no cursor image or window server.
   - Both icons' selection areas (x 128–272 and 488–632, y 92–258) stay plain paper: `check-background.swift` asserts it.
-    It probes the hint only on its own ink (the arrow's shaft, the pointer's black), never on the icon copies, so a new
-    app icon needs no check edit.
+    It probes the hint's own ink by colour (the arrow's shaft, the pointer's black), and the icon copies only for showing
+    ink at all: the last, most opaque copy must differ from the paper by more than 2 levels in at least 5 % of its inner
+    square, clear of the pointer (a blank icon gives at most 0.4 %, today's over 99 %). So a blank icon (transparent, or
+    cut off early) is red, and a new app icon needs no check edit.
 - 布局源：`packaging/dmg/DS_Store`，打包时拷成卷根的 `.DS_Store`。窗口框固定
   `{{120, 120}, {760, 598}}`（为标题栏及用户开启的路径 / 状态栏留出空间，图稿 760×510），图标 128 point，App / Applications
   中心为 `(200, 164)` / `(560, 164)`, the drag hint between them；隐藏工具栏和侧栏。The hidden `.background` folder sits at `(380, 800)`, below
@@ -139,8 +158,9 @@ English first: English, 简体中文, 繁體中文, Español, 日本語, Рус�
 - 扫描守卫：`checks/dmg-packaging.sh` 钉正常打包接线、命名和不带旧 txt / Finder 自动化，
   用标准库解析模板的实际叶记录检查窗口、背景 alias 和图标位置。
 - 产物检查：`scripts/check-dmg.sh` 不带参数时用小型 App 夹具真走生产组装器并挂载只读 DMG，
-  检查背景、布局、软链、无 txt，并解码 TIFF 验两种像素尺寸 / DPI 和完整图稿 (with the hint's own ink, and plain paper
-  under both icons' selection areas)。带 DMG 路径时验完整包。
+  检查背景、布局、软链、无 txt，并解码 TIFF 验两种像素尺寸 / DPI 和完整图稿 (with the hint's own ink, the icon copies'
+  ink, and plain paper under both icons' selection areas)。带 DMG 路径时验完整包。Without a path it also runs a copy of
+  the builder with no icon source, an unreadable one and a cut-off one: each must stop it with the message.
   两条都在 `scripts/check-all.sh`，本地运行 `arch -arm64 /bin/bash scripts/check-local.sh dmg`。
 
 **路径栏 / 状态栏的已知限制（2026-11-06 实测与验收决定）**：macOS 26.5.2 上，模板的
