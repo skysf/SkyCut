@@ -17,11 +17,15 @@ final class SkyStudioSpendStore: ObservableObject {
     static let limitKey = "SrtFlow.skystudio.dailyCreditLimit"
     static let ledgerKey = "SrtFlow.skystudio.creditLedger.v1"
     static let defaultLimit: Double = 1_000
-    /// 设得下的范围（0 = 暂停收费任务）。
-    static let limitRange: ClosedRange<Double> = 0...1_000_000
+    /// 设得下的范围（0 = 暂停收费任务）。Not actor-bound: a refusal's suggested limit reads it as a pure value (SkyCutDailyLimit).
+    nonisolated static let limitRange: ClosedRange<Double> = 0...1_000_000
 
     @Published private(set) var dailyLimit: Double
     @Published private(set) var ledger: DailySpendLedger
+    /// How many times the daily limit changed in this run. A set_settings token is bound to it, so any change since its question
+    /// voids the token, also a change back to the same value (Codex CXM3: a 1,000 → 1,500 token wrote 1,500 after the user went to
+    /// 2,000 and back to 1,000). Tokens live only in memory, so the count does too.
+    private(set) var limitRevision = 0
 
     private let defaults: UserDefaults
 
@@ -41,6 +45,7 @@ final class SkyStudioSpendStore: ObservableObject {
         let next = Self.clamped(value)
         guard next != dailyLimit else { return }
         dailyLimit = next
+        limitRevision += 1
         defaults.set(next, forKey: Self.limitKey)
     }
 
@@ -51,18 +56,42 @@ final class SkyStudioSpendStore: ObservableObject {
         DailySpendPolicy.decide(estimate: credits, spentToday: spentToday(now: now), dailyLimit: dailyLimit)
     }
 
-    /// 记上一笔（交活之前按报价记）。
-    func record(_ credits: Double, now: Date = Date()) {
+    /// 记上一笔（交活之前按报价记）。Returns the ledger's day key it was booked on, which a refund reuses.
+    @discardableResult
+    func record(_ credits: Double, now: Date = Date()) -> String {
+        let key = DailySpendLedger.dayKey(for: now)
+        record(credits, dayKey: key, now: now)
+        return key
+    }
+
+    /// Books on a day key worked out at booking (a settlement of a reservation).
+    func record(_ credits: Double, dayKey: String, now: Date = Date()) {
         var next = ledger
-        next.add(credits, on: now)
+        next.add(credits, dayKey: dayKey)
         next.prune(now: now)
         save(next)
     }
 
     /// 退回一笔（按记上的那一天）。
     func refund(_ credits: Double, on day: Date) {
+        refund(credits, dayKey: DailySpendLedger.dayKey(for: day))
+    }
+
+    /// Refunds on the day key recorded at booking, whatever the time zone is now.
+    func refund(_ credits: Double, dayKey: String) {
         var next = ledger
-        next.refund(credits, on: day)
+        next.refund(credits, dayKey: dayKey)
+        save(next)
+    }
+
+    /// Swaps a reservation for the actual charge on the day it was booked, in one ledger write. Written as a refund and then a
+    /// booking, a kill between the two lost the charge (60 held, 20 spent, 40 charged: 20 left on the books and 70 more allowed
+    /// under 100; Codex CXM3).
+    func settle(reserved: Double, charged: Double, dayKey: String, now: Date = Date()) {
+        var next = ledger
+        next.refund(reserved, dayKey: dayKey)
+        next.add(charged, dayKey: dayKey)
+        next.prune(now: now)
         save(next)
     }
 

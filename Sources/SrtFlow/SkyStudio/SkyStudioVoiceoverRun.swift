@@ -169,6 +169,12 @@ final class SkyStudioVoiceoverRun {
         }
     }
 
+    /// Sky Studio had given the failing batch a job id (a balance error for it may come with a charge: SkyStudioBalanceRefusal).
+    private var batchAccepted: Bool {
+        guard let batches = recovery?.value.batches, batches.indices.contains(batchIndex) else { return false }
+        return batches[batchIndex].serverID != nil
+    }
+
     private func fail(_ error: Error) async {
         let cancelled = Self.isCancellation(error)
         let failureStage = (error as? SkyStudioVoiceProcessingError)?.stage ?? stage
@@ -195,8 +201,10 @@ final class SkyStudioVoiceoverRun {
         }
         if let failure = (error as? SkyStudioJobError)?.failure {
             extra["failure"] = failure.json
-            if failure.code == "insufficient_credits" {
-                extra["recharge_url"] = (failure.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
+            if let balance = SkyStudioBalanceRefusal.refusal(of: error, accepted: batchAccepted) {
+                // The Sky Studio balance, not SkyCut's daily limit: the numbers and where only the user adds credits (MSG1).
+                extra.merge(SkyStudioBalanceRefusal.fields(balance, retry: recovery == nil ? "retry the original add_voiceover call"
+                    : "resume with add_voiceover resume=recovery_file generate_missing=true")) { _, new in new }
             }
             if failure.code == SkyStudioVoiceCodes.fallbackNeedsOneTime, let recovery {
                 // 默认模型出错、备用要先花一次性费用（SkyCut 声音方案 4.5）：这一批停下、没扣钱，别的批照常收好；补上价、记下、问用户
@@ -213,10 +221,46 @@ final class SkyStudioVoiceoverRun {
         }
         // 结构化的原因（比如参考录音人声不够的 reason / voiced_seconds / missing_seconds）照样交给 get_job，不只留一句话。
         if let tool = error as? AIToolError { extra.merge(tool.details) { current, _ in current } }
-        if let blocked = error as? SkyStudioVoiceBudgetProblem {
-            extra.merge(SkyStudioJobGate.budgetBlocked(credits: blocked.credits, store: .shared).payload.objectValue ?? [:]) { _, new in new }
+        let budget = cancelled ? nil : error as? SkyStudioVoiceBudgetProblem
+        if let budget {
+            // Which limit, the numbers and the options (MSG1); the retry is this voiceover's own and finished batches are kept.
+            extra.merge(SkyStudioJobGate.budgetBlocked(budget.numbers,
+                outcome: recovery == nil ? "Nothing was started or charged." : "Finished batches are kept; the missing ones were not started or charged.",
+                retry: recovery == nil ? "retry the original add_voiceover call" : "resume with add_voiceover resume=recovery_file generate_missing=true"
+            ).payload.objectValue ?? [:]) { _, new in new }
+        }
+        // A batch Sky Studio made whose download gave up or was stopped (the user's stop included): the code and the GET count; the
+        // row reads the localized line and its Download again runs the same local recovery as resume=recovery_file (only GETs the
+        // original jobs; nothing is generated).
+        let download = SkyStudioDownloadFailure.from((error as? SkyStudioVoiceProcessingError)?.underlying ?? error)
+        if let download {
+            extra.merge(download.fields(retry: SkyStudioDownloadFailure.taskListRetry.dropLast().description + ", or call add_voiceover "
+                + "with only resume=\"\(recoveryFile.path)\" (it reads the original jobs and downloads their audio; it never pays to "
+                + "generate). Calling add_voiceover again with the lines is a new voiceover and is charged again.")) { _, new in new }
         }
         finish(cancelled ? .cancelled : .failed, text)
+        // The task card says which limit or balance stopped it, in the app's language, with the numbers and where to act.
+        if let budget { status.issue = SkyCutDailyLimit.userLine(budget.numbers) }
+        if !cancelled, let balance = SkyStudioBalanceRefusal.refusal(of: error, accepted: batchAccepted) { status.issue = SkyStudioBalanceRefusal.shown(balance) }
+        if let download, recovery != nil { status.holdDownload(download) { [self] in recoverDownload() } }
+    }
+
+    /// Download again: a new recovery job for this recovery file as it is on disk now (add_voiceover resume=recovery_file,
+    /// generate_missing off), and this row gives way to it. Read fresh: a resume that already landed this voiceover leaves the record
+    /// `applied`, so that recovery adds nothing again (the old copy in memory would land it twice).
+    private func recoverDownload() {
+        guard let file = recovery?.file, let project, status.retryDownload != nil else { return }
+        status.retryDownload = nil   // one press, one recovery
+        let services = services
+        Task { @MainActor in
+            guard let fresh = try? await SkyStudioVoiceRecovery.reading(file), let input = try? fresh.input(for: project) else {
+                status.retryDownload = { [self] in recoverDownload() }   // nothing started: the button stays
+                return
+            }
+            status.releaseDownload()
+            SkyStudioGenerationActivity.shared.dismiss(status)
+            _ = SkyStudioVoiceoverRun(input: input, project: project, recovery: fresh, generateMissing: false, services: services).start()
+        }
     }
 
     /// 回任务号时说好要先装本机转写模型的：交第一批之前装（状态行「准备本机转写」，get_job 的 local_step）。装不上就当这台 Mac
@@ -250,9 +294,10 @@ final class SkyStudioVoiceoverRun {
         prepared?.budget.refundUnused()
         // 先记下为什么换了（get_job 的 voice.note）：新的预留留不下、之后哪一步没做成，AI 都看得到整段换了读法。
         input.choice.note = [input.choice.note, replanned.note].compactMap { $0 }.joined(separator: " ")
-        guard let budget = SkyStudioVoiceBudget.reserve(replanned.plan.batchCredits) else {
+        let budget: SkyStudioVoiceBudget
+        do { budget = try SkyStudioVoiceBudgetProblem.reserve(replanned.plan.batchCredits) } catch {
             prepared = nil
-            throw SkyStudioVoiceBudgetProblem(credits: replanned.plan.batchCredits.reduce(0, +))
+            throw error
         }
         prepared?.plan = replanned.plan
         prepared?.quote = replanned.quote
@@ -409,7 +454,7 @@ final class SkyStudioVoiceoverRun {
         if let wrapped = error as? SkyStudioVoiceProcessingError { return isCancellation(wrapped.underlying) }
         if error is CancellationError || (error as? URLError)?.code == .cancelled { return true }
         if case .stopped? = error as? SkyStudioJobError { return true }
-        return false
+        return SkyStudioDownloadFailure.from(error)?.kind == .stopped   // a stop during a batch's download
     }
 
     private var projectUnchanged: Bool {

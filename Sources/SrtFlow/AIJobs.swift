@@ -133,6 +133,18 @@ final class AIJobs {
         job.detail = .object((job.detail?.objectValue ?? [:]).merging(values) { _, new in new })
     }
 
+    /// A finished job runs again under the same id, session and project: a paid result whose download gave up is downloaded again
+    /// (Download again, SkyStudioMediaStatus.retryDownload; nothing is submitted or charged). Its old ending is cleared; like start it
+    /// takes a keep-awake lease, which finish returns.
+    func reopen(_ job: Job) {
+        guard job.status != .running else { return }
+        job.status = .running
+        job.message = nil
+        job.detail = nil
+        job.finishedAt = nil
+        job.awake = AIKeepAwake.shared.hold()
+    }
+
     /// 原单恢复后来完成（例如源图早成功、角色整理晚到），只更新这份结局，不重复创建或收费。
     func adoptRecovered(_ job: Job, message: String, detail: JSONValue) {
         guard job.status != .running else { return }

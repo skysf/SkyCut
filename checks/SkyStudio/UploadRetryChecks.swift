@@ -27,6 +27,7 @@ func runUploadRetryChecks() async {
     await runDropChecks(server, file: file, size: bytes.count)
     await runUploadAnswerChecks(server, file: file)
     await runUploadAddressChecks(server, file: file)
+    await runDownloadRetryChecks(server)
 }
 
 /// Progress reports and the waits between tries, in the order they happened (waits are recorded, not slept).

@@ -10,6 +10,10 @@ import SrtFlowMCPKit
 // conversion alone (5 credits, `voice_plan.skip_separation: true`) and its job returns `voice_url` without `background_url`;
 // `separationFails` ends a default job with `separation_failed` keeping the separation's part; `quoteIgnoresSkip` is a server
 // that does not know the parameter; `omitBackground` a default result without its background.
+// Downloads (2026-11-24, VoiceChangeDownloadChecks): `fileDrops` loses the connection of that many result GETs; `expireVoiceFile`
+// answers the voice file's first GET 403, after which the job's result names a fresh address (`voice-fresh.wav`); `holdFiles` leaves
+// result GETs unanswered (a stop while downloading); `holdNext` leaves only the next GETs of one file unanswered (`voice.wav`: a job
+// stopped before its voice came; `background.wav`: after it came).
 
 final class VoiceChangeHTTP: URLProtocol {
     static let lock = NSLock()
@@ -22,6 +26,16 @@ final class VoiceChangeHTTP: URLProtocol {
     static var quoteFailure: (Int, JSONValue)?
     /// POST /jobs：断网（结果不明）。
     static var submitNetworkFailure = false
+    /// POST /jobs answers this refusal (a 402 insufficient_credits: nothing admitted or charged).
+    static var submitRefusal: (Int, JSONValue)?
+    /// GET /jobs/{id} for other jobs than convert-1 (the original job a refusal named): id → the job's answer.
+    static var originalJobs: [String: JSONValue] = [:]
+    /// GET /jobs/{id} for such a job answers this error instead (a 402 that carries the final bill).
+    static var originalJobErrors: [String: (Int, JSONValue)] = [:]
+    /// GET /jobs/convert-1 answers this error (a 402 while following an accepted job).
+    static var pollRefusal: (Int, JSONValue)?
+    /// The done answer carries no final bill: a top-level credits_charged of 0 and billing pending_review.
+    static var unbilled = false
     /// POST /jobs 先回 queued；GET /jobs/{id} 等这个变成 true 才回 done。
     static var holdJob = false
     static var released = true
@@ -40,6 +54,17 @@ final class VoiceChangeHTTP: URLProtocol {
     static var omitBackground = false
     /// Whether the last POST /jobs asked for a direct change (GET /jobs/{id} answers for that job).
     static var jobDirect = false
+    /// Result GETs still to lose their connection.
+    static var fileDrops = 0
+    /// The voice file's first GET is refused (403, an expired address); the job's result then names a fresh one.
+    static var expireVoiceFile = false
+    static var voiceRenamed = false
+    /// Result GETs get no answer at all (until the task is cancelled).
+    static var holdFiles = false
+    /// How many of the next GETs of a file (`voice.wav`, `background.wav`) get no answer until the task is cancelled.
+    static var holdNext: [String: Int] = [:]
+    /// A finished job's bill is under review (`pending_review`, `review_required`), its amount not final.
+    static var billUnderReview = false
 
     static let voiceID = "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d"
     static let session: URLSession = {
@@ -52,9 +77,12 @@ final class VoiceChangeHTTP: URLProtocol {
         lock.lock(); defer { lock.unlock() }
         requests = []; uploads = []
         voices = [voiceID: voice(voiceID, name: "Sky", languages: ["zh", "en"])]
-        libraryFailure = nil; quoteFailure = nil; submitNetworkFailure = false; holdJob = false; released = true; jobFails = false
+        libraryFailure = nil; quoteFailure = nil; submitNetworkFailure = false; submitRefusal = nil; originalJobs = [:]; holdJob = false
+        originalJobErrors = [:]; pollRefusal = nil; unbilled = false
+        released = true; jobFails = false
         voiceExtraSeconds = 0.02; backgroundSeconds = nil; sourceSeconds = 4.0; charged = 7.5
         separationFails = false; quoteIgnoresSkip = false; omitBackground = false; jobDirect = false
+        fileDrops = 0; expireVoiceFile = false; voiceRenamed = false; holdFiles = false; holdNext = [:]; billUnderReview = false
     }
 
     static var log: [(method: String, path: String, body: JSONValue)] { lock.lock(); defer { lock.unlock() }; return requests }
@@ -83,6 +111,9 @@ final class VoiceChangeHTTP: URLProtocol {
         let body = (try? JSONValue.decode(data)) ?? .null
         Self.lock.lock()
         Self.requests.append((method, path, body))
+        if Self.holdFiles, path.contains("/files/") { Self.lock.unlock(); return }   // no answer until the task is cancelled
+        let file = (path as NSString).lastPathComponent
+        if path.contains("/files/"), let left = Self.holdNext[file], left > 0 { Self.holdNext[file] = left - 1; Self.lock.unlock(); return }
         let answer = Self.answer(method, path, body, data)
         Self.lock.unlock()
         guard let (status, value, bytes) = answer else {
@@ -118,7 +149,11 @@ final class VoiceChangeHTTP: URLProtocol {
     // 调用时已经拿着锁。nil = 断网。
     private static func answer(_ method: String, _ path: String, _ body: JSONValue, _ data: Data) -> (Int, JSONValue, Data?)? {
         if path.hasSuffix("/models") { return (200, VoiceRecoveryHTTP.catalog, nil) }
-        if path.hasSuffix("/files/voice.wav") { return (200, [:], wave(seconds: sourceSeconds + voiceExtraSeconds)) }
+        if path.contains("/files/"), fileDrops > 0 { fileDrops -= 1; return nil }
+        if path.hasSuffix("/files/voice.wav"), expireVoiceFile { expireVoiceFile = false; voiceRenamed = true; return (403, [:], Data("expired".utf8)) }
+        if path.hasSuffix("/files/voice.wav") || path.hasSuffix("/files/voice-fresh.wav") {
+            return (200, [:], wave(seconds: sourceSeconds + voiceExtraSeconds))
+        }
         if path.hasSuffix("/files/background.wav") { return (200, [:], wave(seconds: backgroundSeconds ?? sourceSeconds)) }
         if path.hasPrefix("/put/") { uploads.append(data); return (200, [:], Data()) }
         if path.hasSuffix("/uploads") {
@@ -140,11 +175,19 @@ final class VoiceChangeHTTP: URLProtocol {
         }
         if path.hasSuffix("/jobs"), method == "POST" {
             if submitNetworkFailure { return nil }
+            if let (status, value) = submitRefusal { return (status, value, nil) }
             jobDirect = body["params"]?["skip_separation"]?.boolValue == true
             if holdJob { return (200, ["job_id": "convert-1", "kind": "voice_convert", "status": "queued", "queue_position": 1, "poll_after_seconds": 2], nil) }
             return (200, finished(), nil)
         }
+        if method == "GET", let range = path.range(of: "/jobs/"), let (status, value) = originalJobErrors[String(path[range.upperBound...])] {
+            return (status, value, nil)
+        }
+        if method == "GET", let range = path.range(of: "/jobs/"), let answer = originalJobs[String(path[range.upperBound...])] {
+            return (200, answer, nil)
+        }
         if path.hasSuffix("/jobs/convert-1"), method == "GET" {
+            if let (status, value) = pollRefusal { return (status, value, nil) }
             if !released { return (200, ["job_id": "convert-1", "kind": "voice_convert", "status": "running", "poll_after_seconds": 2], nil) }
             return (200, finished(), nil)
         }
@@ -174,13 +217,17 @@ final class VoiceChangeHTTP: URLProtocol {
         }
         let charge = jobDirect ? 5 : charged
         var result: [String: JSONValue] = [
-            "voice_url": "http://127.0.0.1/files/voice.wav", "content_type": "audio/wav", "sample_rate": 44_100, "channels": 1,
+            "voice_url": .string("http://127.0.0.1/files/\(voiceRenamed ? "voice-fresh" : "voice").wav"), "content_type": "audio/wav",
+            "sample_rate": 44_100, "channels": 1,
             "duration": .number(sourceSeconds + voiceExtraSeconds), "source_duration": .number(sourceSeconds),
             "padded_seconds": 0, "model": "chatterbox-hd", "fallback_used": false, "skip_separation": .bool(jobDirect)
         ]
         if !jobDirect && !omitBackground { result["background_url"] = "http://127.0.0.1/files/background.wav" }
-        return ["job_id": "convert-1", "kind": "voice_convert", "status": "done", "credits_charged": .number(charge),
-                "billing": ["status": "charged", "credits_charged": .number(charge)], "result": .object(result)]
+        let bill: JSONValue = unbilled ? ["status": "pending_review"]
+            : billUnderReview ? ["status": "pending_review", "review_required": true, "credits_charged": .number(charge)]
+            : ["status": "charged", "credits_charged": .number(charge)]
+        return ["job_id": "convert-1", "kind": "voice_convert", "status": "done", "credits_charged": .number(unbilled ? 0 : charge),
+                "billing": bill, "result": .object(result)]
     }
 }
 
@@ -208,7 +255,12 @@ final class VoiceChangeFixture {
         UserDefaults.standard.removeObject(forKey: VoiceChangeActivity.lastVoiceKey)
     }
 
-    var api: SkyStudioAPI { SkyStudioAPI(session: VoiceChangeHTTP.session, base: URL(string: "http://127.0.0.1/api/skycut/v1")!, machine: nil) }
+    /// Downloads wait 10 ms between tries instead of 1 s and 2 s (VoiceChangeDownloadChecks).
+    var api: SkyStudioAPI {
+        var downloads = SkyStudioDownloadRetry()
+        downloads.pauses = [0.01]
+        return SkyStudioAPI(session: VoiceChangeHTTP.session, base: URL(string: "http://127.0.0.1/api/skycut/v1")!, machine: nil, downloadRetry: downloads)
+    }
 
     var services: VoiceChangeServices {
         var services = VoiceChangeServices()

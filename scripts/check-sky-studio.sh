@@ -47,6 +47,20 @@
 #      The debug-only hook SRTFLOW_TEST_UPLOAD_DROPS (CloudUploadFault): scripts/debug-hook-probe.sh passes this build without DEBUG
 #      and refuses the debug build (the control); the hook's own checks (checks/UploadFault/main.swift) run in a second binary built
 #      with -D DEBUG.
+#      Downloads of paid results (2026-11-24; DownloadRetryChecks and DownloadEdgeChecks, the same server): every GET asks for
+#      identity bytes; a GET cut mid-body is resumed (Range; never an encoded answer) or started again, three GETs in all, then
+#      `download_network`; only the whole result is kept (a short or encoded 206, an empty 200: `download_incomplete`), and only one
+#      checked against its length replaces a file already there (an encoded 200 does not); a 403 / 404 / 410, or an answer whose status
+#      was held back, asks once for a fresh address, never the same GET again; another answer and a TLS failure end it; a stop says
+#      the GETs it sent. HeldDownloadChecks: a request's key is part of what it is bound to, and only its own job is downloaded again.
+#      The debug-only hook SRTFLOW_TEST_DOWNLOAD_DROPS (CloudDownloadFault) is refused by the same probe; its checks
+#      (checks/UploadFault/DownloadFaultChecks.swift) run in the -D DEBUG binary.
+#  14. SkyCut's own daily credit limit stopping a request (2026-11-24, MSG1; DailyLimitChecks): the AI's result names the limit,
+#      gives the numbers, the reset and three options (the exact set_settings call with a friendly suggested value, which still
+#      asks the user; the settings path read from every real string table; waiting); the panels' line in every language.
+#      Its twin, Sky Studio's balance refusal (BalanceRefusalChecks): the account, not SkyCut's limit; the numbers; where to add credits.
+#      Tokens and settlements (Codex CXM3): a raise's token void after any change of the limit, checked before anything is written
+#      (LimitTokenChecks); a settlement on the booking's day key, in one ledger write, a keyless one only on a proven day (SettleChecks).
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写只有一份 KeychainSecret，真钥匙串在 scripts/check-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -91,6 +105,8 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioUploadRetry.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioUploadFailure.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioDownloadRetry.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioDownloadFailure.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioContent.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCards.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCardWords.swift \
@@ -149,10 +165,19 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioImageOperation.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioImageResult.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGenerationRequests.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioHeldDownloads.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGenerationFrame.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioSpend.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioApproval.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobGate.swift \
+  Sources/SrtFlow/SkyStudio/SkyCutDailyLimit.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioBalanceRefusal.swift \
+  Sources/SrtFlow/SettingsCategory.swift \
+  Sources/SrtFlow/AppLanguage.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
+  Sources/SrtFlow/PerfCounters.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioHeldCredits.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceBatch.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoicePlan.swift \
@@ -195,6 +220,9 @@ xcrun swiftc \
   Sources/SrtFlow/CloudMedia/DailySpend.swift \
   Sources/SrtFlow/CloudMedia/CloudTransfer.swift \
   Sources/SrtFlow/CloudMedia/CloudUploadFault.swift \
+  Sources/SrtFlow/CloudMedia/CloudDownloadFault.swift \
+  Sources/SrtFlow/CloudMedia/CloudResultDownload.swift \
+  Sources/SrtFlow/CloudMedia/CloudResultPlace.swift \
   Sources/SrtFlow/CloudMedia/CloudJobPhase.swift \
   checks/Shared/ScratchDefaults.swift \
   checks/SkyStudio/main.swift \
@@ -217,6 +245,9 @@ xcrun swiftc \
   checks/SkyStudio/UploadServer.swift \
   checks/SkyStudio/UploadRetryChecks.swift \
   checks/SkyStudio/UploadAnswerChecks.swift \
+  checks/SkyStudio/DownloadRetryChecks.swift \
+  checks/SkyStudio/DownloadEdgeChecks.swift \
+  checks/SkyStudio/HeldDownloadChecks.swift \
   checks/SkyStudio/FilmChecks.swift \
   checks/SkyStudio/OfficialQuoteChecks.swift \
   checks/SkyStudio/OfficialReceiptChecks.swift \
@@ -227,6 +258,10 @@ xcrun swiftc \
   checks/SkyStudio/SpendChecks.swift \
   checks/SkyStudio/ApprovalChecks.swift \
   checks/SkyStudio/AccessChecks.swift \
+  checks/SkyStudio/DailyLimitChecks.swift \
+  checks/SkyStudio/BalanceRefusalChecks.swift \
+  checks/SkyStudio/LimitTokenChecks.swift \
+  checks/SkyStudio/SettleChecks.swift \
   checks/SkyStudio/VoiceChecks.swift \
   checks/SkyStudio/VoiceTimingChecks.swift \
   checks/SkyStudio/VoiceSplitChecks.swift \
@@ -283,9 +318,15 @@ xcrun swiftc \
   Sources/SrtFlow/AIToolIO.swift \
   Sources/SrtFlow/CloudMedia/CloudTransfer.swift \
   Sources/SrtFlow/CloudMedia/CloudUploadFault.swift \
+  Sources/SrtFlow/CloudMedia/CloudDownloadFault.swift \
+  Sources/SrtFlow/CloudMedia/CloudResultDownload.swift \
+  Sources/SrtFlow/CloudMedia/CloudResultPlace.swift \
+  Sources/SrtFlow/MediaReadQueue.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioUploadRetry.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioUploadFailure.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioDownloadRetry.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioDownloadFailure.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioBilling.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCharacterAPI.swift \
@@ -308,14 +349,22 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceResults.swift \
   checks/SkyStudio/Harness.swift \
   checks/SkyStudio/UploadServer.swift \
+  checks/UploadFault/DownloadFaultChecks.swift \
   checks/UploadFault/main.swift \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 # The control: the probe refuses the debug build, which carries the hook, so its pass above means something (a probe that no longer
 # refuses, say without its exit 1, turns red here).
-if /bin/bash scripts/debug-hook-probe.sh "$DEBUG_OUT" > /dev/null 2>&1; then
-  echo "✗ scripts/debug-hook-probe.sh passed the debug build, which carries the upload hook: the release check would be blind" >&2
+if PROBE_OUT="$(/bin/bash scripts/debug-hook-probe.sh "$DEBUG_OUT" 2>&1)"; then
+  echo "✗ scripts/debug-hook-probe.sh passed the debug build, which carries the upload and download hooks: the release check would be blind" >&2
   exit 1
 fi
+# Each hook must be named by the refusal on its own, so the probe cannot lose one of them unseen.
+for HOOK in SRTFLOW_TEST_UPLOAD_DROPS SRTFLOW_TEST_DOWNLOAD_DROPS; do
+  case "${PROBE_OUT}" in
+    *"${HOOK}"*) ;;
+    *) printf '✗ scripts/debug-hook-probe.sh refused the debug build without naming %s:\n%s\n' "${HOOK}" "${PROBE_OUT}" >&2; exit 1 ;;
+  esac
+done
 echo "==> 跑上传断线钩子的自检"
 "$DEBUG_OUT"

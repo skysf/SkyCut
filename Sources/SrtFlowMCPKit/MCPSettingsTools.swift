@@ -21,7 +21,7 @@ enum MCPSettingsTools {
             return MCPToolDefinition(
                 .setSettings, title: "Change SkyCut settings",
                 description: """
-                Change preferences only when the user asks; all fields validate before any write. Permission-mode changes or a raised credit limit always need needs_confirmation, even in full_access: repeat with confirm_token after approval. Keys stay in Settings; no project edit.
+                Change preferences only when the user asks; all fields validate before any write. Permission-mode changes or a raised credit limit need the user's yes and a confirm_token, even in full_access: from needs_confirmation, or from a daily-limit refusal's first option for exactly that value from the same limit. Keys stay in Settings; no project edit.
                 """,
                 input: MCPSchema.object([
                     "language": MCPSchema.string("Interface language.", oneOf: ["system", "en", "zh-Hans", "es"]),
@@ -31,7 +31,7 @@ enum MCPSettingsTools {
                         "description": "Cache limit in decimal GB, matching the Settings picker."
                     ],
                     "clear_optimized_media_cache": MCPSchema.boolean("true clears regenerable preview media; false does nothing."),
-                    "daily_ai_credit_limit": MCPSchema.integer("Hard daily AI budget in credits; 0 blocks paid tasks; raising it asks first.", minimum: 0, maximum: 1_000_000),
+                    "daily_ai_credit_limit": MCPSchema.integer("Hard daily AI budget in credits; 0 blocks paid tasks; a raise needs the user's yes (confirm_token).", minimum: 0, maximum: 1_000_000),
                     "ai_access_mode": MCPSchema.string("App-wide permission mode; every change needs the user's yes and confirm_token.", oneOf: ["ask_for_approval", "full_access"]),
                     "confirm_token": MCPSchema.confirmToken
                 ])

@@ -12,13 +12,13 @@ struct SkyStudioVoiceBudget {
     private(set) var charged: Double = 0
     private(set) var uncertain: Double = 0
 
-    static func reserve(_ credits: [Double], store: SkyStudioSpendStore? = nil) -> SkyStudioVoiceBudget? {
+    static func reserve(_ credits: [Double], store: SkyStudioSpendStore? = nil, now: Date = Date()) -> SkyStudioVoiceBudget? {
         let store = store ?? SkyStudioSpendStore.shared
         let total = credits.reduce(0, +)
         guard !credits.isEmpty, credits.allSatisfy({ $0.isFinite && $0 >= 0 }),
-              let reservation = SkyStudioJobGate.reserveWithoutAsking(credits: total, store: store) else { return nil }
+              let reservation = SkyStudioJobGate.reserveWithoutAsking(credits: total, store: store, now: now) else { return nil }
         return SkyStudioVoiceBudget(held: credits.map {
-            SkyStudioHeldCredits(.init(credits: $0, day: reservation.day), store: store)
+            SkyStudioHeldCredits(.init(credits: $0, day: reservation.day, dayKey: reservation.dayKey), store: store)
         }, credits: credits)
     }
 

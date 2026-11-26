@@ -69,12 +69,16 @@ struct VoiceChangePanel: View {
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // Over the limit: which limit, the numbers and where to change it (MSG1), in place of the spent line.
+            if overLimit, let quote = model.quote { DailyCreditLimitNote(needed: quote.credits, spend: spend) }
             Divider()
             HStack(alignment: .center, spacing: 12) {
-                Text(String(format: L10n("Spent today %@ of your %@-credit daily limit"), SkyStudioCredits.text(spend.spentToday()), SkyStudioCredits.text(spend.dailyLimit)))
-                    .font(.caption)
-                    .foregroundStyle(overLimit ? .red : .secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if !overLimit {
+                    Text(String(format: L10n("Spent today %@ of your %@-credit daily limit"), SkyStudioCredits.text(spend.spentToday()), SkyStudioCredits.text(spend.dailyLimit)))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Spacer(minLength: 8)
                 // 两个按钮不许被压缩（带价的那个最长）：左边那一句让它折行。
                 Button("Cancel") { dismiss() }

@@ -6,6 +6,8 @@
 #   1. `beginActivity` / `endActivity` 只在 AIKeepAwake 和录屏（录屏另有一份）；
 #   2. `AIKeepAwake.shared.hold()` 只在两处领：AIToolRouter.handle（下一行就是 `defer { awake.release() }`）和 AIJobs.start；
 #   3. AIJobs 的那一份在 finish 里还（只认第一次 finish 的那一支），start 只领一次。
+#   4. (2026-11-24) AIJobs.reopen (a paid result downloaded again under the same job id) takes one more, only for a finished job,
+#      and finish returns it like start's.
 # 计数、只开一次只关一次、重复还不多还、兜底还、真的工具调用和任务都还回来：scripts/check-voice-recovery.sh 的 KeepAwakeChecks。
 #
 # 用法：checks/ai-keep-awake.sh
@@ -42,7 +44,10 @@ AFTER_HOLD="$(awk 'found { print; exit } /let awake = AIKeepAwake\.shared\.hold\
 START="$(awk '/    func start\(/,/^    \}/' "${JOBS}")"
 FINISH="$(awk '/    func finish\(_ job: Job/,/^    \}/' "${JOBS}")"
 [ "$(grep -c 'job.awake = AIKeepAwake.shared.hold()' <<<"${START}" || true)" -eq 1 ] || fail "${JOBS}：start 起新任务时领一份（job.awake = AIKeepAwake.shared.hold()）"
-[ "$(grep -c 'AIKeepAwake.shared.hold()' "${JOBS}" || true)" -eq 1 ] || fail "${JOBS}：只在 start 领一份"
+REOPEN="$(awk '/    func reopen\(_ job: Job\)/,/^    \}/' "${JOBS}")"
+grep -q 'guard job.status != .running else { return }' <<<"${REOPEN}" && [ "$(grep -c 'job.awake = AIKeepAwake.shared.hold()' <<<"${REOPEN}" || true)" -eq 1 ] \
+  || fail "${JOBS}: reopen takes one lease (job.awake = AIKeepAwake.shared.hold()), and only for a job that is no longer running"
+[ "$(grep -c 'AIKeepAwake.shared.hold()' "${JOBS}" || true)" -eq 2 ] || fail "${JOBS}：只在 start 和 reopen 各领一份 (only start and reopen take a lease)"
 grep -q 'guard job.status == .running else { return }' <<<"${FINISH}" && grep -q 'job.awake?.release()' <<<"${FINISH}" \
   || fail "${JOBS}：finish（只认第一次）还那一份（job.awake?.release()）"
 

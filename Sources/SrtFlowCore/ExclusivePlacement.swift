@@ -14,6 +14,8 @@ import Foundation
 // A long write that must not go into the finished name itself (a Compress / Burn In encode) goes into a scratch file of the
 // caller's own, hidden next to the target (`scratch`); it is placed when it is finished, and when it fails or is cancelled
 // only that file is removed (`discard`: only while it is still the file the caller created).
+// `placeOwned` also says which file took the name (device and inode), so a caller can later remove it with `discard` only while it is
+// still that file (a paid download that a cancel or a failure gives up: docs/bugfixes/2026-11-24-download-lost-connection-no-retry.md).
 // What it doesn't: picking the first name from the folder's listing and other exports' reservations (the callers, with
 // ExportFileName.unoccupiedNumber); replacing a file the user said to replace (ExportDelivery's `.replacing`,
 // SubtitleExportPlanner.writeValidated(_:format:to:)).
@@ -96,7 +98,7 @@ public enum ExclusivePlacement {
         guard let placed = try install(made, names: names, numbers: first..<(first + attempts)) else {
             throw exhausted(names(first).first)
         }
-        return placed
+        return (placed.number, placed.urls)
     }
 
     /// Puts the finished `file` into `folder` under name `number` of the series (`ExportFileName.numbered`), or the next one
@@ -106,18 +108,28 @@ public enum ExclusivePlacement {
     public static func place(
         _ file: URL, in folder: URL, stem: String, pathExtension: String, from number: Int, copying: Bool? = nil
     ) throws -> URL {
+        try placeOwned(file, in: folder, stem: stem, pathExtension: pathExtension, from: number, copying: copying).url
+    }
+
+    /// `place`, saying which file is at the name now (its device and inode): the caller's own, to be removed with `discard` only
+    /// while it is still that file. A name taken by anything (a file, a folder, a link) is never touched: the series moves on.
+    public static func placeOwned(
+        _ file: URL, in folder: URL, stem: String, pathExtension: String, from number: Int, copying: Bool? = nil
+    ) throws -> Claim {
         let names = { [ExportFileName.numbered($0, in: folder, stem: stem, pathExtension: pathExtension)] }
         let numbers = max(1, number)..<(max(1, number) + attempts)
         let copies = try copying ?? (device(of: file) != device(of: folder))
         if !copies {
             guard let placed = try install([own(file)], names: names, numbers: numbers) else { throw exhausted(names(numbers.lowerBound).first) }
-            return placed.urls[0]
+            return placed.claims[0]
         }
         guard ExclusiveInstall.takesNamesWithoutCopying(in: folder) else {
             // A drive that can only make a name by creating it (exFAT): one copy, straight into a file made with O_EXCL.
             for candidate in numbers {
                 let url = names(candidate)[0]
-                if try ExclusiveInstall.copyExclusively(from: file, to: url) != nil { return url }
+                if let made = try ExclusiveInstall.copyExclusively(from: file, to: url) {
+                    return Claim(url: url, device: made.device, inode: made.inode)
+                }
             }
             throw exhausted(names(numbers.lowerBound).first)
         }
@@ -125,7 +137,7 @@ public enum ExclusivePlacement {
         let made = try stage(names(numbers.lowerBound)) { _, path in try FileManager.default.copyItem(at: file, to: path) }
         defer { made.forEach(discard) }
         guard let placed = try install(made, names: names, numbers: numbers) else { throw exhausted(names(numbers.lowerBound).first) }
-        return placed.urls[0]
+        return placed.claims[0]
     }
 
     // MARK: - Steps
@@ -152,10 +164,11 @@ public enum ExclusivePlacement {
     }
 
     /// The files take the names of the first number in `numbers` whose names are all free at that moment; a set that
-    /// meets a taken name gives back the names it already took. nil = every number was taken.
+    /// meets a taken name gives back the names it already took. nil = every number was taken. `claims`: which file is at each
+    /// name now.
     private static func install(
         _ made: [Claim], names: (Int) -> [URL], numbers: some Sequence<Int>
-    ) throws -> (number: Int, urls: [URL])? {
+    ) throws -> (number: Int, urls: [URL], claims: [Claim])? {
         for candidate in numbers {
             let urls = names(candidate)
             var taken: [ExclusiveInstall.Installed] = []
@@ -174,7 +187,7 @@ public enum ExclusivePlacement {
                 continue
             }
             taken.forEach(ExclusiveInstall.finish)
-            return (candidate, urls)
+            return (candidate, urls, taken.map { Claim(url: $0.url, device: $0.device, inode: $0.inode) })
         }
         return nil
     }

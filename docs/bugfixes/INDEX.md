@@ -72,10 +72,12 @@
 - [2026-09-23 滤镜卡片、音频库素材拖不进时间线（类型没声明）](2026-09-23-custom-drag-types-not-declared.md) — 自定义拖放类型必须在 Info.plist 声明。
 - [2026-10-18 listen cuts=true 说可以不改，cut_speech 却说切在字上](2026-10-18-cut-check-disagrees-with-cut-speech.md) — 检查类工具说「X 会怎么做」就用 X 的输入、读 X 的决定（`AISpeechHearing`）。
 - [2026-10-14 cut_speech 把量好的静音切口挪进词里](2026-10-14-cut-speech-trusts-word-times.md) — 为一个用途调过偏的数据不能当另一个用途的真相；改了调用方的值要说出来。
+- [2026-11-24 A request stopped by SkyCut's daily limit read like an empty Sky Studio balance](2026-11-24-daily-limit-refusal-unclear.md) — A refusal names the system that stopped it, the numbers and what the user can do, with the exact call when the AI can help; offer only ways that work; a check, its booking and its refund read the clock once.
 - [2026-11-11 设计声音的报价说不出用哪个模型](2026-11-11-design-quote-model-name.md) — 假服务要照真回答的形状造（`model` 在 `voice_plan.selection` 里）。
 - [2026-11-11 设计声音连按下了好几单](2026-11-11-design-voice-ordered-twice.md) — 会花钱的按钮按下去就锁，同一件事只开一单。
 - [2026-11-17 Detached camera audio was treated as an added sound](2026-11-17-detached-audio-listening-provenance.md) — Retained picture metadata identifies camera sound after detachment; moving it to an audio track does not make it an added layer.
 - [2026-11-17 A docs-only merge cancels the only run checking an earlier code merge](2026-11-17-docs-only-main-cancels-unverified-code.md) — A replacement main run must check inherited code too; a docs-only PR marker proves only scans passed.
+- [2026-11-24 A paid result whose download lost its connection was never saved, and trying again meant paying again](2026-11-24-download-lost-connection-no-retry.md) — After payment, retry what a second GET can fix, keep only whole results, delete only your own files, and keep the result for its job's Download again; never submit again or hand an old result to a new request.
 - [2026-09-25 拖块 / 拉框每一拍整条时间线重算](2026-09-25-drag-session-in-timeline-state.md) — 拖动会话不进时间线的 `@State`：`TimelineDragBox` 持有不订阅。
 - [2026-11-19 Web-motion recovery and Compress / Burn In still asked the drive on the main thread](2026-11-19-drive-checks-on-main-thread.md) — When one call site of a class moves off the main thread, sweep its siblings; a check that runs on every rebuild is a hot path for drive latency.
 - [2026-11-19 E2E deadlines, fixture isolation, and test bundle cleanup](2026-11-19-e2e-harness-hardening.md) — Give real work its production budget, keep fixture state scratch-only, review golden candidates, and unregister bundles on exit.

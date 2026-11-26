@@ -1368,7 +1368,19 @@
 
 "AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it." = "La IA se pausa al alcanzar este presupuesto diario. Auméntalo en Ajustes para continuar; ningún modo de permisos lo omite.";
 
-"Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue." = "Se alcanzó el presupuesto diario de IA. Auméntalo en Ajustes > Sky Studio para continuar.";
+"SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@. Raise it in %5$@, or wait until %6$@, when it resets." = "Lo detiene el límite diario de créditos de SkyCut, no tu saldo de Sky Studio: hoy llevas %1$@ de %2$@ créditos, quedan %3$@ y esto necesita %4$@. Súbelo en %5$@ o espera a las %6$@, cuando se reinicia.";
+
+"SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, %3$@ left, and this needs %4$@, more than a whole day allows, so waiting does not help. Raise it in %5$@." = "Lo detiene el límite diario de créditos de SkyCut, no tu saldo de Sky Studio: hoy llevas %1$@ de %2$@ créditos, quedan %3$@ y esto necesita %4$@, más de lo que permite un día entero, así que esperar no sirve. Súbelo en %5$@.";
+
+"Change Limit…" = "Cambiar límite…";
+
+"Change SkyCut's daily limit for AI here; it is the same setting as in Settings" = "Cambia aquí el límite diario de SkyCut para la IA; es el mismo ajuste que en Ajustes";
+
+"The same setting as in %@." = "Es el mismo ajuste que en %@.";
+
+"Not enough Sky Studio credits: your balance is %1$@ and this needs %2$@. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %3$@." = "No hay suficientes créditos de Sky Studio: tu saldo es %1$@ y esto necesita %2$@. Es tu saldo de Sky Studio, no el límite diario de SkyCut. Añade créditos en %3$@.";
+
+"Not enough Sky Studio credits. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %@." = "No hay suficientes créditos de Sky Studio. Es tu saldo de Sky Studio, no el límite diario de SkyCut. Añade créditos en %@.";
 
 "Theme" = "Tema";
 
@@ -1565,6 +1577,15 @@
 "Sky Studio's storage answered the upload of “%@”, but the answer did not come through. Nothing was charged. Try again later." = "El almacenamiento de Sky Studio respondió a la subida de «%@», pero la respuesta no llegó. No se cobró nada. Inténtalo de nuevo más tarde.";
 "Sky Studio did not accept the upload of “%@”. Nothing was charged. Try again later." = "Sky Studio no aceptó la subida de «%@». No se cobró nada. Inténtalo de nuevo más tarde.";
 "“%@” is too large for Sky Studio. Nothing was charged. Use a smaller file." = "«%@» es demasiado grande para Sky Studio. No se cobró nada. Usa un archivo más pequeño.";
+"The result is ready on Sky Studio, but its download was interrupted by the network after %d tries. Nothing more was charged. To get the same result, use Download again on this task in the generation task list." = "El resultado está listo en Sky Studio, pero la red interrumpió su descarga tras %d intentos. No se cobró nada más. Para obtener el mismo resultado, usa «Descargar de nuevo» en esta tarea de la lista de tareas de generación.";
+"The result is ready on Sky Studio, but its download was interrupted by the network. Nothing more was charged. To get the same result, use Download again on this task in the generation task list." = "El resultado está listo en Sky Studio, pero la red interrumpió su descarga. No se cobró nada más. Para obtener el mismo resultado, usa «Descargar de nuevo» en esta tarea de la lista de tareas de generación.";
+"The result is ready on Sky Studio, but what came down was not the whole file. Nothing more was charged. To get the same result, use Download again on this task in the generation task list." = "El resultado está listo en Sky Studio, pero lo que se descargó no era el archivo completo. No se cobró nada más. Para obtener el mismo resultado, usa «Descargar de nuevo» en esta tarea de la lista de tareas de generación.";
+"The result is ready on Sky Studio, but its download could not connect. Nothing more was charged. Check your network connection, then use Download again on this task in the generation task list." = "El resultado está listo en Sky Studio, pero su descarga no pudo conectarse. No se cobró nada más. Revisa tu conexión de red y luego usa «Descargar de nuevo» en esta tarea de la lista de tareas de generación.";
+"The result is ready on Sky Studio, but its storage refused the download (HTTP %d). Nothing more was charged. To try the same result again, use Download again on this task in the generation task list." = "El resultado está listo en Sky Studio, pero su almacenamiento rechazó la descarga (HTTP %d). No se cobró nada más. Para volver a intentar el mismo resultado, usa «Descargar de nuevo» en esta tarea de la lista de tareas de generación.";
+"The result is ready on Sky Studio, but its download was stopped. Nothing more was charged. To get the same result, use Download again on this task in the generation task list." = "El resultado está listo en Sky Studio, pero su descarga se detuvo. No se cobró nada más. Para obtener el mismo resultado, usa «Descargar de nuevo» en esta tarea de la lista de tareas de generación.";
+"The result is ready on Sky Studio, but SkyCut could not save it on this Mac. Nothing more was charged. Free some disk space or check the output folder, then use Download again on this task in the generation task list." = "El resultado está listo en Sky Studio, pero SkyCut no pudo guardarlo en este Mac. No se cobró nada más. Libera espacio en el disco o revisa la carpeta de salida y luego usa «Descargar de nuevo» en esta tarea de la lista de tareas de generación.";
+"Download again" = "Descargar de nuevo";
+"Download the finished result again; nothing more is charged" = "Descarga de nuevo el resultado terminado; no se cobra nada más";
 "This clip has no sound to change." = "Este clip no tiene sonido que cambiar.";
 "This clip is muted. Unmute it first, then change its voice." = "Este clip está silenciado. Quita el silencio primero y luego cambia la voz.";
 "This clip uses %1$@ of its source; a voice change takes at most %2$@ at a time. Split the clip first, then change each part." = "Este clip usa %1$@ de su original; un cambio de voz admite como máximo %2$@ cada vez. Divide el clip primero y cambia cada parte.";

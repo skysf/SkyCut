@@ -10,7 +10,8 @@ import SrtFlowMCPKit
 // `/jobs/{id}`、`/jobs/{id}/cancel`，和把成品下载下来（第 6 刀）。传文件流着发 / 收、带字节进度，借 fal 那边的传输代理（CloudTransferDelegate，
 // 第 7 刀删 fal 时改名留下）；**Key 只发给 Sky Studio**，上传的签名地址和成品地址都不带它。
 // An upload's PUT that the network breaks is tried again, up to three tries; an answer the storage gave stands (SkyStudioUploadRetry;
-// 2026-11-23).
+// 2026-11-23). A paid result's download the network breaks is resumed or tried again, up to three GETs; an expired address is renewed
+// once from the original job (CloudResultDownload, SkyStudioDownloadRetry; 2026-11-24).
 // 声音库的 `/voices`、`/voices/consent-grant` 在 SkyStudioVoiceAPI（用这里的 request / send）。
 // Content for SkyCut (`/content`, `/content/styles/{id}`) is in SkyStudioContentAPI (request + conditionalGet, uncachedSession).
 // 不管什么：Key 存哪（SkyStudioKey）、回答还算不算数（SkyCutLicense）、什么时候问（SkyStudioAccount）、等一个任务做完（SkyStudioJobRun）。
@@ -31,16 +32,20 @@ struct SkyStudioAPI: Sendable {
     let machine: String?
     /// How a PUT the network breaks is tried again (`upload`; checks shorten the pauses).
     let uploadRetry: SkyStudioUploadRetry
+    /// How a result's GET the network breaks is resumed or tried again (`download`; checks shorten the pauses).
+    let downloadRetry: SkyStudioDownloadRetry
 
     init(
         session: URLSession = .shared, base: URL = SkyStudioAPI.configuredBase(ProcessInfo.processInfo.environment),
-        version: String = SkyStudioAPI.appVersion, machine: String? = SkyStudioMachine.current, uploadRetry: SkyStudioUploadRetry = .standard
+        version: String = SkyStudioAPI.appVersion, machine: String? = SkyStudioMachine.current, uploadRetry: SkyStudioUploadRetry = .standard,
+        downloadRetry: SkyStudioDownloadRetry = .standard
     ) {
         self.session = session
         self.base = base
         self.version = version
         self.machine = machine
         self.uploadRetry = uploadRetry
+        self.downloadRetry = downloadRetry
     }
 
     /// 显示用的完整构建版本；请求头在 `request` 边界只取数字三段，不改包里的来源标记。
@@ -251,30 +256,20 @@ struct SkyStudioAPI: Sendable {
         guard (200..<300).contains(status) else { throw SkyStudioUploadRetry.Refused(status: status) }
     }
 
-    /// 把成品下载到 `destination`（先下到它旁边的临时文件再挪过去，下到一半断了不留半个文件）。成品地址不带 Key。
+    /// 把成品下载到 `place`（先下到它旁边的私有临时文件，完整了才放上去，下到一半断了不留半个文件）。成品地址不带 Key。
     /// `onProgress`：收到的字节比例（服务器说了总长才有），做完一定报 1。
-    func download(_ url: URL, to destination: URL, onProgress: @escaping @Sendable (Double) -> Void = { _ in }) async throws {
-        let partial = destination.deletingLastPathComponent()
-            .appendingPathComponent(".\(destination.lastPathComponent).part-\(UUID().uuidString.prefix(8))")
-        defer { try? FileManager.default.removeItem(at: partial) }
-        let delegate = CloudTransferDelegate(moveDestination: partial, onProgress: onProgress)
-        var get = URLRequest(url: url)
-        get.timeoutInterval = 600
-        let task = session.downloadTask(with: get)
-        try await transfer(task, delegate: delegate)
-        let status = (task.response as? HTTPURLResponse)?.statusCode ?? 0
-        guard (200..<300).contains(status) else { throw SkyStudioFailure.badAnswer(status: status) }
-        guard let file = delegate.downloadedFile,
-              let size = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.size] as? Int, size > 0 else {
-            throw SkyStudioFailure.network("the download did not produce a file")
-        }
-        do {
-            try? FileManager.default.removeItem(at: destination)
-            try FileManager.default.moveItem(at: file, to: destination)
-        } catch {
-            throw SkyStudioFailure.network(error.localizedDescription)
-        }
-        onProgress(1)
+    /// Every paid result comes down here (CloudResultDownload does the GETs): a GET the network breaks is resumed or started again,
+    /// `downloadRetry.attempts` GETs in all, redirects included; only the whole result that passes `check` (the flow's own check of
+    /// the private file, which may correct the extension) is kept, and it takes its name without replacing or removing anything (the
+    /// next free number when the name is taken: CloudResultPlace); a 403 / 404 / 410, or an answer whose status never came through,
+    /// asks `renew` (the original job's GET; nothing is ever submitted) once for the current address. Giving up, or a stop, is
+    /// `SkyStudioDownloadFailure`: nothing more was charged, and the flow keeps this job's result for its Download again. Returns
+    /// the file it became (the caller's own while it is still that file) and the GETs sent.
+    func download(
+        _ url: URL, into place: CloudResultPlace, renew: (@Sendable () async throws -> URL?)? = nil,
+        check: (@Sendable (URL) async throws -> String?)? = nil, onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> CloudResultFile {
+        try await CloudResultDownload(session: session, retry: downloadRetry).run(url, into: place, check: check, renew: renew, onProgress: onProgress)
     }
 
     // MARK: 发请求

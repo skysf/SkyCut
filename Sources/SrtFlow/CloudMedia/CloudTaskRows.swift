@@ -2,6 +2,7 @@ import SwiftUI
 
 // MARK: - 生成 / 配音与 upscale 的任务行适配
 // 一行只订阅自己的任务；浮层暂不放取消，关闭异常提示与比较成片仍保留在详情内。
+// A paid result whose download gave up gets Download again in the details (the same result, nothing charged; 2026-11-24).
 struct CloudGenerationTaskRow: View {
     @Environment(\.locale) private var locale
     @ObservedObject var run: SkyStudioMediaStatus
@@ -29,8 +30,14 @@ struct CloudGenerationTaskRow: View {
                 else if let progress = run.progress { CloudPhaseClock(progress: progress, prefix: "") }
             }
             if run.issue != nil {
-                Button("Dismiss") { SkyStudioGenerationActivity.shared.dismiss(run) }
-                    .instantHelp("Dismiss this task")
+                HStack {
+                    if let retry = run.retryDownload {
+                        Button("Download again") { retry() }
+                            .instantHelp("Download the finished result again; nothing more is charged")
+                    }
+                    Button("Dismiss") { SkyStudioGenerationActivity.shared.dismiss(run) }
+                        .instantHelp("Dismiss this task")
+                }
             }
         }
     }
@@ -67,7 +74,14 @@ struct CloudUpscaleTaskRow: View {
                         .instantHelp("Compare the original and upscaled video")
                     dismissButton
                 }
-            case .failed, .cancelled: dismissButton
+            case .failed, .cancelled:
+                HStack {
+                    if job.canRetryDownload {
+                        Button("Download again") { UpscaleActivity.shared.downloadAgain(job) }
+                            .instantHelp("Download the finished result again; nothing more is charged")
+                    }
+                    dismissButton
+                }
             }
         }
     }
@@ -79,7 +93,7 @@ struct CloudUpscaleTaskRow: View {
     private var issue: String? {
         switch job.state {
         case .failed(let message): return message
-        case .cancelled(let stop): return stop.localizedNote
+        case .cancelled(let stop): return job.downloadFailure.map(SkyStudioDownloadWords.shown) ?? stop.localizedNote
         case .running, .done: return nil
         }
     }

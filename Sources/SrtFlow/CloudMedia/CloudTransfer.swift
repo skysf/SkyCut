@@ -108,14 +108,28 @@ final class CloudTransferDelegate: NSObject, URLSessionDataDelegate, URLSessionD
         _ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64,
         totalBytesExpectedToWrite: Int64
     ) {
-        report(totalBytesWritten, of: totalBytesExpectedToWrite)
+        report(totalBytesWritten, of: Self.wholeLength(downloadTask) ?? totalBytesExpectedToWrite)
+    }
+
+    /// A resumed download (SkyStudioAPI.download): progress goes on from the bytes already on disk (0 when the server sent it all
+    /// again); `didWriteData` then counts from there.
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didResumeAtOffset fileOffset: Int64, expectedTotalBytes: Int64) {
+        report(fileOffset, of: Self.wholeLength(downloadTask) ?? expectedTotalBytes)
+    }
+
+    /// A resumed answer's whole length (its Content-Range total): the system counts only to the end of the range it was sent, so a
+    /// 206 that stops short would otherwise read 100% (CloudResultDownload throws such a result away).
+    private static func wholeLength(_ task: URLSessionDownloadTask) -> Int64? {
+        guard let answer = task.response as? HTTPURLResponse, answer.statusCode == 206,
+              let total = answer.value(forHTTPHeaderField: "Content-Range").flatMap(SkyStudioDownloadRetry.parseContentRange)?.total else { return nil }
+        return Int64(total)
     }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         // 这个回调一返回，系统就删 `location`：当场挪走。
         guard let destination = moveDestination else { return }
         do {
-            try? FileManager.default.removeItem(at: destination)
+            CloudResultPlace.removePrivateFile(destination)   // the download's own partial: a folder that took the name stays
             try FileManager.default.moveItem(at: location, to: destination)
             lock.lock()
             movedTo = destination

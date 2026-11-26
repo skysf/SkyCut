@@ -5,8 +5,11 @@ import SrtFlowCore
 //
 // 管什么（SkyCut 声音方案 4.8 第 5 步）：`<原名> - <声音名>.wav`（变声后的人声）、`<原名> - 背景.wav`（分离出来的背景；「背景」
 // 照界面语言写），放在原素材所在的文件夹；写不进去（只读盘、相机卡、没授权）退到工程的家、再退到下载（同 upscale，
-// UpscaleOutputName.folder）；撞名加编号（ExportFileName.unoccupied，全 App 一个规矩，不覆盖）。扩展名照服务器报的类型
+// UpscaleOutputName.folder）；撞名加编号（ExclusivePlacement，全 App 一个规矩，不覆盖）。扩展名照服务器报的类型
 // （人声是 WAV；背景不是 WAV 时服务器另报 `background_content_type`），认不出来看成品地址的扩展名，再不行按 WAV。
+// Each file takes its name on disk only when it is whole and never replaces anything (`places` → CloudResultPlace): two jobs for the
+// same clip and voice once chose the same two paths, and cancelling one deleted the other's files on the timeline (CXD3); names claimed
+// in memory then still let SkyCut and SkyCut Beta overwrite each other's file (CXD4, PR #554).
 // 不管什么：文件内容（VoiceChangeJob 下载）。
 
 enum VoiceChangeOutputName {
@@ -31,19 +34,21 @@ enum VoiceChangeOutputName {
         }
     }
 
-    /// 不撞名的两个完整路径：都放在同一个文件夹（原素材的，写不进去照 `fallbacks` 退）。
-    static func destinations(
+    /// Where one change's two files go: the folder (the original's; when that cannot be written, the fallbacks), and each file's
+    /// stem and extension. Each file takes its name only when it is whole, never replacing or removing anything: `stem.ext`, or the
+    /// next free number of that series at that moment (CloudResultPlace, on disk, so SkyCut and SkyCut Beta never share a name
+    /// either). The two never collide, not even in case only (a voice called "Background" and the background once became one file on
+    /// a case-insensitive drive): the background then numbers from 2, and the placement moves on if a name still matches.
+    static func places(
         original: URL, voiceName: String, backgroundLabel: String, voiceExtension: String, backgroundExtension: String, fallbacks: [URL],
-        isWritable: (URL) -> Bool = { FileManager.default.isWritableFile(atPath: $0.path) },
-        exists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
-    ) -> (voice: URL, background: URL) {
+        isWritable: (URL) -> Bool = { FileManager.default.isWritableFile(atPath: $0.path) }
+    ) -> (voice: CloudResultPlace, background: CloudResultPlace) {
         let folder = UpscaleOutputName.folder(original: original, fallbacks: fallbacks, isWritable: isWritable)
         let names = stems(original: original, voiceName: voiceName, backgroundLabel: backgroundLabel)
-        let voice = ExportFileName.unoccupied(in: folder, stem: names.voice, pathExtension: voiceExtension, exists: exists)
-        // 声音名正好也叫「背景」时两个文件不撞：背景那个把人声的路径也当成占着的。
-        let background = ExportFileName.unoccupied(in: folder, stem: names.background, pathExtension: backgroundExtension) {
-            exists($0) || $0 == voice
+        var background = CloudResultPlace(folder: folder, stem: names.background, pathExtension: backgroundExtension)
+        if "\(names.voice).\(voiceExtension)".caseInsensitiveCompare("\(names.background).\(backgroundExtension)") == .orderedSame {
+            background.number = 2
         }
-        return (voice, background)
+        return (CloudResultPlace(folder: folder, stem: names.voice, pathExtension: voiceExtension), background)
     }
 }

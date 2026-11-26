@@ -33,11 +33,14 @@ enum SkyStudioGenerateTool {
         if try args.string("model") == "ideogram-remove-background", !args.has("operation") { ask.operation = "remove_background" }
         if kind != .image, ask.operation != "generate" { throw AIToolError("operation=\(ask.operation) requires kind=image; upscale_clip is video-only.") }
         let idempotencyKey = try args.string("idempotency_key")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? UUID().uuidString.lowercased()
-        var arguments = args.raw.objectValue ?? [:]
-        arguments["confirm_token"] = nil
-        let requestIdentity: JSONValue = ["arguments": .object(arguments), "project": .string(String(describing: ObjectIdentifier(project))),
-            "generation": .number(Double(project.documentGeneration)), "account": .string(SkyStudioAccount.shared.stored?.me.account.id ?? "")]
-        if let cached = try SkyStudioGenerationRequests.begin(idempotencyKey, identity: requestIdentity) { return cached }
+        let requestIdentity = SkyStudioGenerationRequests.identity(arguments: args.raw, key: idempotencyKey,
+            project: String(describing: ObjectIdentifier(project)), generation: project.documentGeneration,
+            account: SkyStudioAccount.shared.stored?.me.account.id ?? "")
+        // This key's own job holds a paid result that did not come down: Download again of that result, never a new job. Without
+        // this key (or with another one) it is a new request, charged again.
+        if let cached = try SkyStudioGenerationRequests.begin(idempotencyKey, identity: requestIdentity) {
+            return SkyStudioGenerationRequests.heldAnswer(for: cached) ?? cached
+        }
         defer { SkyStudioGenerationRequests.abandonPreparation(idempotencyKey) }
         let picked = try SkyStudioReferenceFiles.picks(args, kind: kind)
         if let approval = try AIWorkspace.shared.confirmReading(picked.files.map(\.file), verb: "send to Sky Studio", args: args, project: project) { return approval }
@@ -99,7 +102,7 @@ enum SkyStudioGenerateTool {
         } catch let error as AIToolError {
             throw error
         } catch {
-            throw SkyStudioCharacterError.tool(error)
+            throw SkyStudioCharacterError.tool(error, beforeSubmission: true)
         }
 
         // 每一项越档连同用户点名它时会说的写法（user_requested_overrides 要 user_request 里找得到，AIOverrideQuote）。

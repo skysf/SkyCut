@@ -158,7 +158,9 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
             batches[index].model = outcome.model ?? outcome.plan?.model
             batches[index].fallbackUsed = outcome.fallbackUsed
         }
-        if let charge = result.billing?.netCharged ?? result.creditsCharged {
+        // Only a final charge (SkyStudioJobStatus.finalCharge): a bill under review keeps the batch's unknown amount, never its
+        // top-level figure as the charge (a recovered batch once booked 0.1 and cleared the unknown 2.5, CXD5 on PR #554).
+        if let charge = result.finalCharge {
             batches[index].charged = charge
             batches[index].uncertain = 0
         }

@@ -30,6 +30,21 @@ import SrtFlowMCPKit
             await runVoicePaidAudioChecks(root)
             try await runVoiceChangeChecks(root)
             try await runVoiceChangeDirectChecks(root)
+            try await runVoiceChangeDownloadChecks(root)
+            try await runVoiceChangeOwnFilesChecks(root)
+            // Every paid job the download checks start gives its job slot back once its Sky Studio job ended: a held download,
+            // Download again, a stop, a bill still pending never keep one (three slots stay with LibraryRestartChecks' parked jobs).
+            let slotsBefore = SkyStudioJobSlots.shared.snapshot.running[.shared] ?? 0
+            defer {
+                let after = SkyStudioJobSlots.shared.snapshot.running[.shared] ?? 0
+                require(after == slotsBefore, "every paid job the download checks started gave its job slot back (\(slotsBefore) before, \(after) after)")
+            }
+            try await runGenerationDownloadChecks(root)
+            try await runVoiceoverDownloadChecks(root)
+            try await runUpscaleJobDownloadChecks(root)
+            try await runPaidToolEntryChecks(root)   // last: it marks a key on the account
+            try await runOfficialRecoveryDownloadChecks(root)   // after it: the account verified against the fake /me
+            try await runOfficialFilmRunChecks(root)
         } catch {
             VoiceCheckLog.failures += 1
             print("FAIL: production voice recovery checks: \(error)")
@@ -38,6 +53,10 @@ import SrtFlowMCPKit
         require(AIKeepAwake.shared.holders == 0, "every AI job in these checks gave its keep-awake lease back (\(AIKeepAwake.shared.holders) left)")
         ProjectTeardown.stopPreview(OpenProjects.shared.primary)
         UserDefaults.standard.removePersistentDomain(forName: domain)
+        // This run's own Application Support folder (official receipts, the provider marker): the script removes it too.
+        if let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            try? FileManager.default.removeItem(at: support.appendingPathComponent(domain, isDirectory: true))
+        }
         if VoiceCheckLog.failures > 0 { print("FAIL: \(VoiceCheckLog.failures) production voice recovery checks"); exit(1) }
         print("PASS: production voice: whole-segment quote before job_id, one selection per segment, budget / refusal / local fallback before paying, "
             + "batches read together within the audio slots and landed in order, mid-script fallback for later batches, fallback_needs_one_time "
@@ -58,7 +77,22 @@ import SrtFlowMCPKit
             + "changed, refund on failure, no resend after an unknown submit, the panel's default voice / re-quote / budget / same job"
             + "; direct change: skip_separation in the quote and the job, the voice alone on one new track as one undo step, an unconfirmed "
             + "direct quote refused before paying, a default result without its background not landed, separation_failed failing with "
-            + "nothing landed and only the separation charged, the panel's localized line and its direct retry")
+            + "nothing landed and only the separation charged, the panel's localized line and its direct retry"
+            + "; a voice change whose download gave up: download_network after three GETs, its row's Download again lands the "
+            + "byte-identical files under the same job id, an expired address renewed once from the original job; the same change and "
+            + "Chinese after English asked again are new paid jobs; a stop keeps the button"
+            + "; a generation held after three drops stays held through a failed Download again, its own key downloads it after the row "
+            + "was dismissed, a stop and empty answers keep it, a missing SRT is fetched alone; a voiceover row's Download again runs its "
+            + "recovery once, never after a resume landed it, and survives a stop; an upscale's books at the charge from either field, "
+            + "Cancel while downloading again keeps it on its row, its bill under review keeps the reservation; an official recovery held "
+            + "through a 503 then downloaded by its key through generate_media; an official film generation's next step through the "
+            + "flow; a voice change's files take their names on disk (never another process's file), a cancel deletes only a file it "
+            + "placed while it is still that file and no timeline uses it, every GET counted, its bill kept reserved until get_job "
+            + "reads it final; PNG headers held until the image is saved; a folder at the name left whole"
+            + "; through the tools: generate_media's own key downloads the held job with no POST, key-less and 9:16 are new jobs, "
+            + "another key is a new job, a spaced key sent back is the same job, a blocked or read-only output folder holds the result; "
+            + "upscale_clip from project B is B's own new job, one saved while its bill is under review stays reserved until get_job "
+            + "reads it final")
         exit(0)
     }
 
@@ -103,6 +137,23 @@ import SrtFlowMCPKit
         let blocked = try await fixture.resume(file, generate: true)
         require(blocked["status"] == "failed" && blocked["code"] == "daily_budget_exceeded" && VoiceRecoveryHTTP.posts == 3,
                 "a hard budget blocks missing generation while retaining all recovered audio")
+        // A limit of 0 never covers the batches: raise or change it, no waiting; option (a) carries its set_settings token (MSG1).
+        let options = blocked["options"]?.arrayValue ?? []
+        require(blocked["blocked_by"] == "skycut_daily_credit_limit"
+                && options.compactMap { $0["id"]?.stringValue } == ["raise_limit", "change_in_settings"]
+                && options.first?["confirm_token"]?.stringValue != nil
+                && blocked["next_step"]?.stringValue?.contains("resume with add_voiceover resume=recovery_file generate_missing=true") == true,
+                "the budget stop names SkyCut's own limit, offers raising (asked once) or Settings, and resumes its own missing batches (MSG1): \(blocked)")
+        // Its numbers are the ones the batches were refused on, not the store's when the result is built (MSG1 review).
+        do {
+            _ = try SkyStudioVoiceBudgetProblem.reserve([40])
+            require(false, "a limit of 0 refuses the batches")
+        } catch let problem as SkyStudioVoiceBudgetProblem {
+            SkyStudioSpendStore.shared.setDailyLimit(1_000)
+            let later = SkyStudioJobGate.budgetBlocked(problem.numbers).payload
+            require(later["daily_limit_credits"] == 0 && later["credits_needed"] == 40,
+                    "the refusal keeps the limit and need it was refused on after the limit changed: \(later)")
+        }
         SkyStudioSpendStore.shared.setDailyLimit(1_000)
         // 恢复补批次：照记录的选择再报价（params.plan）。服务器这次要是自己选，会选成别的模型（rechoose）—— 不带选择就被认出来。
         VoiceRecoveryHTTP.rechoose = true

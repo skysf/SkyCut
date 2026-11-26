@@ -41,3 +41,15 @@ func expectFailure(_ message: String, file: String = #fileID, line: Int = #line,
 func moment(_ seconds: TimeInterval = 0) -> Date {
     Date(timeIntervalSince1970: 1_793_113_445).addingTimeInterval(seconds)
 }
+
+extension SkyStudioAPI {
+    /// The checks' way to download: the result placed at `file` (its folder, stem and extension) when that name is free, else at the
+    /// next free number of the series (SkyStudioAPI.download never replaces anything); the GETs sent.
+    @discardableResult
+    func download(
+        _ url: URL, to file: URL, renew: (@Sendable () async throws -> URL?)? = nil, onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> Int {
+        try await download(url, into: CloudResultPlace(folder: file.deletingLastPathComponent(), stem: file.deletingPathExtension().lastPathComponent,
+                                                       pathExtension: file.pathExtension), renew: renew, onProgress: onProgress).gets
+    }
+}
