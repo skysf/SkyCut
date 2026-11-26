@@ -6,12 +6,10 @@ import Foundation
 // What it does: Restart and Update quits through the normal quit flow (NSApp.terminate): ProjectQuit asks about unsaved
 // projects, and Cancel there cancels the restart (ProjectQuit.quitCancelled); a screen recording never gets this far
 // (AppUpdater waits for it, AppUpdateBusy). At applicationWillTerminate, after the install (AppUpdater.installAtQuit), it
-// remembers the windowed projects' files and starts a small shell that outlives SkyCut: it waits for this process to exit
-// (never two SkyCut instances), then opens the app at the same path: the new version when the swap went in, the old one
-// when it didn't. The next launch reopens those projects (only right after a restart; the main window's in the main
-// window). The shell is InstallerDisk's eject shell with `open` in place of `hdiutil detach`: the pid and the path go in as
-// arguments, never into the script's text.
-// What it doesn't: wait for running work (AppUpdater with AppUpdateBusy), install (AppUpdateInstaller).
+// remembers the windowed projects' files and starts the shell that opens SkyCut again once this process has exited
+// (AppUpdateRelaunch: never two instances, never a path that no longer holds an app). The next launch reopens those
+// projects (only right after a restart; the main window's in the main window).
+// What it doesn't: wait for running work (AppUpdater with AppUpdateBusy), install (AppUpdateInstaller), the shell itself.
 // Rules: docs/architecture/app-updates.md "Restart and Update".
 
 @MainActor
@@ -31,23 +29,7 @@ enum AppUpdateRestart {
     static func finishQuit() {
         guard quitting else { return }
         rememberProjects()
-        relaunch(Bundle.main.bundleURL, afterExitOf: ProcessInfo.processInfo.processIdentifier)
-    }
-
-    /// Waits for $1 to exit (at most 600 polls of 0.1 s), then opens the app at $2.
-    static let relaunchScript = """
-        i=0; while kill -0 "$1" 2>/dev/null; do i=$((i+1)); [ "$i" -gt 600 ] && exit 0; sleep 0.1; done; \
-        exec /usr/bin/open "$2"
-        """
-
-    static func relaunch(_ bundle: URL, afterExitOf pid: Int32) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", relaunchScript, "sh", String(pid), bundle.path]
-        process.standardInput = FileHandle.nullDevice
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try? process.run()
+        AppUpdateRelaunch.start(Bundle.main.bundleURL, afterExitOf: ProcessInfo.processInfo.processIdentifier)
     }
 
     // MARK: The projects

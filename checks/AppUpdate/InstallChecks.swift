@@ -1,11 +1,14 @@
 import Darwin
 import Foundation
 
-// scripts/check-app-update.sh: the install at quit against scratch folders (AppUpdateInstaller): the new copy swapped in, the
-// replaced one in the scratch Trash only after the new one is in place, the marker for the next launch, the record gone;
-// nothing staged, a copy that fails its check, another instance running, a swap that fails, the destination missing and
-// a staged copy on another volume leave the old app where it was, working. Then the guarantee itself: a loop of swaps is
-// killed (SIGKILL) at random instants, and after every kill both paths hold a whole, valid app: never missing, never half.
+// scripts/check-app-update.sh: the install at quit against scratch folders (AppUpdateInstaller with the production verifier,
+// its system steps replaced by the fixtures'): the new copy swapped in, the replaced one in the scratch Trash only after the
+// new one is in place, the marker for the next launch, the record and the downloaded DMG gone; nothing staged, a copy that
+// fails its check, another instance running, a swap that fails, the running app moved away or unreadable, a staged copy on
+// another volume leave the old app where it was, working; a record naming an app outside the staging folder, or reached
+// through a link, is refused and touches nothing there; a destination already at the staged version or newer is never
+// downgraded. Then the guarantee itself: a loop of swaps is killed (SIGKILL) at random instants, and after every kill both
+// paths hold a whole, valid app: never missing, never half.
 
 enum InstallChecks {
     struct Scene {
@@ -29,21 +32,26 @@ enum InstallChecks {
             try UpdateFixture.app(in: applications, version: "1.0.0", marker: "old")
             let folder = files.stagingFolder(for: AppUpdateVersion(stagedVersion)!)
             let staged = try UpdateFixture.app(in: folder, version: stagedVersion, build: "2", marker: "new")
-            let feed = FeedChecks.feed(UpdateFixture.feedJSON(version: "1.1.0", build: "2", url: FeedChecks.url, size: 1, sha: FeedChecks.sha))!
-            let record = AppUpdateStagedRecord(feed: feed, appPath: staged.path, asked: false)
+            let record = AppUpdateStagedRecord(feed: InstallChecks.feed, appPath: staged.path, asked: false)
             try files.writeStaged(record)
             return record
         }
 
-        func installer(othersRunning: Bool = false, swap: ((URL, URL) throws -> Void)? = nil,
+        /// The production verifier at quit against the running app (the destination), with the fixtures' requirement.
+        func installer(othersRunning: Bool = false, requirementFails: Bool = false, swap: ((URL, URL) throws -> Void)? = nil,
                        trashCheck: @escaping (URL) -> Void = { _ in }) -> AppUpdateInstaller {
             let trash = self.trash
+            let destination = self.destination
+            var steps = AppUpdateVerifier.Steps()
+            steps.requirement = { _ in
+                if requirementFails { throw AppUpdateError("the running app's signature can't be read") }
+                return UpdateFixture.identifierRequirement()
+            }
             var installer = AppUpdateInstaller(
                 destination: destination, files: files,
                 verify: { staged, feed in
-                    try AppUpdateVerifier.checkInfo(of: staged, feed: feed, bundleIdentifier: UpdateFixture.identifier,
-                                                    running: AppUpdateVersion("1.0.0")!)
-                    try AppBundleSignature.verify(staged, satisfies: UpdateFixture.identifierRequirement(), network: false)
+                    try AppUpdateVerifier.verify(staged, feed: feed, runningApp: destination, running: AppUpdateVersion("1.0.0")!,
+                                                 atQuit: true, steps: steps)
                 },
                 othersRunning: { _ in othersRunning },
                 trash: { item in
@@ -55,11 +63,15 @@ enum InstallChecks {
         }
     }
 
+    static let feed = FeedChecks.feed(UpdateFixture.feedJSON(version: "1.1.0", build: "2", url: FeedChecks.url, size: 1, sha: FeedChecks.sha))!
+
     static func run(root: URL, binary: String, check: (Bool, String) -> Void) throws {
         print("==> the install at quit against scratch folders")
         let running = AppUpdateVersion("1.0.0")!
         try installs(root, running, check)
         try refusals(root, running, check)
+        try ownCopyOnly(root, running, check)
+        try noDowngrade(root, running, check)
         try crossVolume(root, running, check)
         print("==> a loop of swaps killed at random instants")
         try kills(root, binary: binary, check)
@@ -68,6 +80,7 @@ enum InstallChecks {
     private static func installs(_ root: URL, _ running: AppUpdateVersion, _ check: (Bool, String) -> Void) throws {
         let scene = try Scene(root, "install")
         let record = try scene.prepare()
+        try Data("dmg".utf8).write(to: scene.files.dmg(for: feed))
         var newInPlaceWhenTrashed = false
         let outcome = scene.installer(trashCheck: { _ in
             newInPlaceWhenTrashed = UpdateFixture.marker(of: scene.destination) == "new"
@@ -80,20 +93,22 @@ enum InstallChecks {
         check(scene.files.readInstalledNote() == note && note.from == running && note.to.description == "1.1.0",
               "the marker for the next launch names 1.0.0 → 1.1.0")
         check(scene.files.readStaged() == nil && UpdateFixture.contents(of: scene.files.staging).isEmpty, "the staged record and folder are gone")
+        check(UpdateFixture.contents(of: scene.files.downloads).isEmpty, "the downloaded DMG is removed once installed")
+    }
+
+    private static func untouched(_ scene: Scene, _ label: String, staged: Bool, _ check: (Bool, String) -> Void) {
+        check(UpdateFixture.marker(of: scene.destination) == "old" && UpdateFixture.codesignVerifies(scene.destination),
+              "\(label): the old app is where it was, intact")
+        check(scene.files.readInstalledNote() == nil, "\(label): no marker")
+        check((scene.files.readStaged() != nil) == staged, "\(label): the update \(staged ? "stays staged" : "is removed")")
+        check(UpdateFixture.contents(of: scene.trash).isEmpty, "\(label): nothing went to the Trash")
     }
 
     private static func refusals(_ root: URL, _ running: AppUpdateVersion, _ check: (Bool, String) -> Void) throws {
-        func untouched(_ scene: Scene, _ label: String, staged: Bool) {
-            check(UpdateFixture.marker(of: scene.destination) == "old" && UpdateFixture.codesignVerifies(scene.destination),
-                  "\(label): the old app is where it was, intact")
-            check(scene.files.readInstalledNote() == nil, "\(label): no marker")
-            check((scene.files.readStaged() != nil) == staged, "\(label): the update \(staged ? "stays staged" : "is removed")")
-            check(UpdateFixture.contents(of: scene.trash).isEmpty, "\(label): nothing went to the Trash")
-        }
         let nothing = try Scene(root, "nothing")
         try UpdateFixture.app(in: nothing.applications, version: "1.0.0", marker: "old")
         check(nothing.installer().install(nil, running: running) == .nothingStaged, "nothing staged: nothing happens")
-        untouched(nothing, "nothing staged", staged: false)
+        untouched(nothing, "nothing staged", staged: false, check)
 
         let stale = try Scene(root, "stale")
         let staleRecord = try stale.prepare()
@@ -104,7 +119,7 @@ enum InstallChecks {
         let brokenRecord = try broken.prepare(stagedVersion: "1.1.0")
         try Data("changed".utf8).write(to: URL(fileURLWithPath: brokenRecord.appPath).appendingPathComponent("Contents/Resources/marker.txt"))
         if case .copyRejected = broken.installer().install(brokenRecord, running: running) {
-            untouched(broken, "a staged copy changed since it was verified", staged: false)
+            untouched(broken, "a staged copy changed since it was verified", staged: false, check)
         } else {
             check(false, "a staged copy changed since it was verified is rejected")
         }
@@ -113,24 +128,78 @@ enum InstallChecks {
         let busyRecord = try busy.prepare()
         check(busy.installer(othersRunning: true).install(busyRecord, running: running) == .otherInstanceRunning,
               "another SkyCut running from the bundle: no install")
-        untouched(busy, "another instance running", staged: true)
+        untouched(busy, "another instance running", staged: true, check)
 
         let failing = try Scene(root, "swap-fails")
         let failingRecord = try failing.prepare()
         if case .swapFailed = failing.installer(swap: { _, _ in throw AppUpdateError("no") }).install(failingRecord, running: running) {
-            untouched(failing, "a swap that fails", staged: true)
+            untouched(failing, "a swap that fails", staged: true, check)
         } else {
             check(false, "a swap that fails is reported")
         }
 
+        // The running app moved or renamed away (Finder), or its signature unreadable: the copy isn't to blame and stays.
         let missing = try Scene(root, "missing")
         let missingRecord = try missing.prepare()
         try FileManager.default.removeItem(at: missing.destination)
-        if case .swapFailed = missing.installer().install(missingRecord, running: running) {
-            check(!FileManager.default.fileExists(atPath: missing.destination.path) && missing.files.readStaged() != nil,
-                  "the destination gone: the real exchange refuses, nothing is created there, the update stays staged")
+        let gone = missing.installer().install(missingRecord, running: running)
+        if case .runningAppUnavailable = gone {
+            check(!FileManager.default.fileExists(atPath: missing.destination.path) && missing.files.readStaged() != nil
+                  && UpdateFixture.marker(of: URL(fileURLWithPath: missingRecord.appPath)) == "new",
+                  "the running app moved away: nothing is created there, the staged copy stays for the next quit")
         } else {
-            check(false, "the destination gone: the real exchange refuses")
+            check(false, "the running app moved away: the staged copy stays for the next quit (got \(gone))")
+        }
+        let unreadable = try Scene(root, "unreadable-signature")
+        let unreadableRecord = try unreadable.prepare()
+        let unreadableOutcome = unreadable.installer(requirementFails: true).install(unreadableRecord, running: running)
+        if case .runningAppUnavailable = unreadableOutcome {
+            untouched(unreadable, "the running app's signature unreadable", staged: true, check)
+        } else {
+            check(false, "the running app's signature unreadable: the staged copy stays (got \(unreadableOutcome))")
+        }
+    }
+
+    /// Only the stager's own copy (E1): a record naming an app elsewhere, or reached through a link, is refused and dropped;
+    /// the app it named and the folder around it stay.
+    private static func ownCopyOnly(_ root: URL, _ running: AppUpdateVersion, _ check: (Bool, String) -> Void) throws {
+        let outside = try Scene(root, "outside-record")
+        _ = try outside.prepare()
+        let folder = outside.root.appendingPathComponent("SomeFolder")
+        let elsewhere = try UpdateFixture.app(in: folder, version: "1.1.0", build: "2", marker: "elsewhere")
+        try Data("keep me".utf8).write(to: folder.appendingPathComponent("notes.txt"))
+        let bogus = AppUpdateStagedRecord(feed: feed, appPath: elsewhere.path, asked: false)
+        try outside.files.writeStaged(bogus)
+        check(outside.installer().install(bogus, running: running) == .recordRefused, "a record naming an app outside the staging folder is refused")
+        untouched(outside, "a record naming an app elsewhere", staged: false, check)
+        check(UpdateFixture.marker(of: elsewhere) == "elsewhere" && FileManager.default.fileExists(atPath: folder.appendingPathComponent("notes.txt").path),
+              "the app it named and the folder around it are untouched")
+
+        let linked = try Scene(root, "linked-record")
+        try UpdateFixture.app(in: linked.applications, version: "1.0.0", marker: "old")
+        let target = linked.root.appendingPathComponent("Elsewhere")
+        let reached = try UpdateFixture.app(in: target, version: "1.1.0", build: "2", marker: "through-link")
+        let version = linked.files.stagingFolder(for: AppUpdateVersion("1.1.0")!)
+        try FileManager.default.createSymbolicLink(at: version, withDestinationURL: target)
+        let through = AppUpdateStagedRecord(feed: feed, appPath: version.appendingPathComponent("SkyCut.app").path, asked: false)
+        try linked.files.writeStaged(through)
+        check(linked.installer().install(through, running: running) == .recordRefused, "a staged copy reached through a link is refused")
+        untouched(linked, "a staged copy reached through a link", staged: false, check)
+        check(UpdateFixture.marker(of: reached) == "through-link", "what the link points to stays where it is, whole")
+    }
+
+    /// No downgrade at quit (E2): what is at the destination now is read again; the same version or a newer one stays.
+    private static func noDowngrade(_ root: URL, _ running: AppUpdateVersion, _ check: (Bool, String) -> Void) throws {
+        for (name, there) in [("newer-there", "1.2.0"), ("same-there", "1.1.0")] {
+            let scene = try Scene(root, name)
+            let record = try scene.prepare()
+            try FileManager.default.removeItem(at: scene.destination)
+            try UpdateFixture.app(in: scene.applications, version: there, marker: "there")
+            let outcome = scene.installer().install(record, running: running)
+            check(outcome == .notNewer(AppUpdateVersion(there)!), "\(there) put at the destination while 1.0.0 runs: no install (got \(outcome))")
+            check(UpdateFixture.marker(of: scene.destination) == "there" && UpdateFixture.contents(of: scene.trash).isEmpty,
+                  "\(there) stays where it is, nothing goes to the Trash")
+            check(scene.files.readStaged() == nil && UpdateFixture.contents(of: scene.files.staging).isEmpty, "\(there): the staged copy is dropped")
         }
     }
 

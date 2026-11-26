@@ -929,31 +929,66 @@
     DMG may come from the hook's own origin only. Notes fall back by language, then to English. The staged record, the
     installed marker and the reopen record read back as written (a marker going backwards, relative paths, stale or future
     reopen records refused).
-  - **Who updates** (`AppUpdateEligibility.decide`): 27 cases: the release app updates (an AI-started launch too); the
-    installer disk, a translocated download, an unwritable folder or bundle, a volume without atomic swaps and staging on
-    another volume only tell; SkyCut Beta, check bundles, ad-hoc or another team's signature, a local version, `dist/`,
-    `.build`, `/tmp`, temporary folders, a bare executable, `CI` and `SRTFLOW_*` never check (unless the test hook is
-    loopback).
+  - **Who updates** (`AppUpdateEligibility.decide`): 37 cases: the release app updates (an AI-started launch too, a folder
+    that only starts like Downloads, another user's Downloads); the installer disk, a translocated download, Desktop,
+    Documents, Downloads and iCloud Drive (any letter case, through the Data volume too), an unwritable folder or bundle, a
+    volume without atomic swaps and staging on another volume only tell; a copy running from inside the Updates folder,
+    SkyCut Beta, check bundles, ad-hoc or another team's signature, a local version, `dist/`, `.build`, `/tmp`, temporary
+    folders, a bare executable, `CI` and `SRTFLOW_*` never check (unless the test hook is loopback).
   - **The state machine** (`AppUpdateState`): background checks and downloads show nothing and are never answered; a
     check the person started is answered (up to date, failed, found); auto install: download, Update, the same release
-    changes nothing, a newer one replaces the staged copy, "up to date" removes a withdrawn one; auto off: New Version,
-    Download and Install, a failed asked download says so; the switch stops a background download and keeps a staged copy
-    from installing by itself; can't update: never downloads; launch states (a staged copy, the marker, Updated going away
+    changes nothing, a newer one replaces the staged copy, "up to date" removes a withdrawn one and every download; auto
+    off: New Version, Download and Install, a failed asked download says so, a feed naming another DMG removes the old
+    download (nothing downloads); the switch stops a background download and keeps a staged copy from installing by itself; can't update: never downloads; launch states (a staged copy, the marker, Updated going away
     once viewed); the popover's content; what a restart waits for, in order, and which cloud kinds don't hold it; the
-    Settings status line (today, yesterday, a date, checking, failed, downloading, ready).
+    Settings status line (today, yesterday, a date, checking, failed, downloading, ready); Settings' check never answered
+    with a window.
+  - **A pulled release** (U2): a copy an earlier run staged is neither shown nor installable until this launch's first check:
+    the feed naming it confirms it (Update, nothing downloads; the menu's check at once), a check that can't reach the feed
+    too (offline Macs still update), "up to date" removes it and the kept download, another release replaces it unseen;
+    auto off: New Version once confirmed, asked for: ready; a copy that only tells holds none.
+  - **The retry record** (U1, `AppUpdateRetryRecord`): a DMG that came down whole and failed its check or staging is
+    counted and kept on disk, silently; automatic checks leave it alone for 24 hours (1 h and 23 h later: nothing; 25 h:
+    fetched), never after three failures; Settings' and the menu's checks fetch it and their failures count; a download
+    that didn't complete isn't counted; another DMG is fetched; a staged copy removes the record; the record read at launch
+    still holds; a clock set back by more than a day doesn't hold it for ever; the pipeline's outcomes map to their events;
+    the file reads back as written and refuses a wrong schema, an uppercase or missing SHA-256, 0, 1000, a boolean, a
+    fraction or a string as the count, and a missing or textual date.
   - **Over loopback** (python3's http.server on 127.0.0.1, never the network): the feed (offer, up to date, 404, a 301 not
     followed, over 64 KB, malformed); the DMG (whole with progress to 100%; a wrong SHA-256, a size off by one either way, a
-    404, a redirect and a cancelled download each leave no file).
+    404, a redirect and a cancelled download each leave no file; the first three came down but aren't the feed's DMG
+    (`AppUpdateDMGMismatch`, counted), the others didn't come down). The server records every request's headers: at least
+    10 requests, nothing beyond Host, User-Agent (`SkyCut`), Accept, Accept-Language, Accept-Encoding, Connection,
+    Cache-Control (`no-cache`) and Priority.
+  - **The pipeline** (`AppUpdatePipeline`, U3): a release staged with its DMG kept; another release's download removed; the
+    same release taken from its staged copy; a kept download staged without asking the server again (the server no longer
+    has it); a kept download that no longer matches removed and downloaded again; a wrong SHA-256 and a failing staging
+    rejected (counted), nothing kept; a missing DMG not downloaded (not counted). The verifier's steps
+    (`AppUpdateVerifier.Steps`): a copy that passes everything else is refused by Gatekeeper alone when staging, Gatekeeper
+    isn't asked at quit, the same copy passes once Gatekeeper accepts it; the running app moved away or its requirement
+    unreadable is `AppUpdateRunningAppError`, a changed copy isn't.
   - **Staging from real images** (hdiutil, `-nobrowse`): the copy is the new app, intact, without quarantine, its record
     written, only the newest kept, the image detached; refused without touching the earlier staged copy: another version,
     another build, not newer, a failed signature, another bundle id, two apps. The production verifier refuses an ad-hoc
     copy (not notarized), Gatekeeper rejects it (when assessments are on), and `gatekeeperAccepts` reads spctl's lines.
-    A killed run's attached image is detached at the next launch; the launch cleanup trashes the replaced app and removes
-    everything but the staged copy its record names.
-  - **The install** (`AppUpdateInstaller`) against scratch folders: the new app in place and intact, the old one in the
-    scratch Trash only after the new one was in place, the marker 1.0.0 → 1.1.0, the record gone; untouched and reported:
-    nothing staged, not newer, a copy changed since it was verified (removed), another instance running (kept staged), a
-    failing swap (kept), the destination gone, a staged copy on another volume (EXDEV).
+    The staged copy lies under `staged.noindex/` where the installer takes it. A killed run's attached image is detached
+    at the next launch.
+  - **The install** (`AppUpdateInstaller`, the production verifier with the fixtures' requirement) against scratch
+    folders: the new app in place and intact, the old one in the scratch Trash only after the new one was in place, the
+    marker 1.0.0 → 1.1.0, the record and the downloaded DMG gone; untouched and reported: nothing staged, not newer, a copy
+    changed since it was verified (removed), another instance running (kept staged), a failing swap (kept), the running app
+    moved away or its signature unreadable (kept for the next quit, nothing created at the destination), a staged copy on
+    another volume (EXDEV). Only the stager's own copy (E1): a record naming an app in another folder, and a staged copy
+    reached through a link, are refused and dropped, the app and folder they named untouched. No downgrade (E2): 1.2.0 or
+    1.1.0 put at the destination while 1.0.0 runs stays, the staged 1.1.0 is dropped.
+  - **The launch** (`AppUpdateLaunchFiles`): a copy that only tells, SkyCut Beta and a copy inside the Updates folder read
+    and change nothing there; a copy that installs reads the marker once, the staged and retry records, and cleans: only
+    the app a swap replaced (older than the running one and its folder's version) goes to the Trash; an older staged copy,
+    one no record names, an unfinished folder and a link are deleted (the link's target stays); the recorded newer copy
+    stays; a newer release's DMG stays, the rest go; a record whose copy is gone is removed; a staged copy of the running
+    version (installed by hand) is deleted, never trashed; the bundle this process runs from, and the folder around it,
+    are never touched. The relaunch shell (`AppUpdateRelaunch`, a recorder in place of `/usr/bin/open`): waits while the
+    old process runs, then opens the path alone; a path that no longer holds an app is never opened.
   - **Killed swaps**: 24 times, a child process swapping the two bundles in a loop is killed with SIGKILL 1–40 ms after it
     started swapping; after every kill both paths hold a whole app that `codesign --verify --deep --strict` accepts.
   - **The feed writer** (`scripts/update-feed/FeedWriter.swift`) on fixture values: writes a release's feed and a loopback
@@ -963,11 +998,20 @@
     which moves nothing else onto the destination and keeps the default swap at quit; the updater started once in
     `startServices()`, the install last in `applicationWillTerminate`, the menu item after About, the Settings section, the
     pill between the AI badge and the cloud tasks and on the tools' toolbar; a cancelled quit cancelling the restart (the hook
-    set before `NSApp.terminate`); staging on `AppUpdateWork`'s queue; no administrator rights; the release team equal to
-    `scripts/signing/common.sh`; `SrtFlow.`-prefixed keys; the check's binary taking only a 127.0.0.1 server and only
-    FlowChecks.swift transferring.
+    set before `NSApp.terminate`); staging and hashing a kept download on `AppUpdateWork`'s queue; no administrator
+    rights; the release team equal to `scripts/signing/common.sh`; `SrtFlow.`-prefixed keys; the check's binary taking
+    only a 127.0.0.1 server, only FlowChecks.swift and PipelineChecks.swift transferring. Deleting only through
+    `AppUpdateFiles.remove` (and the download's own file), the Trash only at the install and the launch cleanup, the
+    installer taking only `stagedCopy`. The coordinator (FBU1 G1): the probe through `processes(inside:)` and never
+    `processes(under:)`; the production verifier at quit (`atQuit: true`) and when staging (`atQuit: false`), no empty
+    verifier anywhere; `decision == .updates` before an install; the launch reading the folder only through
+    `AppUpdateLaunchFiles.take`, which returns at once unless `decision == .updates`; the pipeline's outcome sent to the
+    state machine; file effects on the work queue; a copy inside the Updates folder told apart; `staged.noindex`; the
+    relaunch shell for this pid with `/usr/bin/open`, never `-n`; the test hook line in Settings.
   - **Reverse verification** (2026-11-27): a two-rename replace instead of the swap turns every kill red (the destination
     missing) and the cross-volume case; before their fixes, a download cancelled before it started and a failed re-stage of
     the same version were red; dropping the AI-launch exception and the withdrawal are red; 16 wiring sabotages are red.
+    For the fixes before the first release (U1b, the bugfix case `2026-11-27-updater-gaps-before-first-release.md`): every
+    new case above and each new guard line was red with its fix undone, FBU1's seven green sabotages included.
     Off-screen images: `scripts/render-app-updates.sh <folder>` (graphical session, **not in `check-all.sh`**). The live feed
     at release: `python3 scripts/check-release-download.py <dmg> --feed`. Rules: [App updates](../architecture/app-updates.md).

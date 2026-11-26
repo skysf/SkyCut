@@ -1802,3 +1802,4 @@
 "Download and install updates automatically" = "Descargar e instalar las actualizaciones automáticamente";
 "New versions download in the background and install when you quit." = "Las versiones nuevas se descargan en segundo plano y se instalan al salir.";
 "You’re only told about new versions; nothing downloads until you click." = "Solo te avisa cuando hay una versión nueva; no se descarga nada hasta que hagas clic.";
+"Test update feed: %@" = "Fuente de actualizaciones de prueba: %@";

@@ -334,6 +334,7 @@
 - [2026-10-28 停不下来的 upscale 没人再查](2026-10-28-uncancellable-upscale-left-unfinished.md) — 没有长轮询：取消不了的那单接着查到底（`followToEnd`）。
 - [2026-10-02 「撤销这一轮」退不回 V1](2026-10-02-undo-round-repacks-v1.md) — 「换回某一刻」不是一次编辑，别走编辑的收尾（磁吸、联动）。
 - [2026-10-27 AI 传了说明上没有的参数，悄悄丢掉、照样做](2026-10-27-unknown-tool-arguments-silently-ignored.md) — 「读得宽」只能对值、不能对名字：参数名按说明核对，有不认识的整个调用不做；null、`project`、没写字段的里层对象、登记的别名照收。
+- [2026-11-27 The updater's gaps before its first release](2026-11-27-updater-gaps-before-first-release.md) — An installer or cleanup checks the thing, not its name (resolve the path, refuse links out, read the bundle's version); whatever repeats at every launch needs a memory across launches.
 - [2026-11-23 An upload that lost its connection ended the generation at once, and the error blamed Sky Studio](2026-11-23-upload-lost-connection-no-retry.md) — The system never replays a body upload: retry what a second try can fix at the same signed address (never an answer or a cancel), and name the step that failed.
 - [2026-10-02 AI 起的 upscale 换源后扣费一直是「—」](2026-10-02-upscale-cost-lookup-killed-by-remove.md) — 异步补账要追着已落地的数据写；remove ≠ cancel。
 - [2026-10-28 检查器 Upscale 那一节还写着「fal.ai」](2026-10-28-upscale-inspector-still-says-fal.md) — 换提供方要连 verbatim 写死的名字一起搜。

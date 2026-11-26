@@ -5,9 +5,10 @@ import Foundation
 //
 // What it does: opens the downloaded image read-only where Finder doesn't show it (hdiutil attach -nobrowse at a private
 // mount point under Updates/), finds the app at its top (the running app's bundle id), copies it into
-// staged/<version>/ (Application Support, on the app's own volume: AppUpdateEligibility makes sure), clears any download
-// quarantine, has the copy verified (SkyCut: AppUpdateVerifier against the running app), closes the image and keeps only
-// this staged copy and its record. Any failure removes what it made and leaves the record of an earlier copy alone.
+// staged.noindex/<version>/ (Application Support, on the app's own volume: AppUpdateEligibility makes sure; `.noindex` so
+// Spotlight never lists it), clears any download quarantine, has the copy verified (SkyCut: AppUpdateVerifier against the
+// running app), closes the image and keeps only this staged copy and its record. Any failure removes what it made (through
+// AppUpdateFiles.remove, inside the Updates folder only) and leaves the record of an earlier copy alone.
 // Blocking (hdiutil, copying, hashing): AppUpdateWork.queue only. The checks inject the verification and run the rest
 // against scratch folders and real images.
 // What it doesn't: download (AppUpdateHTTP), install (AppUpdateInstaller).
@@ -35,7 +36,7 @@ struct AppUpdateStager {
         defer { detach(mount) }
         let app = try findApp(in: mount)
         // Copied and checked in a folder of its own: a failure touches no staged copy, and only a verified one takes the
-        // version's place (a folder name that isn't a version is removed at the next launch: AppUpdateFiles.cleanAtLaunch).
+        // version's place (a folder name that isn't a version is removed at the next launch: AppUpdateLaunchFiles.clean).
         let incoming = files.staging.appendingPathComponent("incoming-\(UUID().uuidString)", isDirectory: true)
         let folder = files.stagingFolder(for: feed.version)
         do {
@@ -45,14 +46,14 @@ struct AppUpdateStager {
             Quarantine.removeFlagRecursively(at: copy)
             if Quarantine.isFlagged(atPath: copy.path) { throw AppUpdateError("the copy keeps the download quarantine") }
             try verify(copy, feed)
-            try? FileManager.default.removeItem(at: folder)
+            files.remove(folder)
             try FileManager.default.moveItem(at: incoming, to: folder)
             let record = AppUpdateStagedRecord(feed: feed, appPath: folder.appendingPathComponent(appName).path, asked: asked)
             try files.writeStaged(record)
             files.removeStaged(except: feed.version)
             return record
         } catch {
-            try? FileManager.default.removeItem(at: incoming)
+            files.remove(incoming)
             throw error
         }
     }
@@ -80,11 +81,12 @@ struct AppUpdateStager {
         Self.removeMountPoint(mount)
     }
 
-    /// Images a killed run left attached under Updates/ (its mount points): detached, their folders removed.
-    func detachLeftovers() {
+    /// Images a killed run left attached under Updates/ (its mount points): detached, their folders removed. At launch, for
+    /// a copy that installs only (AppUpdateLaunchFiles).
+    static func detachLeftovers(in files: AppUpdateFiles, hdiutil: String = "/usr/bin/hdiutil") {
         for item in files.contents(of: files.root) where item.lastPathComponent.hasPrefix("mount-") {
-            if Self.isMountPoint(item) { _ = AppUpdateTool.run(hdiutil, ["detach", item.path, "-quiet", "-force"], timeout: 60) }
-            Self.removeMountPoint(item)
+            if isMountPoint(item) { _ = AppUpdateTool.run(hdiutil, ["detach", item.path, "-quiet", "-force"], timeout: 60) }
+            removeMountPoint(item)
         }
     }
 

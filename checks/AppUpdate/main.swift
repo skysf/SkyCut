@@ -1,9 +1,10 @@
 import Foundation
 
-// scripts/check-app-update.sh: SkyCut's updater. The pure rules (versions, the feed, who updates, the state machine, what a
-// restart waits for), then the real flow against scratch folders: a loopback feed and DMG, real images, the install at quit
-// with fixture bundles, and a loop of swaps killed at random instants. Never the network, the real /Applications, the
-// person's Trash or a running SkyCut: every destination, Trash and running probe is injected.
+// scripts/check-app-update.sh: SkyCut's updater. The pure rules (versions, the feed, who updates, the state machine, the
+// retry record, what a restart waits for), then the real flow against scratch folders: a loopback feed and DMG, real
+// images, the pipeline, the install at quit with fixture bundles, a loop of swaps killed at random instants, what a launch
+// reads and cleans, and the relaunch shell. Never the network, the real /Applications, the person's Trash or a running
+// SkyCut: every destination, Trash, opener and running probe is injected.
 // Usage: check-app-update <scratch folder> <loopback base URL> <the server's folder>
 //        check-app-update --swap-loop <a> <b> <count>   (the kill test's child)
 
@@ -28,6 +29,7 @@ struct AppUpdateChecks {
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
             try await FlowChecks.run(server: server, root: root.appendingPathComponent("flow"), check: check)
             try InstallChecks.run(root: root.appendingPathComponent("install"), binary: arguments[0], check: check)
+            try LaunchChecks.run(root: root.appendingPathComponent("launch"), check: check)
         } catch {
             check(false, "fixture: \(error)")
         }

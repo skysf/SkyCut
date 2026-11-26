@@ -3,10 +3,13 @@ import Foundation
 // MARK: - What the updater is doing, what the toolbar shows, and what happens next (pure)
 //
 // What it does: the updater's state and its one transition function, `apply(_:mode:)`, which returns the effects to run
-// (download, stop a download, drop a staged copy the feed withdrew, answer a check the person started). Checking and
-// downloading show nothing; a verified copy shows Update; a copy that only tells (auto install off, or one that can't
-// update itself) shows New Version; the first launch after an update shows Updated until its notes are viewed. Nothing
-// here ever opens a window: only a check the person started gets an answer (AppUpdateCheckAnswer). Pure, so the checks
+// (download, stop a download, drop a staged copy or the downloads the feed withdrew, keep the retry record, answer a check
+// the person started). Checking and downloading show nothing; a verified copy shows Update; a copy that only tells (auto
+// install off, or one that can't update itself) shows New Version; the first launch after an update shows Updated until its
+// notes are viewed. A copy an earlier run staged stays unseen, and never installs, until this launch's first check has
+// confirmed the feed still names it or failed to reach the feed: a pulled release never goes in at a quit that comes first.
+// A DMG that downloaded whole and then failed is held back from automatic checks (AppUpdateRetryRecord). Nothing here ever
+// opens a window: only a check the person started from the menu gets an answer (AppUpdateCheckAnswer). Pure, so the checks
 // drive every transition.
 // What it doesn't: run the effects (AppUpdater), decide who updates (AppUpdateEligibility), what a restart waits for
 // (AppUpdateBusy).
@@ -18,6 +21,14 @@ enum AppUpdateMode: Equatable, Sendable {
     case install(automatic: Bool)
     /// Only tells, with the download page.
     case notifyOnly(AppUpdateEligibility.CannotUpdate)
+}
+
+/// Who started a check. The schedule's is never answered and never fetches a DMG the retry record holds back; the person's
+/// (Settings' button, answered in its status line; the app menu's, answered with a window) always fetches it.
+enum AppUpdateCheckOrigin: Equatable, Sendable {
+    case schedule, settings, menu
+
+    var byPerson: Bool { self != .schedule }
 }
 
 enum AppUpdateCheckResult: Equatable, Sendable {
@@ -40,14 +51,18 @@ enum AppUpdateCheckAnswer: Equatable, Sendable {
 }
 
 enum AppUpdateEvent: Equatable, Sendable {
-    case checkStarted(byPerson: Bool)
-    case checkFinished(AppUpdateCheckResult)
+    case checkStarted(AppUpdateCheckOrigin)
+    /// `at`: when the check finished (the retry record's clock).
+    case checkFinished(AppUpdateCheckResult, at: Date)
     /// Download and Install (auto install off).
     case downloadAsked
     case downloadProgress(Double?)
     /// The copy of this release is downloaded, verified and staged.
     case staged(AppUpdateFeed)
+    /// The download didn't complete (offline, a server error): nothing is known about the DMG, nothing is counted.
     case downloadFailed
+    /// The download completed, then failed its check or its staging: counted in the retry record.
+    case downloadRejected(AppUpdateFeed, at: Date)
     /// The Settings switch; `apply` gets the mode it now means.
     case automaticChanged
     case notesViewed
@@ -56,11 +71,15 @@ enum AppUpdateEvent: Equatable, Sendable {
 }
 
 enum AppUpdateEffect: Equatable, Sendable {
-    /// Download, verify and stage this release (or take the copy already staged for it).
+    /// Download, verify and stage this release (or take a kept download or the copy already staged for it).
     case download(AppUpdateFeed)
     case cancelDownload
     /// The feed no longer offers the staged copy (withdrawn or replaced): remove it so it never installs.
     case discardStaged
+    /// Downloads of other DMGs go: the feed names another release (`keeping` it), or nothing newer at all (nil).
+    case discardDownloads(keeping: AppUpdateFeed?)
+    /// Keep the retry record on disk (nil: remove it).
+    case saveRetry(AppUpdateRetryRecord?)
     case answer(AppUpdateCheckAnswer)
 }
 
@@ -84,8 +103,10 @@ struct AppUpdateState: Equatable, Sendable {
     var offer: AppUpdateFeed?
     var progress: Double?
     var checking = false
-    /// A check the person started waits for its answer.
+    /// A check the person started from the menu waits for its answer.
     var personChecking = false
+    /// The check in flight was started (or joined) by the person: it fetches a DMG the retry record holds back.
+    var personStarted = false
     /// The last check failed (offline, a server error, a malformed feed): only Settings' status line says so.
     var lastCheckFailed = false
     /// Download and Install was clicked for `offer` (auto install off): it installs at quit like an automatic one.
@@ -97,6 +118,10 @@ struct AppUpdateState: Equatable, Sendable {
     /// This launch follows an update (the installer's marker).
     var updated: AppUpdateInstalledNote?
     var updatedNotesViewed = false
+    /// A copy an earlier run staged: not shown and never installed until this launch's first check settles it.
+    var unconfirmed: AppUpdateStagedRecord?
+    /// The DMG held back from automatic checks (Updates/retry.json).
+    var retry: AppUpdateRetryRecord?
 
     var pill: Pill? {
         switch phase {
@@ -107,30 +132,32 @@ struct AppUpdateState: Equatable, Sendable {
         }
     }
 
-    /// The state a launch starts in: a copy staged by an earlier run that this mode installs, and the installer's marker.
-    static func atLaunch(staged: AppUpdateStagedRecord?, updated: AppUpdateInstalledNote?, mode: AppUpdateMode,
-                         running: AppUpdateVersion) -> AppUpdateState {
+    /// The state a launch starts in: the installer's marker, the retry record, and a copy staged by an earlier run that this
+    /// mode installs, held as unconfirmed until this launch's first check.
+    static func atLaunch(staged: AppUpdateStagedRecord?, updated: AppUpdateInstalledNote?, retry: AppUpdateRetryRecord?,
+                         mode: AppUpdateMode, running: AppUpdateVersion) -> AppUpdateState {
         var state = AppUpdateState()
+        state.retry = retry
         if let updated, updated.to == running { state.updated = updated }
-        guard case .install(let automatic) = mode, let staged, staged.feed.version > running else { return state }
-        state.offer = staged.feed
-        state.downloadAsked = staged.asked
-        state.phase = automatic || staged.asked ? .ready : .available
+        guard case .install = mode, let staged, staged.feed.version > running else { return state }
+        state.unconfirmed = staged
         return state
     }
 
     /// One event; returns what to do next. `mode` is how this copy takes updates now (the Settings switch included).
     mutating func apply(_ event: AppUpdateEvent, mode: AppUpdateMode) -> [AppUpdateEffect] {
         switch event {
-        case .checkStarted(let byPerson):
+        case .checkStarted(let origin):
             checking = true
-            if byPerson { personChecking = true }
+            if origin.byPerson { personStarted = true }
+            if origin == .menu { personChecking = true }
             return []
-        case .checkFinished(let result):
+        case .checkFinished(let result, let now):
             checking = false
-            let answering = personChecking
+            let answering = personChecking, byPerson = personStarted
             personChecking = false
-            let (effects, answer) = finish(result, mode: mode)
+            personStarted = false
+            let (effects, answer) = finish(result, mode: mode, byPerson: byPerson, now: now)
             return effects + (answering ? [.answer(answer)] : [])
         case .downloadAsked:
             guard phase == .available, let offer, case .install = mode else { return [] }
@@ -146,17 +173,17 @@ struct AppUpdateState: Equatable, Sendable {
             guard phase == .downloading, offer?.isSameRelease(as: feed) == true else { return [] }
             phase = .ready
             progress = nil
-            return []
+            guard retry != nil else { return [] }
+            retry = nil
+            return [.saveRetry(nil)]
         case .downloadFailed:
-            guard phase == .downloading else { return [] }
-            progress = nil
-            if downloadAsked {
-                phase = .available
-                downloadFailed = true
-            } else {
-                clearRelease()   // silent: the next check tries again
-            }
+            failDownload()
             return []
+        case .downloadRejected(let feed, let now):
+            guard phase == .downloading, offer?.isSameRelease(as: feed) == true else { return [] }
+            retry = AppUpdateRetryRecord.counting(retry, failureOf: feed, at: now)
+            failDownload()
+            return [.saveRetry(retry)]
         case .automaticChanged:
             return automaticChanged(mode)
         case .notesViewed:
@@ -171,33 +198,71 @@ struct AppUpdateState: Equatable, Sendable {
         }
     }
 
-    private mutating func finish(_ result: AppUpdateCheckResult, mode: AppUpdateMode) -> ([AppUpdateEffect], AppUpdateCheckAnswer) {
-        lastCheckFailed = result == .failed
-        switch result {
-        case .failed:
-            return ([], .failed)
-        case .upToDate:
-            // Nothing newer than the running version: whatever this run held was withdrawn and must never install.
-            let effects = withdraw()
+    /// A download that didn't stage: an asked one says so and is offered again; an automatic one is silent (a later check
+    /// tries again, unless the retry record holds the DMG back).
+    private mutating func failDownload() {
+        guard phase == .downloading else { return }
+        progress = nil
+        if downloadAsked {
+            phase = .available
+            downloadFailed = true
+        } else {
             clearRelease()
-            return (effects, .upToDate)
-        case .offer(let feed):
-            return offer(feed, mode: mode)
         }
     }
 
-    private mutating func offer(_ feed: AppUpdateFeed, mode: AppUpdateMode) -> ([AppUpdateEffect], AppUpdateCheckAnswer) {
+    private mutating func finish(_ result: AppUpdateCheckResult, mode: AppUpdateMode, byPerson: Bool,
+                                 now: Date) -> ([AppUpdateEffect], AppUpdateCheckAnswer) {
+        lastCheckFailed = result == .failed
+        // This launch's first check settles a copy an earlier run staged (nothing else changes the state before it).
+        let pending = unconfirmed
+        unconfirmed = nil
+        switch result {
+        case .failed:
+            // The feed couldn't be reached or read: the copy shows and installs as staged.
+            if let pending { adopt(pending, mode: mode) }
+            return ([], .failed)
+        case .upToDate:
+            // Nothing newer than the running version: whatever this run held, staged or downloaded, was withdrawn.
+            var effects = withdraw()
+            if pending != nil { effects.append(.discardStaged) }
+            clearRelease()
+            return (effects + [.discardDownloads(keeping: nil)], .upToDate)
+        case .offer(let feed):
+            var effects: [AppUpdateEffect] = []
+            if let pending {
+                // The feed still names it: it shows now. Another release: it goes, never having shown.
+                if pending.feed.isSameRelease(as: feed) { adopt(pending, mode: mode) } else { effects.append(.discardStaged) }
+            }
+            let (more, answer) = offer(feed, mode: mode, byPerson: byPerson, now: now)
+            return (effects + more, answer)
+        }
+    }
+
+    /// A copy an earlier run staged, now confirmed: Update, or New Version with auto install off and never asked for.
+    private mutating func adopt(_ staged: AppUpdateStagedRecord, mode: AppUpdateMode) {
+        guard case .install(let automatic) = mode else { return }
+        offer = staged.feed
+        downloadAsked = staged.asked
+        downloadFailed = false
+        phase = automatic || staged.asked ? .ready : .available
+    }
+
+    private mutating func offer(_ feed: AppUpdateFeed, mode: AppUpdateMode, byPerson: Bool,
+                                now: Date) -> ([AppUpdateEffect], AppUpdateCheckAnswer) {
         guard case .install(let automatic) = mode else {
             if offer?.isSameRelease(as: feed) != true { downloadFailed = false }
             phase = .available
             offer = feed
             return ([], .cannotUpdate(feed))
         }
+        // An automatic check leaves a DMG the retry record holds back alone; the person's check fetches it.
+        let fetches = byPerson || AppUpdateRetryRecord.allowsAutomaticDownload(retry, of: feed, at: now)
         if let offer, offer.isSameRelease(as: feed), phase != .idle {
             switch phase {
             case .ready, .downloading:
                 return ([], .downloading(feed))
-            case .available where automatic:
+            case .available where automatic && fetches:
                 phase = .downloading
                 downloadFailed = false
                 return ([.download(feed)], .downloading(feed))
@@ -205,14 +270,18 @@ struct AppUpdateState: Equatable, Sendable {
                 return ([], .askToDownload(feed))
             }
         }
-        // Another release than the one held (newer, or the held one withdrawn): drop it first.
-        let effects = withdraw()
+        // Another release than the one held (newer, or the held one withdrawn): drop it first, and any other DMG's
+        // download (also with auto install off, where nothing downloads now).
+        let effects = withdraw() + [.discardDownloads(keeping: feed)]
         clearRelease()
-        offer = feed
         guard automatic else {
+            offer = feed
             phase = .available
             return (effects, .askToDownload(feed))
         }
+        // Held back: nothing downloads and nothing is shown (an automatic check is never answered).
+        guard fetches else { return (effects, .downloading(feed)) }
+        offer = feed
         phase = .downloading
         return (effects + [.download(feed)], .downloading(feed))
     }

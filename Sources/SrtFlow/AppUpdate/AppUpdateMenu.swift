@@ -28,7 +28,7 @@ struct AppUpdateMenuItem: View {
                     updater.requestPopover(for: focused)
                 }
             } else {
-                Button("Check for Updates…") { updater.check(byPerson: true) }
+                Button("Check for Updates…") { updater.check(from: .menu) }
             }
         }
     }

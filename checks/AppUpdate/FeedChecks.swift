@@ -121,7 +121,7 @@ enum FeedChecks {
         check(AppUpdateFeed.notes(notes, forLanguage: "es-MX") == ["Hola"], "notes: a regional variant")
         check(AppUpdateFeed.notes(notes, forLanguage: "fr") == ["Hello"], "notes: English when the language has none")
         guard let parsed = feed(valid()) else { return }
-        let record = AppUpdateStagedRecord(feed: parsed, appPath: "/Users/x/Library/Application Support/SrtFlow/Updates/staged/0.19.0/SkyCut.app",
+        let record = AppUpdateStagedRecord(feed: parsed, appPath: "/Users/x/Library/Application Support/SrtFlow/Updates/staged.noindex/0.19.0/SkyCut.app",
                                            asked: true)
         check((try? record.data()).flatMap(AppUpdateStagedRecord.init(data:)) == record, "the staged record reads back as written")
         check(AppUpdateStagedRecord(data: Data("{}".utf8)) == nil, "an empty staged record is none")
@@ -137,5 +137,22 @@ enum FeedChecks {
         check(!reopen.isFresh(now: now.addingTimeInterval(3600), freshness: 600), "reopen: an hour-old record is dropped")
         check(!reopen.isFresh(now: now.addingTimeInterval(-3600), freshness: 600), "reopen: a record from the future is dropped")
         check(AppUpdateReopenRecord(dictionary: ["windows": ["relative.skycut"], "at": 1.0]) == nil, "reopen: relative paths refused")
+        retryRecord(check)
+    }
+
+    /// The retry record (U1) on disk: read back as written; anything not exactly right is none.
+    private static func retryRecord(_ check: (Bool, String) -> Void) {
+        let retry = AppUpdateRetryRecord(dmgSHA256: sha, failures: 2, lastFailure: Date(timeIntervalSince1970: 1_800_000_000))
+        check((try? retry.data()).flatMap(AppUpdateRetryRecord.init(data:)) == retry, "the retry record reads back as written")
+        let good: [String: Any] = ["schema": 1, "dmg_sha256": sha, "failures": 2, "last_failure": 1_800_000_000.0]
+        let wrong: [(String, Any?)] = [("schema", 2), ("dmg_sha256", String(repeating: "AB", count: 32)), ("dmg_sha256", nil),
+                                       ("failures", 0), ("failures", 1000), ("failures", true), ("failures", 1.5), ("failures", "2"),
+                                       ("last_failure", "yesterday"), ("last_failure", nil)]
+        for (field, value) in wrong {
+            var object = good
+            object[field] = value
+            let data = try! JSONSerialization.data(withJSONObject: object)
+            check(AppUpdateRetryRecord(data: data) == nil, "a retry record with \(field) = \(value.map { "\($0)" } ?? "missing") is none")
+        }
     }
 }

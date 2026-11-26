@@ -6,7 +6,8 @@ import SwiftUI
 // looks in a toolbar strip; every popover (ready; waiting for running work, with the recording note; auto install off;
 // downloading; a download that didn't finish; a copy that can't update itself; after an update with and without the AI
 // line); the answers to a check started from the menu (the production NSAlerts); the app menu's item in both titles (a
-// SwiftUI stand-in: the real menu bar can't be captured off-screen); Settings › General › Software Update (on, off, can't).
+// SwiftUI stand-in: the real menu bar can't be captured off-screen); Settings › General › Software Update (on, off, ready,
+// can't, and with the test hook set).
 // The production views, fed sample states (AppUpdater.showForRender) and sample notes. Only images, no verdicts: the
 // behaviour is pinned by scripts/check-app-update.sh.
 
@@ -55,7 +56,7 @@ import SwiftUI
 
     @MainActor
     private static func show(_ phase: AppUpdateState.Phase, decision: AppUpdateEligibility.Decision = .updates, automatic: Bool = true,
-                             progress: Double? = nil, failed: Bool = false, asked: Bool = false) {
+                             progress: Double? = nil, failed: Bool = false, asked: Bool = false, testFeed: URL? = nil) {
         var state = AppUpdateState()
         state.phase = phase
         state.offer = phase == .idle ? nil : feed
@@ -63,7 +64,8 @@ import SwiftUI
         state.downloadFailed = failed
         state.downloadAsked = asked
         let today = Calendar.current.date(bySettingHour: 10, minute: 42, second: 0, of: Date())
-        AppUpdater.shared.showForRender(state, decision: decision, automatic: automatic, running: running, lastUpToDate: today)
+        AppUpdater.shared.showForRender(state, decision: decision, automatic: automatic, running: running, lastUpToDate: today,
+                                        testFeed: testFeed)
     }
 
     @MainActor
@@ -109,6 +111,10 @@ import SwiftUI
             try await Snapshot.take(Form { AppUpdateSettingsSection() }.formStyle(.grouped).scrollDisabled(true),
                                     to: file("settings-\(name)"), size: CGSize(width: 586, height: 250))
         }
+        // A test hook left set: its address under the status line.
+        show(.idle, testFeed: URL(string: "http://127.0.0.1:8123/skycut.json"))
+        try await Snapshot.take(Form { AppUpdateSettingsSection() }.formStyle(.grouped).scrollDisabled(true),
+                                to: file("settings-test-feed"), size: CGSize(width: 586, height: 270))
     }
 }
 

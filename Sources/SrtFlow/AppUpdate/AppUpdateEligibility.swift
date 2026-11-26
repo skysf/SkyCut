@@ -5,11 +5,13 @@ import Foundation
 // What it does: the one rule, a pure function of `Facts` (like MoveToApplicationsOffer.decide), so the checks feed it every
 // case. Only the release app updates: bundle id com.srtflow.SrtFlow, signed by the pinned Developer ID team, a plain x.y.z
 // version, running from a folder it can replace itself in. A release app that can't (on the installer disk, translocated,
-// a folder or bundle this user can't write, a volume without atomic swaps, the staging folder on another volume) is only
-// told, with the download page. Never: SkyCut Beta, ad-hoc and source builds, anything in dist/, .build, /tmp or a scratch
-// folder, and a scripted run (CI or SRTFLOW_* in the environment: checks, smokes, E2E) unless it points the test hook at a
-// loopback feed. A launch the AI helper made (SRTFLOW_AI_LAUNCH) is a normal launch here.
-// What it doesn't: gather the facts (AppUpdateLaunchFacts), check, download or install.
+// anywhere inside Desktop, Documents, Downloads or iCloud Drive (privacy-protected: the swap would ask for access from
+// inside the quit), a folder or bundle this user can't write, a volume without atomic swaps, the staging folder on another
+// volume) is only told, with the download page. Never: SkyCut Beta, ad-hoc and source builds, anything in dist/, .build,
+// /tmp or a scratch folder, a copy running from inside the Updates folder (a staged copy, an image mounted there), and a
+// scripted run (CI or SRTFLOW_* in the environment: checks, smokes, E2E) unless it points the test hook at a loopback
+// feed. A launch the AI helper made (SRTFLOW_AI_LAUNCH) is a normal launch here.
+// What it doesn't: gather the facts (AppUpdateLaunch), check, download or install.
 // Rules: docs/architecture/app-updates.md "Who updates".
 
 enum AppUpdateEligibility {
@@ -17,6 +19,8 @@ enum AppUpdateEligibility {
     /// The Developer ID team that signs releases (scripts/signing/common.sh, SIGNING_TEAM_ID; checks/app-update-wiring.sh
     /// keeps the two the same).
     static let releaseTeam = "26TVX3S9FR"
+    /// Privacy-protected folders under the home folder (Files and Folders): a copy anywhere inside only tells.
+    static let protectedFolders = ["Desktop", "Documents", "Downloads", "Library/Mobile Documents"]
 
     struct Facts: Equatable, Sendable {
         /// `Bundle.main.bundleURL`, standardized.
@@ -27,8 +31,12 @@ enum AppUpdateEligibility {
         /// CFBundleShortVersionString.
         var version: String?
         var environment: [String: String]
+        /// This user's home folder (for the privacy-protected folders).
+        var homeDirectory: String
         /// The feed comes from the test hook on this Mac (AppUpdateFeed.Source.isLoopback).
         var testHookIsLoopback: Bool
+        /// The bundle runs from inside the Updates folder (AppUpdateFiles.holds): a staged copy, an image mounted there.
+        var insideUpdatesFolder: Bool
         /// The bundle sits on a read-only disk image (InstallerDisk.containing).
         var onReadOnlyDiskImage: Bool
         /// This user can write the folder that holds the bundle (to swap a new copy in).
@@ -57,7 +65,8 @@ enum AppUpdateEligibility {
 
     /// Why a release app can't replace itself.
     enum CannotUpdate: Equatable, Sendable {
-        case installerDisk, translocated, folderNotWritable, bundleNotWritable, volumeCannotSwap, stagingOnOtherVolume
+        case installerDisk, translocated, protectedFolder, folderNotWritable, bundleNotWritable, volumeCannotSwap,
+             stagingOnOtherVolume
     }
 
     enum Never: Equatable, Sendable {
@@ -73,6 +82,8 @@ enum AppUpdateEligibility {
         case developmentVersion
         /// dist/, .build, /tmp, the temporary folders.
         case developmentFolder
+        /// A copy running from inside the Updates folder: never checks, downloads, installs or cleans up.
+        case updatesFolder
     }
 
     static func decide(_ facts: Facts) -> Decision {
@@ -80,12 +91,14 @@ enum AppUpdateEligibility {
         guard facts.bundleIdentifier == releaseBundleIdentifier else { return .never(.otherBundle) }
         let path = trimmed(facts.bundlePath)
         guard path.hasPrefix("/"), path.hasSuffix(".app") else { return .never(.notAppBundle) }
+        if facts.insideUpdatesFolder { return .never(.updatesFolder) }
         guard facts.teamIdentifier == releaseTeam else { return .never(.notReleaseSignature) }
         guard let version = facts.version, AppUpdateVersion(version) != nil else { return .never(.developmentVersion) }
         // Before the scratch folders: macOS translocates into the temporary folder (as MoveToApplicationsOffer does).
         if MoveToApplicationsOffer.isTranslocated(path) { return .notifyOnly(.translocated) }
         if MoveToApplicationsOffer.isDevelopmentFolder(path) { return .never(.developmentFolder) }
         if facts.onReadOnlyDiskImage { return .notifyOnly(.installerDisk) }
+        if isPrivacyProtected(path, home: facts.homeDirectory) { return .notifyOnly(.protectedFolder) }
         guard facts.folderWritable else { return .notifyOnly(.folderNotWritable) }
         guard facts.bundleWritable else { return .notifyOnly(.bundleNotWritable) }
         guard facts.volumeSupportsSwap else { return .notifyOnly(.volumeCannotSwap) }
@@ -99,6 +112,17 @@ enum AppUpdateEligibility {
         var environment = environment
         environment[MoveToApplicationsOffer.aiLaunchKey] = nil
         return MoveToApplicationsOffer.isScripted(environment)
+    }
+
+    /// Anywhere inside Desktop, Documents, Downloads or iCloud Drive of `home` (as reached through the Data volume too),
+    /// letter case ignored.
+    static func isPrivacyProtected(_ path: String, home: String) -> Bool {
+        let home = trimmed(home)
+        guard home.hasPrefix("/"), home.count > 1 else { return false }
+        let path = path.lowercased()
+        return [home, "/System/Volumes/Data" + home].contains { root in
+            protectedFolders.contains { path.hasPrefix((root + "/" + $0 + "/").lowercased()) }
+        }
     }
 
     private static func trimmed(_ path: String) -> String {

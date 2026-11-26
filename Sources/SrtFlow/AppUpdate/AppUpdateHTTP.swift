@@ -7,7 +7,9 @@ import Foundation
 // about the person: no account, key, machine id or other identifier, only a generic User-Agent. No redirects are
 // followed (the feed and the DMG are served directly; anything else is a failure). The feed is at most 64 KB; the DMG
 // never more bytes than the feed says, then its size and SHA-256 are checked before anything opens it. Every failure is a
-// thrown error or nil, which the updater keeps to itself. The hashing blocks a thread: it runs on AppUpdateWork.queue.
+// thrown error or nil, which the updater keeps to itself; a DMG that came down but isn't the feed's (more bytes, another
+// size, another SHA-256) throws AppUpdateDMGMismatch, which the retry record counts (AppUpdatePipeline). The hashing
+// blocks a thread: it runs on AppUpdateWork.queue.
 // What it doesn't: parse (AppUpdateFeed), decide when (AppUpdater), open the image (AppUpdateStager).
 // Rules: docs/architecture/app-updates.md "Checking" and "Downloading".
 
@@ -28,6 +30,14 @@ enum AppUpdateWork {
 }
 
 struct AppUpdateError: LocalizedError, Equatable, CustomStringConvertible {
+    let description: String
+    init(_ description: String) { self.description = description }
+    var errorDescription: String? { description }
+}
+
+/// The download came down, but it isn't the feed's DMG: more bytes than the feed says, another size or another SHA-256.
+/// Unlike a download that didn't complete, it says something about the DMG: the retry record counts it.
+struct AppUpdateDMGMismatch: LocalizedError, Equatable, CustomStringConvertible {
     let description: String
     init(_ description: String) { self.description = description }
     var errorDescription: String? { description }
@@ -65,7 +75,8 @@ enum AppUpdateHTTP {
     }
 
     /// Downloads the feed's DMG to `destination` (replacing what is there): HTTP 200, no redirect, never more than the feed's
-    /// size; then the size and the SHA-256 are checked. Throws otherwise, leaving no file. Cancelling the task stops it.
+    /// size; then the size and the SHA-256 are checked. Throws otherwise, leaving no file: AppUpdateDMGMismatch when it came
+    /// down but isn't the feed's DMG. Cancelling the task stops it.
     static func download(_ feed: AppUpdateFeed, to destination: URL,
                          progress: @escaping @Sendable (Double) -> Void) async throws {
         let transfer = AppUpdateDownload(destination: destination, expectedBytes: feed.dmgSize, progress: progress)
@@ -78,9 +89,11 @@ enum AppUpdateHTTP {
             let size = await AppUpdateWork.run { () -> Int64? in
                 (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value
             }
-            guard size == feed.dmgSize else { throw AppUpdateError("size \(size ?? -1), the feed says \(feed.dmgSize)") }
+            guard size == feed.dmgSize else { throw AppUpdateDMGMismatch("size \(size ?? -1), the feed says \(feed.dmgSize)") }
             let digest = await AppUpdateWork.run { AppUpdateDigest.sha256(of: destination) }
-            guard digest == feed.dmgSHA256 else { throw AppUpdateError("SHA-256 \(digest ?? "unreadable"), the feed says \(feed.dmgSHA256)") }
+            guard digest == feed.dmgSHA256 else {
+                throw AppUpdateDMGMismatch("SHA-256 \(digest ?? "unreadable"), the feed says \(feed.dmgSHA256)")
+            }
         } catch {
             try? FileManager.default.removeItem(at: destination)
             throw error
@@ -120,6 +133,8 @@ final class AppUpdateDownload: NSObject, URLSessionDownloadDelegate, @unchecked 
     private var continuation: CheckedContinuation<Void, Error>?
     private var placed: Result<Void, Error>?
     private var task: URLSessionDownloadTask?
+    /// The server sent more bytes than the feed says: stopped, and reported as a mismatch (not a lost connection).
+    private var oversized = false
 
     init(destination: URL, expectedBytes: Int64, progress: @escaping @Sendable (Double) -> Void) {
         self.destination = destination
@@ -150,7 +165,10 @@ final class AppUpdateDownload: NSObject, URLSessionDownloadDelegate, @unchecked 
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
                     totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        guard totalBytesWritten <= expectedBytes else { return downloadTask.cancel() }
+        guard totalBytesWritten <= expectedBytes else {
+            lock.withLock { oversized = true }
+            return downloadTask.cancel()
+        }
         progress(Double(totalBytesWritten) / Double(max(expectedBytes, 1)))
     }
 
@@ -172,9 +190,13 @@ final class AppUpdateDownload: NSObject, URLSessionDownloadDelegate, @unchecked 
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        let (continuation, placed) = lock.withLock { () -> (CheckedContinuation<Void, Error>?, Result<Void, Error>?) in
+        let (continuation, placed, oversized) = lock.withLock {
+            () -> (CheckedContinuation<Void, Error>?, Result<Void, Error>?, Bool) in
             defer { self.continuation = nil }
-            return (self.continuation, self.placed)
+            return (self.continuation, self.placed, self.oversized)
+        }
+        if oversized {
+            return continuation?.resume(throwing: AppUpdateDMGMismatch("more bytes than the feed says (\(expectedBytes))")) ?? ()
         }
         if let error { return continuation?.resume(throwing: error) ?? () }
         continuation?.resume(with: placed ?? .failure(AppUpdateError("no file")))
