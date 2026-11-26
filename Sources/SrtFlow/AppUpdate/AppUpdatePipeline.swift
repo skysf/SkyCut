@@ -67,7 +67,7 @@ enum AppUpdatePipeline {
         }
         if !downloaded {
             do {
-                try await AppUpdateHTTP.download(feed, to: dmg, progress: progress)
+                try await AppUpdateHTTP.download(feed, into: files, progress: progress)
             } catch let mismatch as AppUpdateDMGMismatch {
                 log.notice("download rejected: \(mismatch.description, privacy: .public)")
                 return .rejected

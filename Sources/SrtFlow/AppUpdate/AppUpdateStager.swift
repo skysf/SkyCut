@@ -30,7 +30,7 @@ struct AppUpdateStager {
         let attach = AppUpdateTool.run(hdiutil, ["attach", "-readonly", "-nobrowse", "-noautoopen", "-noverify", "-noautofsck",
                                                  "-mountpoint", mount.path, dmg.path], timeout: 120)
         guard attach.status == 0 else {
-            Self.removeMountPoint(mount)
+            Self.removeMountPoint(mount, files: files)
             throw AppUpdateError("hdiutil attach: \(attach.output.trimmingCharacters(in: .whitespacesAndNewlines))")
         }
         defer { detach(mount) }
@@ -78,27 +78,34 @@ struct AppUpdateStager {
         if AppUpdateTool.run(hdiutil, ["detach", mount.path, "-quiet"], timeout: 60).status != 0 {
             _ = AppUpdateTool.run(hdiutil, ["detach", mount.path, "-quiet", "-force"], timeout: 60)
         }
-        Self.removeMountPoint(mount)
+        Self.removeMountPoint(mount, files: files)
     }
 
-    /// Images a killed run left attached under Updates/ (its mount points): detached, their folders removed. At launch, for
-    /// a copy that installs only (AppUpdateLaunchFiles).
+    /// Images a killed run left attached under Updates/ (its mount points): detached, their folders removed. A `mount-…` that
+    /// is a link is never followed, and what it points to never detached: the link itself goes. At launch, for a copy that
+    /// installs only (AppUpdateLaunchFiles).
     static func detachLeftovers(in files: AppUpdateFiles, hdiutil: String = "/usr/bin/hdiutil") {
         for item in files.contents(of: files.root) where item.lastPathComponent.hasPrefix("mount-") {
+            if AppUpdateFiles.isLink(item) {
+                files.remove(item)
+                continue
+            }
             if isMountPoint(item) { _ = AppUpdateTool.run(hdiutil, ["detach", item.path, "-quiet", "-force"], timeout: 60) }
-            removeMountPoint(item)
+            removeMountPoint(item, files: files)
         }
     }
 
     /// Removes the folder only when nothing is mounted on it and it is empty (never a mounted volume's contents).
-    private static func removeMountPoint(_ folder: URL) {
+    private static func removeMountPoint(_ folder: URL, files: AppUpdateFiles) {
         guard !isMountPoint(folder) else { return }
-        rmdir(folder.path)
+        files.removeEmptyFolder(folder)
     }
 
+    /// A real folder (never a link: lstat) on another device than the folder holding it.
     static func isMountPoint(_ folder: URL) -> Bool {
         var here = stat(), parent = stat()
-        guard stat(folder.path, &here) == 0, stat(folder.deletingLastPathComponent().path, &parent) == 0 else { return false }
+        guard lstat(folder.path, &here) == 0, (here.st_mode & S_IFMT) == S_IFDIR,
+              stat(folder.deletingLastPathComponent().path, &parent) == 0 else { return false }
         return here.st_dev != parent.st_dev
     }
 }

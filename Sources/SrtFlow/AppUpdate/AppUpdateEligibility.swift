@@ -5,12 +5,13 @@ import Foundation
 // What it does: the one rule, a pure function of `Facts` (like MoveToApplicationsOffer.decide), so the checks feed it every
 // case. Only the release app updates: bundle id com.srtflow.SrtFlow, signed by the pinned Developer ID team, a plain x.y.z
 // version, running from a folder it can replace itself in. A release app that can't (on the installer disk, translocated,
-// anywhere inside Desktop, Documents, Downloads or iCloud Drive (privacy-protected: the swap would ask for access from
-// inside the quit), a folder or bundle this user can't write, a volume without atomic swaps, the staging folder on another
-// volume) is only told, with the download page. Never: SkyCut Beta, ad-hoc and source builds, anything in dist/, .build,
-// /tmp or a scratch folder, a copy running from inside the Updates folder (a staged copy, an image mounted there), and a
-// scripted run (CI or SRTFLOW_* in the environment: checks, smokes, E2E) unless it points the test hook at a loopback
-// feed. A launch the AI helper made (SRTFLOW_AI_LAUNCH) is a normal launch here.
+// anywhere inside Desktop, Documents, Downloads, iCloud Drive or third-party cloud storage (privacy-protected: the swap
+// would ask for access from inside the quit), a folder or bundle this user can't write, a volume without atomic swaps, the
+// staging folder on another volume) is only told, with the download page. Never: SkyCut Beta, ad-hoc and source builds,
+// anything in dist/, .build, /tmp or a scratch folder, a copy running from inside the Updates folder (a staged copy, an
+// image mounted there; through the Data volume's spelling too), and a scripted run (CI or SRTFLOW_* in the environment:
+// checks, smokes, E2E) unless it points the test hook at a loopback feed. A launch the AI helper made (SRTFLOW_AI_LAUNCH)
+// is a normal launch here.
 // What it doesn't: gather the facts (AppUpdateLaunch), check, download or install.
 // Rules: docs/architecture/app-updates.md "Who updates".
 
@@ -19,8 +20,9 @@ enum AppUpdateEligibility {
     /// The Developer ID team that signs releases (scripts/signing/common.sh, SIGNING_TEAM_ID; checks/app-update-wiring.sh
     /// keeps the two the same).
     static let releaseTeam = "26TVX3S9FR"
-    /// Privacy-protected folders under the home folder (Files and Folders): a copy anywhere inside only tells.
-    static let protectedFolders = ["Desktop", "Documents", "Downloads", "Library/Mobile Documents"]
+    /// Privacy-protected folders under the home folder (Files and Folders): a copy anywhere inside only tells. iCloud Drive
+    /// is Library/Mobile Documents; third-party cloud storage (File Provider: Dropbox, OneDrive, …) is Library/CloudStorage.
+    static let protectedFolders = ["Desktop", "Documents", "Downloads", "Library/Mobile Documents", "Library/CloudStorage"]
 
     struct Facts: Equatable, Sendable {
         /// `Bundle.main.bundleURL`, standardized.
@@ -114,8 +116,8 @@ enum AppUpdateEligibility {
         return MoveToApplicationsOffer.isScripted(environment)
     }
 
-    /// Anywhere inside Desktop, Documents, Downloads or iCloud Drive of `home` (as reached through the Data volume too),
-    /// letter case ignored.
+    /// Anywhere inside Desktop, Documents, Downloads, iCloud Drive or CloudStorage of `home` (as reached through the Data
+    /// volume too), letter case ignored.
     static func isPrivacyProtected(_ path: String, home: String) -> Bool {
         let home = trimmed(home)
         guard home.hasPrefix("/"), home.count > 1 else { return false }

@@ -81,6 +81,14 @@ enum AppUpdateEffect: Equatable, Sendable {
     /// Keep the retry record on disk (nil: remove it).
     case saveRetry(AppUpdateRetryRecord?)
     case answer(AppUpdateCheckAnswer)
+
+    /// Reads or writes the Updates folder: never for a copy that only tells (it may share the folder with one that installs).
+    var touchesFiles: Bool {
+        switch self {
+        case .download, .discardStaged, .discardDownloads, .saveRetry: return true
+        case .cancelDownload, .answer: return false
+        }
+    }
 }
 
 struct AppUpdateState: Equatable, Sendable {
@@ -144,8 +152,15 @@ struct AppUpdateState: Equatable, Sendable {
         return state
     }
 
-    /// One event; returns what to do next. `mode` is how this copy takes updates now (the Settings switch included).
+    /// One event; returns what to do next. `mode` is how this copy takes updates now (the Settings switch included). A copy
+    /// that only tells gets no effect on the Updates folder: another copy of SkyCut, one that installs, may be using it.
     mutating func apply(_ event: AppUpdateEvent, mode: AppUpdateMode) -> [AppUpdateEffect] {
+        let effects = transition(event, mode: mode)
+        guard case .notifyOnly = mode else { return effects }
+        return effects.filter { !$0.touchesFiles }
+    }
+
+    private mutating func transition(_ event: AppUpdateEvent, mode: AppUpdateMode) -> [AppUpdateEffect] {
         switch event {
         case .checkStarted(let origin):
             checking = true

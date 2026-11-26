@@ -72,6 +72,7 @@ enum InstallChecks {
         try refusals(root, running, check)
         try ownCopyOnly(root, running, check)
         try noDowngrade(root, running, check)
+        try stagedGone(root, check)
         try crossVolume(root, running, check)
         print("==> a loop of swaps killed at random instants")
         try kills(root, binary: binary, check)
@@ -186,6 +187,22 @@ enum InstallChecks {
         check(linked.installer().install(through, running: running) == .recordRefused, "a staged copy reached through a link is refused")
         untouched(linked, "a staged copy reached through a link", staged: false, check)
         check(UpdateFixture.marker(of: reached) == "through-link", "what the link points to stays where it is, whole")
+    }
+
+    /// A staged copy another SkyCut removed meanwhile (renamed aside in one step, AppUpdateFiles.remove): the swap fails and
+    /// the old app stays whole, never half a bundle in its place.
+    private static func stagedGone(_ root: URL, _ check: (Bool, String) -> Void) throws {
+        let scene = try Scene(root, "staged-gone")
+        let record = try scene.prepare()
+        let staged = URL(fileURLWithPath: record.appPath)
+        scene.files.remove(staged)
+        do {
+            try AppUpdateInstaller.exchange(staged, scene.destination)
+            check(false, "a swap whose staged copy is gone fails")
+        } catch {
+            check(UpdateFixture.marker(of: scene.destination) == "old" && UpdateFixture.codesignVerifies(scene.destination),
+                  "a swap whose staged copy was removed meanwhile fails, the old app whole (\(error.localizedDescription))")
+        }
     }
 
     /// No downgrade at quit (E2): what is at the destination now is read again; the same version or a newer one stays.

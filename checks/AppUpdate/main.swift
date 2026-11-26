@@ -30,6 +30,7 @@ struct AppUpdateChecks {
             try await FlowChecks.run(server: server, root: root.appendingPathComponent("flow"), check: check)
             try InstallChecks.run(root: root.appendingPathComponent("install"), binary: arguments[0], check: check)
             try LaunchChecks.run(root: root.appendingPathComponent("launch"), check: check)
+            try FilesChecks.run(root: root.appendingPathComponent("files"), check: check)
         } catch {
             check(false, "fixture: \(error)")
         }

@@ -4,8 +4,8 @@
 #      defaults key is read only through AppUpdateFeed.Source.overrideKey.
 #   2. The app is replaced only through the atomic exchange: renamex_np with RENAME_SWAP in AppUpdateInstaller.swift and
 #      nowhere else; the quit's installer keeps the default swap; the installer moves nothing else onto the destination.
-#      Nothing is deleted but through AppUpdateFiles.remove (inside the Updates folder) or the download's own file; only
-#      the replaced app goes to the Trash.
+#      Nothing is deleted outside AppUpdateFiles.swift (remove, removeEmptyFolder: inside the Updates folder only, never
+#      through a link at its root, renamed aside first); only the replaced app goes to the Trash.
 #   3. The updater starts once, from startServices (after the move offer, never on the launch path itself); the install
 #      runs at applicationWillTerminate, after the Compress / Burn In stop; the menu item follows About; Settings › General
 #      holds the section; the pill is in the editor's toolbar (between the AI badge and the cloud tasks) and the tools' one.
@@ -20,8 +20,10 @@
 #      the production verifier at quit and when staging (no empty verifier anywhere); an install only for `decision ==
 #      .updates`; the launch reads and cleans the Updates folder only through AppUpdateLaunchFiles.take, which returns at
 #      once unless `decision == .updates`; the restart's shell is AppUpdateRelaunch (waits for this pid, opens the path with
-#      /usr/bin/open, never -n); the pipeline's outcome reaches the state machine; file effects go onto the work queue; a copy
-#      inside the Updates folder never updates; Settings shows the test hook while one is set.
+#      /usr/bin/open, never -n); the pipeline's outcome reaches the state machine; file effects go onto the work queue, only
+#      for a copy that installs; a copy inside the Updates folder never updates; Settings shows the test hook while one is
+#      set. And (review FBU2, F10) the schedule's origin, the retry record at launch, the real home folder, the cadence, a
+#      cancelled download's silence and the record matched to the offer.
 # Usage: checks/app-update-wiring.sh
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -61,11 +63,13 @@ INSTALLER="${DIR}/AppUpdateInstaller.swift"
 if grep -nE '(^|[^A-Za-z])(moveItem|replaceItem|copyItem|linkItem|createSymbolicLink)' "${INSTALLER}"; then
   fail "AppUpdateInstaller.swift moves, copies or replaces nothing itself: only the swap touches the destination"
 fi
-REMOVERS="$(code_hits 'removeItem[(]' "${DIR}")"
-[ "${REMOVERS}" = "${DIR}/AppUpdateFiles.swift ${DIR}/AppUpdateHTTP.swift " ] \
-  || fail "the updater deletes only through AppUpdateFiles.remove (and the download's own file in AppUpdateHTTP) (found in: ${REMOVERS:-nothing})"
-[ "$(grep -c 'FileManager.default.removeItem(at:' "${DIR}/AppUpdateFiles.swift")" = 1 ] \
-  || fail "AppUpdateFiles.swift deletes in one place, its guarded remove"
+REMOVERS="$(code_hits 'removeItem[(]|unlink[(]|rmdir[(]|recycle[(]|Darwin[.]remove[(]' "${DIR}")"
+[ "${REMOVERS}" = "${DIR}/AppUpdateFiles.swift " ] \
+  || fail "the updater deletes only in AppUpdateFiles.swift (remove, removeEmptyFolder) (found in: ${REMOVERS:-nothing})"
+for primitive in 'FileManager.default.removeItem(at:' 'rmdir(' 'unlink('; do
+  [ "$(grep -c -F "${primitive}" "${DIR}/AppUpdateFiles.swift")" = 1 ] \
+    || fail "AppUpdateFiles.swift deletes in one place each (${primitive}): after renaming aside, an empty folder, a link at removing.noindex"
+done
 TRASHERS="$(code_hits 'trashItem[(]' "${DIR}")"
 [ "${TRASHERS}" = "${DIR}/AppUpdateLaunch.swift ${DIR}/AppUpdater.swift " ] \
   || fail "only the install at quit and the launch cleanup send anything to the Trash (found in: ${TRASHERS:-nothing})"
@@ -175,7 +179,29 @@ for effect in 'AppUpdateWork.queue.addOperation { files.removeStaged(except: nil
   'AppUpdateWork.queue.addOperation { files.writeRetry(record) }'; do
   [ "$(count "${effect}" "${UPDATER}")" = 1 ] || fail "${UPDATER}: missing or repeated file effect: ${effect}"
 done
+TOUCH_LINE="$(line_of 'if effect.touchesFiles {' "${UPDATER}")"
+GATE_LINE="$(line_of 'guard decision == .updates else { return }' "${UPDATER}")"
+if [ -z "${TOUCH_LINE}" ] || [ -z "${GATE_LINE}" ] || [ $((GATE_LINE - TOUCH_LINE)) -ne 1 ]; then
+  fail "${UPDATER}: file effects run only for a copy that installs (review FBU2, F5)"
+fi
+# Review FBU2, F10: the coordinator's lines for U1, E5 and the cadence.
+[ "$(count 'self?.check(from: .schedule)' "${UPDATER}")" = 1 ] && [ "$(grep -cE 'check\(from: \.(menu|settings)\)' "${UPDATER}")" = 0 ] \
+  && [ "$(count 'updater.check(from: .menu)' "${DIR}/AppUpdateMenu.swift")" = 1 ] && [ "$(count 'updater.check(from: .settings)' "${DIR}/AppUpdateSettingsSection.swift")" = 1 ] \
+  || fail "the schedule's check is the automatic one (.schedule), the menu's and Settings' the person's: a held DMG stays held"
+[ "$(count 'retry: reading.files.retry,' "${UPDATER}")" = 1 ] || fail "${UPDATER}: the retry record read at launch reaches the state machine"
+[ "$(count 'static let firstCheckDelay: Duration = .seconds(60)' "${UPDATER}")" = 1 ] \
+  && [ "$(count 'static let checkInterval: Duration = .seconds(24 * 60 * 60)' "${UPDATER}")" = 1 ] \
+  || fail "${UPDATER}: a check about a minute after launch, then every 24 hours"
+CANCEL_LINE="$(line_of 'guard !Task.isCancelled, let self else { return }' "${UPDATER}")"
+SEND_LINE="$(line_of 'self.send(outcome.event(for: feed, at: Date()))' "${UPDATER}")"
+if [ -z "${CANCEL_LINE}" ] || [ -z "${SEND_LINE}" ] || [ $((SEND_LINE - CANCEL_LINE)) -ne 1 ]; then
+  fail "${UPDATER}: a cancelled download reports nothing"
+fi
+[ "$(count 'let record = files.readStaged(), record.feed.isSameRelease(as: offer) else { return }' "${UPDATER}")" = 1 ] \
+  || fail "${UPDATER}: installAtQuit installs only the record of the release on offer"
 LAUNCH="${DIR}/AppUpdateLaunch.swift"
+[ "$(count 'homeDirectory: manager.homeDirectoryForCurrentUser.path,' "${LAUNCH}")" = 1 ] \
+  || fail "${LAUNCH}: the launch's facts carry the real home folder (the protected folders)"
 [ "$(count 'let found = AppUpdateLaunchFiles.take(from: files, decision: decision, running: running, runningBundle: Bundle.main.bundleURL,' "${LAUNCH}")" = 1 ] \
   || fail "${LAUNCH}: the launch reads the Updates folder only through AppUpdateLaunchFiles.take, with its decision"
 [ "$(count 'guard decision == .updates, let running else { return AppUpdateLaunchFiles() }' "${DIR}/AppUpdateLaunchFiles.swift")" = 1 ] \

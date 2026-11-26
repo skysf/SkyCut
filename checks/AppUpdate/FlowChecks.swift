@@ -52,44 +52,47 @@ enum FlowChecks {
 
     private static func downloads(_ server: LoopbackServer, root: URL, size: Int64, sha: String, check: (Bool, String) -> Void) async throws {
         let source = server.source("feed.json")
-        let target = root.appendingPathComponent("downloaded.dmg")
+        let files = AppUpdateFiles(root: root.appendingPathComponent("http/Updates"))
+        try files.makeFolders()
         func parsed(size: Int64, sha: String, path: String = "SkyCut-1.1.0.dmg") -> AppUpdateFeed {
             AppUpdateFeed.parse(UpdateFixture.feedJSON(version: "1.1.0", build: "2", url: server.url(path).absoluteString, size: size, sha: sha),
                                 from: source)!
         }
         let progress = ProgressBox()
+        let good = parsed(size: size, sha: sha)
         do {
-            try await AppUpdateHTTP.download(parsed(size: size, sha: sha), to: target) { progress.add($0) }
-            check(UpdateFixture.sha256(target) == sha, "the DMG downloads whole")
+            try await AppUpdateHTTP.download(good, into: files) { progress.add($0) }
+            check(UpdateFixture.sha256(files.dmg(for: good)) == sha, "the DMG downloads whole, to its place in downloads/")
             check(progress.last == 1, "progress reaches 100% (last \(progress.last))")
         } catch {
             check(false, "the DMG downloads whole: \(error)")
         }
+        files.removeDownloads()
         let wrongSHA = String(repeating: "0", count: 64)
         // Came down but isn't the feed's DMG (counted by the retry record), or didn't come down at all (not counted).
-        await refuses("a wrong SHA-256", parsed(size: size, sha: wrongSHA), target, mismatch: true, check)
-        await refuses("a feed that says bigger", parsed(size: size + 1, sha: sha), target, mismatch: true, check)
-        await refuses("a feed that says smaller (more bytes than it says)", parsed(size: size - 1, sha: sha), target, mismatch: true, check)
-        await refuses("a missing DMG (404)", parsed(size: size, sha: sha, path: "nothing.dmg"), target, mismatch: false, check)
+        await refuses("a wrong SHA-256", parsed(size: size, sha: wrongSHA), files, mismatch: true, check)
+        await refuses("a feed that says bigger", parsed(size: size + 1, sha: sha), files, mismatch: true, check)
+        await refuses("a feed that says smaller (more bytes than it says)", parsed(size: size - 1, sha: sha), files, mismatch: true, check)
+        await refuses("a missing DMG (404)", parsed(size: size, sha: sha, path: "nothing.dmg"), files, mismatch: false, check)
         try FileManager.default.createDirectory(at: server.folder.appendingPathComponent("folder.dmg"), withIntermediateDirectories: true)
-        await refuses("a redirect", parsed(size: size, sha: sha, path: "folder.dmg"), target, mismatch: false, check)
-        let cancelled = Task { try await AppUpdateHTTP.download(parsed(size: size, sha: sha), to: target) { _ in } }
+        await refuses("a redirect", parsed(size: size, sha: sha, path: "folder.dmg"), files, mismatch: false, check)
+        let cancelled = Task { try await AppUpdateHTTP.download(good, into: files) { _ in } }
         cancelled.cancel()
         let outcome = await cancelled.result
         if case .failure(let error) = outcome {
-            check(!(error is AppUpdateDMGMismatch) && !FileManager.default.fileExists(atPath: target.path),
+            check(!(error is AppUpdateDMGMismatch) && UpdateFixture.contents(of: files.downloads).isEmpty,
                   "a cancelled download leaves no file and isn't a mismatch")
         } else {
             check(false, "a cancelled download is refused")
         }
     }
 
-    private static func refuses(_ label: String, _ feed: AppUpdateFeed, _ target: URL, mismatch: Bool, _ check: (Bool, String) -> Void) async {
+    private static func refuses(_ label: String, _ feed: AppUpdateFeed, _ files: AppUpdateFiles, mismatch: Bool, _ check: (Bool, String) -> Void) async {
         do {
-            try await AppUpdateHTTP.download(feed, to: target) { _ in }
+            try await AppUpdateHTTP.download(feed, into: files) { _ in }
             check(false, "\(label): refused")
         } catch {
-            check(!FileManager.default.fileExists(atPath: target.path), "\(label): refused, no file left (\(error.localizedDescription))")
+            check(UpdateFixture.contents(of: files.downloads).isEmpty, "\(label): refused, no file left (\(error.localizedDescription))")
             check((error is AppUpdateDMGMismatch) == mismatch,
                   "\(label): \(mismatch ? "the DMG isn't the feed's (counted)" : "it didn't come down (not counted)") (got \(type(of: error)))")
         }
@@ -168,6 +171,17 @@ enum FlowChecks {
         check(attached.status == 0 && Tools.isMounted(mount), "a killed run's image is attached under Updates/")
         AppUpdateStager.detachLeftovers(in: files)
         check(!Tools.isMounted(mount) && !FileManager.default.fileExists(atPath: mount.path), "the next launch detaches it and removes its mount point")
+        // A `mount-…` link to a volume mounted elsewhere: never followed, what it points to never detached; the link goes.
+        let elsewhere = root.appendingPathComponent("leftover/elsewhere-mount")
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+        let mountedElsewhere = Tools.run("/usr/bin/hdiutil", ["attach", "-readonly", "-nobrowse", "-noautoopen", "-noverify", "-mountpoint",
+                                                              elsewhere.path, dmg.path])
+        defer { Tools.run("/usr/bin/hdiutil", ["detach", "-quiet", "-force", elsewhere.path]) }
+        let link = files.root.appendingPathComponent("mount-link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: elsewhere)
+        check(mountedElsewhere.status == 0 && Tools.isMounted(elsewhere), "a volume is mounted outside Updates/, a mount-… link to it inside")
+        AppUpdateStager.detachLeftovers(in: files)
+        check(Tools.isMounted(elsewhere) && !AppUpdateFiles.isLink(link), "a mount-… link: the volume it points to stays mounted, the link itself goes")
     }
 }
 

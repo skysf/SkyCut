@@ -74,12 +74,14 @@ enum AppUpdateHTTP {
         return data
     }
 
-    /// Downloads the feed's DMG to `destination` (replacing what is there): HTTP 200, no redirect, never more than the feed's
-    /// size; then the size and the SHA-256 are checked. Throws otherwise, leaving no file: AppUpdateDMGMismatch when it came
-    /// down but isn't the feed's DMG. Cancelling the task stops it.
-    static func download(_ feed: AppUpdateFeed, to destination: URL,
+    /// Downloads the feed's DMG to its place in `files` (`files.dmg(for:)`, replacing what is there): HTTP 200, no redirect,
+    /// never more than the feed's size; then the size and the SHA-256 are checked. Throws otherwise, leaving no file
+    /// (removed through `files.remove`, like every deletion): AppUpdateDMGMismatch when it came down but isn't the feed's DMG.
+    /// Cancelling the task stops it.
+    static func download(_ feed: AppUpdateFeed, into files: AppUpdateFiles,
                          progress: @escaping @Sendable (Double) -> Void) async throws {
-        let transfer = AppUpdateDownload(destination: destination, expectedBytes: feed.dmgSize, progress: progress)
+        let destination = files.dmg(for: feed)
+        let transfer = AppUpdateDownload(destination: destination, files: files, expectedBytes: feed.dmgSize, progress: progress)
         let session = session(requestTimeout: 60, resourceTimeout: 3600, delegate: transfer)
         defer { session.finishTasksAndInvalidate() }
         do {
@@ -95,7 +97,7 @@ enum AppUpdateHTTP {
                 throw AppUpdateDMGMismatch("SHA-256 \(digest ?? "unreadable"), the feed says \(feed.dmgSHA256)")
             }
         } catch {
-            try? FileManager.default.removeItem(at: destination)
+            files.remove(destination)
             throw error
         }
     }
@@ -127,6 +129,7 @@ final class AppUpdateNoRedirects: NSObject, URLSessionTaskDelegate {
 /// One DMG download with progress: the file is moved out of URLSession's temporary place before its callback returns.
 final class AppUpdateDownload: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     private let destination: URL
+    private let files: AppUpdateFiles
     private let expectedBytes: Int64
     private let progress: @Sendable (Double) -> Void
     private let lock = NSLock()
@@ -136,8 +139,9 @@ final class AppUpdateDownload: NSObject, URLSessionDownloadDelegate, @unchecked 
     /// The server sent more bytes than the feed says: stopped, and reported as a mismatch (not a lost connection).
     private var oversized = false
 
-    init(destination: URL, expectedBytes: Int64, progress: @escaping @Sendable (Double) -> Void) {
+    init(destination: URL, files: AppUpdateFiles, expectedBytes: Int64, progress: @escaping @Sendable (Double) -> Void) {
         self.destination = destination
+        self.files = files
         self.expectedBytes = expectedBytes
         self.progress = progress
     }
@@ -179,7 +183,7 @@ final class AppUpdateDownload: NSObject, URLSessionDownloadDelegate, @unchecked 
             result = .failure(AppUpdateError("HTTP \(status)"))
         } else {
             do {
-                try? FileManager.default.removeItem(at: destination)
+                files.remove(destination)
                 try FileManager.default.moveItem(at: location, to: destination)
                 result = .success(())
             } catch {

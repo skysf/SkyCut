@@ -140,6 +140,14 @@ enum LaunchChecks {
         check(!AppUpdateFiles.isLink(versionLink) && UpdateFixture.marker(of: elsewhereApp) == "elsewhere",
               "…while the link itself, inside the folder, is removed")
 
+        // An app as old as the running one (1.0.0 put back by hand after an update), even in a newer version's folder: our
+        // leftover, deleted, never sent to the Trash; only an app older than both goes there.
+        let putBack = try LaunchScene(root, "put-back")
+        let asOld = try putBack.app("1.0.0", inFolder: "1.1.0", marker: "as old as the running one")
+        AppUpdateLaunchFiles.clean(putBack.files, running: AppUpdateVersion("1.0.0")!, runningBundle: putBack.runningBundle, trash: putBack.trash)
+        check(putBack.trashed.isEmpty && !FileManager.default.fileExists(atPath: asOld.path),
+              "an app as old as the running one is deleted, never sent to the Trash (only one older than both goes there)")
+
         let byHand = try LaunchScene(root, "installed-by-hand")
         let never = try byHand.app("1.1.0", inFolder: "1.1.0", marker: "never installed")
         try byHand.files.writeStaged(AppUpdateStagedRecord(feed: FeedChecks.feed(FeedChecks.valid(version: "1.1.0"))!, appPath: never.path, asked: false))

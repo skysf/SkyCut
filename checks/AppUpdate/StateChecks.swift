@@ -16,6 +16,7 @@ enum StateChecks {
         automatic(feed, newer, check)
         manual(feed, check)
         notifyOnly(feed, check)
+        notifyFiles(feed, check)
         launch(feed, newer, check)
         retry(feed, otherDMG, check)
         busy(check)
@@ -115,6 +116,23 @@ enum StateChecks {
         check(state.pill == .newVersion && AppUpdatePopoverContent.choose(state, mode: mode) == .cannotUpdate(feed), "can't update: New Version, the can't popover")
         check(state.apply(.downloadAsked, mode: mode).isEmpty, "can't update: nothing ever downloads")
         check(AppUpdatePopoverContent.choose(state, mode: manualMode) == .available(feed), "auto off: the Download and Install popover")
+    }
+
+    /// A copy that only tells touches no file (review FBU2, F5): another copy, one that installs, may share the folder.
+    private static func notifyFiles(_ feed: AppUpdateFeed, _ check: (Bool, String) -> Void) {
+        let mode = AppUpdateMode.notifyOnly(.installerDisk)
+        var state = AppUpdateState()
+        _ = state.apply(done(.offer(feed)), mode: mode)
+        let upToDate = state.apply(done(.upToDate), mode: mode)
+        check(upToDate.isEmpty && state.pill == nil,
+              "a copy that only tells, up to date: no file effect, another copy's DMG and staged copy stay (got \(upToDate))")
+        var person = AppUpdateState()
+        _ = person.apply(.checkStarted(.menu), mode: mode)
+        check(person.apply(done(.upToDate), mode: mode) == [.answer(.upToDate)], "…the menu's check there is still answered")
+        check(AppUpdateEffect.discardDownloads(keeping: nil).touchesFiles && AppUpdateEffect.discardStaged.touchesFiles
+              && AppUpdateEffect.saveRetry(nil).touchesFiles && AppUpdateEffect.download(feed).touchesFiles
+              && !AppUpdateEffect.cancelDownload.touchesFiles && !AppUpdateEffect.answer(.upToDate).touchesFiles,
+              "the effects on the Updates folder are told apart")
     }
 
     /// A copy an earlier run staged (U2): unseen and never installed until this launch's first check confirms it (the feed

@@ -388,7 +388,9 @@ CDN 缓存属于外部状态，每次发布都要执行这条真实网络检查�
 4. Once Cloudflare Pages has deployed it: `python3 scripts/check-release-download.py <verified.dmg> --feed` (the live feed,
    read as SkyCut reads it, names this DMG, which downloads whole with its size and SHA-256).
 
-Pulling a bad release: publish the feed of the previous version again. What that does and doesn't do:
+Pulling a bad release: publish a valid feed again, the one of the previous (older) version. Only that pulls it: never
+remove the feed or break it, because a check that can't reach or read the feed lets a copy already staged install at the
+next quit (offline Macs still update). What a valid older feed does and doesn't do:
 
 - it stops new downloads of the bad release;
 - a copy already staged on a Mac is removed at that Mac's next check, but installs at a quit that comes first (within a run

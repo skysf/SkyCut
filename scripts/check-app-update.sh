@@ -60,6 +60,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -wmo \
   checks/AppUpdate/PipelineChecks.swift \
   checks/AppUpdate/InstallChecks.swift \
   checks/AppUpdate/LaunchChecks.swift \
+  checks/AppUpdate/FilesChecks.swift \
   -o "${WORK}/check-app-update"
 
 echo "==> loopback server"
@@ -115,20 +116,22 @@ fi
 FAILED=0
 "${WORK}/check-app-update" "${WORK}/scratch" "http://127.0.0.1:${PORT}/" "${WORK}/www" || FAILED=1
 
-# What every request carried (the server's record): standard headers only, `User-Agent: SkyCut`, no cookie, no key, no
-# machine id or other identifier (docs/architecture/app-updates.md "Checking"). `Priority` is URLSession's own on newer
-# systems. An empty record is a failure too: then nothing was checked.
+# What every request carried (the server's record): standard headers only, `User-Agent: SkyCut`, `Accept: */*`, no cookie,
+# no key, no machine id or other identifier, and no query string (docs/architecture/app-updates.md "Checking"). `Priority`
+# is URLSession's own on newer systems. An empty record is a failure too: then nothing was checked.
 echo "==> request headers"
 python3 - "${WORK}/requests.log" <<'PYTHON' || FAILED=1
 import json
 import sys
 
 ALLOWED = {"host", "user-agent", "accept", "accept-language", "accept-encoding", "connection", "cache-control", "priority"}
-FIXED = {"user-agent": "SkyCut", "cache-control": "no-cache"}
+FIXED = {"user-agent": "SkyCut", "cache-control": "no-cache", "accept": "*/*"}
 problems, requests = [], 0
 for line in open(sys.argv[1], encoding="utf-8"):
     request = json.loads(line)
     requests += 1
+    if "?" in request["path"]:
+        problems.append(f"{request['path']}: a query string in the request")
     for name, value in request["headers"]:
         key = name.lower()
         if key not in ALLOWED:

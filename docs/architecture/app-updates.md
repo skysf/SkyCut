@@ -32,8 +32,9 @@ published at release in the same PR that moves `/download/skycut`). The addresse
   Unknown fields are ignored, so a later feed can add some.
 - **Never offered**: a version not newer than the running one (no downgrade, no reinstall of the same version) or one
   needing a newer macOS.
-- **Withdrawing a release** (rolling the feed back to the current version is how a bad release is pulled). What it does
-  and doesn't do:
+- **Withdrawing a release** (rolling the feed back to the current version is how a bad release is pulled). Only a valid
+  feed naming an older version pulls it: a feed removed or broken is a check that can't reach or read the feed, and a copy
+  already staged then installs at the next quit (below). What a valid older feed does and doesn't do:
   - it stops new downloads: a check that finds nothing newer than the running version removes a staged copy and a kept
     download; a feed naming another release replaces them;
   - a copy already staged on a Mac is removed at that Mac's next check, but installs at a quit that comes first. Within a
@@ -55,12 +56,15 @@ One pure rule, `AppUpdateEligibility.decide` (like `MoveToApplicationsOffer.deci
   `scripts/signing/common.sh` pins it, a plain `x.y.z` version), running from a folder this user can write, the bundle
   writable too, on a volume that swaps atomically, with Application Support on the same volume.
 - **Only told** (the New Version pill, Open Download Page): such an app on the installer disk or translocated (#559's move
-  offer handles those first), anywhere inside Desktop, Documents, Downloads or iCloud Drive (privacy-protected folders:
-  the swap would ask for access from inside the quit, or fail at every quit after Don't Allow), or in a place it can't
-  replace itself. Never asks for administrator rights.
+  offer handles those first), anywhere inside Desktop, Documents, Downloads, iCloud Drive or third-party cloud storage
+  (`Library/CloudStorage`) (privacy-protected folders: the swap would ask for access from inside the quit, or fail at every
+  quit after Don't Allow; reached through `/System/Volumes/Data` too), or in a place it can't replace itself. Never asks
+  for administrator rights. A copy that only tells never touches the Updates folder: no file effect runs for it (another
+  copy of SkyCut, one that installs, may be using the folder).
 - **Never checks** (no menu item, no Settings section): SkyCut Beta, ad-hoc and source builds (`SKYCUT_ALLOW_ADHOC`), local
   builds' versions, `dist/`, `.build`, `/tmp` and scratch folders, a copy running from inside the Updates folder (a staged
-  copy started by its path, an image mounted there: it never checks, downloads, installs or cleans up), and scripted runs
+  copy started by its path, also spelled through `/System/Volumes/Data`, an image mounted there: it never checks,
+  downloads, installs or cleans up), and scripted runs
   (`CI` or `SRTFLOW_*` in the environment: checks, smokes, E2E) unless the test hook points at loopback.
   `SRTFLOW_AI_LAUNCH` (Claude or Codex opening SkyCut) is a normal launch.
 
@@ -73,8 +77,8 @@ failed).
 
 The requests are plain GETs from an ephemeral session: no cookies, cache or credentials, a generic `User-Agent: SkyCut`, no
 account, key, machine id or any other identifier. Redirects are refused (the feed and the DMG are served directly). The
-check records every request's headers on its loopback server and fails on any header beyond Host, User-Agent, Accept,
-Accept-Language, Accept-Encoding, Connection, Cache-Control and Priority.
+check records every request on its loopback server and fails on any header beyond Host, User-Agent (`SkyCut`), Accept
+(`*/*`), Accept-Language, Accept-Encoding, Connection, Cache-Control (`no-cache`) and Priority, and on any query string.
 
 ## 4. Downloading and verifying
 
@@ -134,8 +138,17 @@ Any failure before the swap leaves the old app where it was and (but for a broke
 the next quit; a swap across volumes or onto a missing destination fails without changing anything. A quit during logout or
 shutdown can at worst skip it. An AI client's `skycut-mcp` running from the old bundle keeps working (a rename under it; it
 opens the app at the same path next, as #559 measured). **The updater removes nothing outside its Updates folder**, except
-the replaced app going to the Trash: every deletion goes through `AppUpdateFiles.remove`, which refuses a path that leads
-outside once links are resolved, and removes a link itself, never what it points to.
+the replaced app going to the Trash. Every deletion, the download's own file included, is in `AppUpdateFiles.swift`
+(`remove`; `removeEmptyFolder` for an image's empty mount point; `checks/app-update-wiring.sh` pins it):
+
+- it refuses a path that leads outside once links are resolved (the Data volume's spelling is the same place as the plain
+  one), and removes a link itself, never what it points to;
+- it never goes through the Updates folder itself when that is a link (made by hand): nothing is removed, staged or
+  installed there, and a launch reads nothing there. A link above it (Application Support moved to another disk) is
+  followed as any path is;
+- it is one step for anyone watching: the item is first renamed into `removing.noindex/` in one call, then deleted there,
+  so another SkyCut never finds half a bundle at the path it knew (its swap of a staged path that is gone fails and leaves
+  its app). What a crash or a deletion that failed halfway leaves there is emptied at the next launch.
 
 ## 6. Restart and Update
 
@@ -179,15 +192,17 @@ Views subscribe to `AppUpdater` only (never a project or the player clock); ever
 ## 8. Files
 
 `Application Support/SrtFlow/Updates/`: `downloads/` (a finished download, kept until installed, §4),
-`staged.noindex/<version>/` (the verified copy; after the swap, the old app until it is trashed), `staged.json`,
-`installed.json` (read once by the next launch, then removed), `retry.json` (`AppUpdateRetryRecord`, §4), `mount-*` (image
-mount points; a killed run's are detached at the next launch). The new version reads the marker the old version wrote: its
+`staged.noindex/<version>/` (the verified copy; after the swap, the old app until it is trashed), `removing.noindex/` (what
+is being deleted, §5), `staged.json`, `installed.json` (read once by the next launch, then removed), `retry.json`
+(`AppUpdateRetryRecord`, §4), `mount-*` (image mount points; a killed run's are detached at the next launch, a link there is
+removed itself and what it points to never detached). The new version reads the marker the old version wrote: its
 format (`AppUpdateInstalledNote`) is part of the contract. UserDefaults: `SrtFlow.update.automatic.v1`,
 `SrtFlow.update.lastUpToDate.v1`, `SrtFlow.update.reopen.v1`, the test hook `SrtFlow.update.feedURL`.
 
 **At launch** (`AppUpdateLaunchFiles`), and only for a copy that installs (`decision == .updates`: a copy that only tells,
-never updates, or runs from inside the Updates folder touches nothing there): the marker is read once; images a killed run
-left attached are detached; in `staged.noindex/`, an app older than the running one, in the folder of a newer version
+never updates, or runs from inside the Updates folder touches nothing there; nor does any copy while the Updates folder
+itself is a link): the marker is read once; images a killed run left attached are detached; `removing.noindex/` is
+emptied; in `staged.noindex/`, an app older than the running one, in the folder of a newer version
 (where a swap leaves the copy it replaced when the installer couldn't trash it), goes to the Trash. The staged copy the
 record names, newer than the running app, stays. Anything else is our own download and is deleted, never sent to the
 Trash: a copy not newer than the running app (installed by hand or by #559's move), one no record names, an unfinished
@@ -203,17 +218,22 @@ than the running one stays; the rest goes.
   verifier's steps on their own (Gatekeeper alone, the running app unreadable), a killed run's image, the install (order,
   refusals, the stager's own copy only, no downgrade, cross-volume), 24 loops of atomic swaps killed with SIGKILL at random
   instants (after every kill both paths hold a whole, valid app), what a launch reads and cleans, and the relaunch shell
-  (with a recorder for `/usr/bin/open`). Every request's headers against the allow-list (§3). FeedWriter on fixture values.
+  (with a recorder for `/usr/bin/open`); the Updates folder's own rules (a link at its root never followed, deletions in
+  one step, the Data volume's spelling, a sibling folder). Every request's headers against the allow-list, `Accept: */*`
+  exactly, and no query string (§3). FeedWriter on fixture values.
 - `checks/app-update-wiring.sh` (check-all): one feed address, the swap only through `renamex_np` with `RENAME_SWAP`,
   deletions only inside the Updates folder and the Trash only for the replaced app, the wiring at start / quit / menu /
   Settings / both toolbars, the quit-cancel hook, blocking work on its queue, no administrator rights, the release team,
   identity-class keys, no network in the check, and the coordinator the check doesn't compile: the probe without helpers,
   the production verifier at quit and when staging, `decision == .updates` before an install and before the launch reads
-  the folder, the relaunch shell (this pid, `/usr/bin/open`, never `-n`), the test hook line in Settings.
+  the folder, the relaunch shell (this pid, `/usr/bin/open`, never `-n`), the test hook line in Settings; file effects only
+  for a copy that installs; the schedule's origin, the retry record at launch, the real home folder, the cadence, a
+  cancelled download's silence, the record matched to the offer (review FBU2). Deletion calls (`removeItem`, `unlink`,
+  `rmdir`, `recycle`) only in `AppUpdateFiles.swift`.
 - Reverse-verified on 2026-11-27 (#565): replacing the swap with two renames turns the kill loop red (the destination missing
   after kills); removing the cancellation check or the incoming staging folder turns their cases red; each wiring line
-  removed turns the guard red. Again for the fixes before the first release (U1b): each new case and guard line was red
-  with its fix undone; the table is in the PR.
+  removed turns the guard red. Again for the fixes before the first release (U1b, two rounds): each new case and guard line
+  was red with its fix undone; the tables are in the PR.
 - `scripts/render-app-updates.sh <folder>` (graphical session, not in check-all): the pill states, popovers, menu answers and
   Settings section in zh-Hans / en / es.
 
@@ -251,4 +271,12 @@ No check reaches a real notarized pair of builds, Gatekeeper on a real download,
 14. A wrong SHA-256 in the test feed: B downloads once, nothing is shown, no Update pill; an automatic check doesn't
     download it again for a day (quit and reopen A: no second download), SkyCut › Check for Updates… does (U1's limit:
     `Updates/retry.json` counts it).
-15. Clean up: `defaults delete com.srtflow.SrtFlow SrtFlow.update.feedURL`; the replaced build is in the Trash.
+15. With B staged, quit A and open it again, then quit within 30 s (before its first check): A stays, B is still staged
+    (`staged.noindex/`), and the next quit after a check installs it.
+16. With B staged, roll the test feed back to A's version, then quit and reopen A: once its first check ran (about a
+    minute), B is gone from `staged.noindex/` and nothing is shown; a quit then leaves A.
+17. With B staged, stop the test server, then quit and reopen A: after about a minute the Update pill shows (the feed
+    can't be reached), and quitting installs B.
+18. Quit A right after B finished downloading (while it is being staged): at the next launch B is staged from the kept DMG,
+    with no second download in the test server's log.
+19. Clean up: `defaults delete com.srtflow.SrtFlow SrtFlow.update.feedURL`; the replaced build is in the Trash.

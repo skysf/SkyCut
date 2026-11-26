@@ -3,10 +3,12 @@ import Foundation
 // MARK: - What a launch takes from the Updates folder, and the cleanup after an update
 //
 // What it does: once per launch, and only for a copy that installs (`decision == .updates`: a copy that only tells, never
-// updates, or runs from inside the Updates folder touches nothing there): reads the installer's marker once (then removes
-// it), detaches images a killed run left attached, cleans what the last update left, and reads the staged and retry
-// records. The cleanup, in staged.noindex/: an app older than the running one, in the folder of a newer version (where a
-// swap leaves the copy it replaced, when the installer couldn't trash it), is the person's old app and goes to the Trash;
+// updates, or runs from inside the Updates folder touches nothing there; nor does any copy while the Updates folder itself
+// is a link): reads the installer's marker once (then removes it), detaches images a killed run left attached (never
+// through a link), cleans what the last update left, and reads the staged and retry records. The cleanup first empties
+// removing.noindex/ (what a crash left mid-deletion), then, in staged.noindex/: an app older than the running one, in the
+// folder of a newer version (where a swap leaves the copy it replaced, when the installer couldn't trash it), is the
+// person's old app and goes to the Trash;
 // the staged copy the record names, newer than the running app, stays for the next quit; anything else is our own download
 // (a copy not newer than the running app, one no record names, an unfinished incoming folder, a link) and is deleted, never
 // sent to the Trash; the folder holding the bundle this process runs from is never touched. In downloads/: a DMG of a
@@ -25,6 +27,8 @@ struct AppUpdateLaunchFiles: Equatable, Sendable {
                      runningBundle: URL, hdiutil: String = "/usr/bin/hdiutil",
                      trash: (URL) throws -> Void) -> AppUpdateLaunchFiles {
         guard decision == .updates, let running else { return AppUpdateLaunchFiles() }
+        // The Updates folder itself a link (made by hand): never followed, nothing read, detached or cleaned there.
+        guard !files.rootIsLink else { return AppUpdateLaunchFiles() }
         let installed = files.readInstalledNote()
         files.removeInstalledNote()
         AppUpdateStager.detachLeftovers(in: files, hdiutil: hdiutil)
@@ -34,6 +38,7 @@ struct AppUpdateLaunchFiles: Equatable, Sendable {
 
     /// The cleanup after an update (see above). `trash` gets only an app older than the running one.
     static func clean(_ files: AppUpdateFiles, running: AppUpdateVersion, runningBundle: URL, trash: (URL) throws -> Void) {
+        files.emptyRemovalFolder()
         for folder in [files.staging, files.downloads] where AppUpdateFiles.isLink(folder) { files.remove(folder) }
         let own = AppUpdateFiles.resolvedPath(runningBundle)
         let record = files.readStaged().flatMap { record -> AppUpdateStagedRecord? in

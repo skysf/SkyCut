@@ -220,9 +220,12 @@ final class AppUpdater: ObservableObject {
     }
 
     /// File effects go straight onto AppUpdateWork's serial queue, in order, ahead of anything a download started by the same
-    /// transition queues there.
+    /// transition queues there; and only for a copy that installs (the state machine gives a copy that only tells none).
     private func run(_ effect: AppUpdateEffect) {
         let files = files
+        if effect.touchesFiles {
+            guard decision == .updates else { return }
+        }
         switch effect {
         case .download(let feed):
             startDownload(feed)
