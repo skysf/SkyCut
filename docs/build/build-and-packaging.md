@@ -135,7 +135,7 @@ English first: English, 简体中文, 繁體中文, Español, 日本語, Рус�
   - Both icons' selection areas (x 128–272 and 488–632, y 92–258) stay plain paper: `check-background.swift` asserts it.
     It probes the hint's own ink by colour (the arrow's shaft, the pointer's black), and the icon copies only for showing
     ink at all: the last, most opaque copy must differ from the paper by more than 2 levels in at least 5 % of its inner
-    square, clear of the pointer (a blank icon gives at most 0.4 %, today's over 99 %). So a blank icon (transparent, or
+    square, clear of the pointer (a blank icon gives under 1 %, today's over 99 %). So a blank icon (transparent, or
     cut off early) is red, and a new app icon needs no check edit.
 - 布局源：`packaging/dmg/DS_Store`，打包时拷成卷根的 `.DS_Store`。窗口框固定
   `{{120, 120}, {760, 598}}`（为标题栏及用户开启的路径 / 状态栏留出空间，图稿 760×510），图标 128 point，App / Applications

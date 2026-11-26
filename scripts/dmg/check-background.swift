@@ -56,7 +56,7 @@ for index in 0..<2 {
     // for them. Its inner square (x 372–408, y 146–182: clear of the 2 pt overlap), less the corner its pointer
     // and shadow reach (x ≥ 386, y ≥ 160), must differ from the paper by more than 2 levels in at least 5 % of
     // its pixels. No colour is pinned, so any icon passes: today's and the old blue one ink over 99 % of it,
-    // a blank icon at most 0.4 %.
+    // a blank one (transparent, or paper-coloured) under 1 %.
     var inked = 0, total = 0
     for y in (146 * scale)..<(182 * scale) {
         for x in (372 * scale)..<(408 * scale) where x < 386 * scale || y < 160 * scale {
