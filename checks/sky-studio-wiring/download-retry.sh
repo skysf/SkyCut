@@ -58,8 +58,10 @@ done
 
 # The GET exists once, inside the retry loop, asking for identity bytes; the system never redirects it; an answer that began is judged
 # first; a held-back answer never goes to the same address again; a result is checked whole before it is moved into place; only
-# CloudResultDownload gives up, a stop included.
-others="$(code_files_with 'downloadTask\(' | grep -v -e "^${DOWNLOAD_GETS}\$" -e '^Sources/SrtFlow/KokoroVoicePack.swift$' || true)"
+# CloudResultDownload gives up, a stop included. Not paid results, so not here: the Kokoro voice pack, and SkyCut's own update
+# DMG (AppUpdateHTTP: size and SHA-256 from the feed, docs/architecture/app-updates.md).
+others="$(code_files_with 'downloadTask\(' | grep -v -e "^${DOWNLOAD_GETS}\$" -e '^Sources/SrtFlow/KokoroVoicePack.swift$' \
+  -e '^Sources/SrtFlow/AppUpdate/AppUpdateHTTP.swift$' || true)"
 [ -z "${others}" ] || fail "these files download results themselves: $(tr '\n' ' ' <<<"${others}")— paid results go through SkyStudioAPI.download (CloudResultDownload resumes and retries)"
 grep -qF 'try await CloudResultDownload(session: session, retry: downloadRetry).run(' "${DOWNLOAD_API}" \
   || fail "${DOWNLOAD_API}: SkyStudioAPI.download must hand every paid result to CloudResultDownload"

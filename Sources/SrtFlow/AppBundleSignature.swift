@@ -6,8 +6,11 @@ import Security
 // What it does: checks a copied bundle's code signature the strict way (every architecture, nested code such as the
 // helpers, sealed resources) against the designated requirement of the bundle it was copied from: for the Developer ID
 // the same identifier and team, for an ad-hoc build the same code hash. Nothing goes over the network.
+// The updater asks the same check of a downloaded new version, together with Apple's notarization
+// (`verify(_:matchesNotarized:network:)`, AppUpdateVerifier).
 // What it doesn't: copy (AppBundleMover) or decide anything about Gatekeeper; the running original already passed it.
-// Rules: docs/build/build-and-packaging.md "Installing from the DMG", docs/architecture/code-signing-and-permissions.md.
+// Rules: docs/build/build-and-packaging.md "Installing from the DMG", docs/architecture/code-signing-and-permissions.md,
+// docs/architecture/app-updates.md "Verifying".
 
 enum AppBundleSignature {
     struct Failure: LocalizedError, Equatable, CustomStringConvertible {
@@ -17,10 +20,30 @@ enum AppBundleSignature {
 
     /// Throws unless `copy` is validly signed and satisfies `original`'s designated requirement.
     static func verify(_ copy: URL, matches original: URL) throws {
-        let requirement = try designatedRequirement(of: original)
+        try verify(copy, satisfies: designatedRequirement(of: original), network: false)
+    }
+
+    /// Throws unless `copy` satisfies `original`'s designated requirement and is notarized (`notarized` in the same
+    /// requirement: its stapled ticket offline; with `network` macOS may also ask Apple whether the ticket still stands).
+    /// For the Developer ID the designated requirement names the team, so a new build of the team passes.
+    static func verify(_ copy: URL, matchesNotarized original: URL, network: Bool) throws {
+        var text: CFString?
+        let designated = try designatedRequirement(of: original)
+        guard SecRequirementCopyString(designated, [], &text) == errSecSuccess, let text else {
+            throw Failure(description: "the original's designated requirement could not be read")
+        }
+        var combined: SecRequirement?
+        let status = SecRequirementCreateWithString("(\(text as String)) and notarized" as CFString, [], &combined)
+        guard status == errSecSuccess, let combined else { throw Failure(description: message(status, nil)) }
+        try verify(copy, satisfies: combined, network: network)
+    }
+
+    /// Throws unless `copy` is validly signed (strictly: every architecture, nested code, sealed resources) and satisfies
+    /// `requirement`.
+    static func verify(_ copy: URL, satisfies requirement: SecRequirement, network: Bool) throws {
         let code = try staticCode(at: copy)
-        let flags = SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSCheckNestedCode | kSecCSStrictValidate)
-            .union(.noNetworkAccess)
+        var flags = SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSCheckNestedCode | kSecCSStrictValidate)
+        if !network { flags.formUnion(.noNetworkAccess) }
         var error: Unmanaged<CFError>?
         let status = SecStaticCodeCheckValidityWithErrors(code, flags, requirement, &error)
         guard status == errSecSuccess else {

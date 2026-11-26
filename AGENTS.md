@@ -170,6 +170,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 官网 `website/`、本地网页预览、官网 Vercel 配置与部署、首屏 3D 场景（`website/src/scene*.js`、烤好的静图 `hero-still-*`、`main.js` 里加载场景的那一段） | [SkyCut 官网](docs/architecture/skycut-website.md)（改了场景外观要 `npm run build:hero-still` 重烤并提交指纹；不加 npm 依赖） |
 | 构建、打包、版本、授权、shell、CI、签名（`scripts/signing/`）、the Developer ID, hardened runtime and entitlements (`packaging/SkyCut.entitlements`, `packaging/signing-identity.sha1`), notarization (`notarytool`, `stapler`, `spctl`), code added to the app bundle, local installs and test app bundles (`lsregister`) | [签名与系统权限](docs/architecture/code-signing-and-permissions.md)（signing and notarization only through `scripts/signing/`; only the pinned Developer ID; every piece of code in the bundle named in `sign-app.sh`, an entitlement only with proof; ad-hoc or un-notarized builds never go to users）、[构建与打包](docs/build/build-and-packaging.md) (one SkyCut and one Beta installed; test bundles unregistered and deleted)、[构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)、[包内授权声明过期](docs/bugfixes/2026-08-06-stale-bundled-license-notice.md)、[CI 首跑与吞错](docs/bugfixes/2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) |
 | Moving SkyCut from the installer disk into Applications at launch (`MoveToApplicationsOffer`, `MoveToApplicationsFlow`, `MoveToApplicationsLaunch`, `MoveToApplicationsAlerts`, `AppBundleMover`, `AppBundleSignature`, `InstallerDisk`, `RunningBundleProbe`; `SRTFLOW_AI_LAUNCH`, Connect AI from the disk, App Translocation, ejecting the DMG) | [构建与打包](docs/build/build-and-packaging.md)「Installing from the DMG」(asks only from a disk image or a translocated path, before anything else starts; never touches a running app of that name, never asks for administrator rights)、[签名与系统权限](docs/architecture/code-signing-and-permissions.md) |
+| Updating itself (`AppUpdate*`, `write-update-feed.sh`, install at quit, the update pill) | [App updates](docs/architecture/app-updates.md) (nothing pops up; one atomic swap) |
 | Web-motion renderer: `skycut-web-motion`, `SrtFlowWebMotionKit`, `Sources/SrtFlow/WebMotion/`, `set_motion`, stored pages and project-relative motion caches (`WebMotionRecovery`); page checks (MCP-75), memory / time limits | [Web-motion renderer](docs/architecture/web-motion-renderer.md) (pages only run in the helper; the network lock is never relaxed and fails closed; the page clock is SkyCut's own, never the probe's) |
 | AGENTS.md 和 `docs/bugfixes/INDEX.md` 的索引：加 / 改 / 收短一条索引或必读表的一行、新加小节、`checks/docs-index-drift.sh` 红了或要改它（`--self-test`）、并行的 PR 撞在索引的同一行、`merge=union` | [文档索引怎么写](docs/architecture/doc-indexes.md)（只许规定的写法，别的都红；收成一句话时「只有 / 一律」写全例外、实测数字带着条件；超了不抬数；`INDEX.md` 按文件名里日期后面那一段的字母序插） |
 | App、小程序、MCP 服务器叫什么（SkyCut / `skycut-mcp` / `skycut`）；新加身份类的字符串（bundle id、UTType、数据文件夹、UserDefaults 的键、钥匙串、AI 通道、环境变量）；界面和给 AI 的话里写产品名 | [产品名与代码名](docs/architecture/product-name.md)（看得见的写 SkyCut；身份类的名字沿用 SrtFlow，新加的同类照旧用老前缀）、[改名方案](docs/plans/2026-10-18-rename-to-skycut.md) |
@@ -278,6 +279,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-mix-layers.sh` — 按层量混音：频段 / 帧 / 响度的 oracle、和导出逐位对账; `listen voice=` / `describe=` checks.
 - `scripts/check-motion-placement.sh` — Stored web motion: real rendering, template reuse, approval modes, same-clip parameter edits, undo and cache recovery.
 - `scripts/check-move-to-applications.sh` — Moving SkyCut from the installer disk into Applications: the launch rule, the move against scratch folders, the disk image and its eject.
+- `scripts/check-app-update.sh` — The updater: feed, rules, states, downloads, install, killed swaps.
 - `scripts/check-optimized-media.sh` — 优化媒体：判据、真转一块、缓存。
 - `scripts/check-parameter-limits.sh` — MCP 编辑参数的边界、实际生效值、素材加载重试; every tool's times outside one day refused (`TimeBoundChecks`).
 - `scripts/check-player-clock.sh` — 播放头与悬停 peek、`PacedPlayhead`、回到开头、卸片后晚到的回调、播到头收尾; pause / resume, hover and a new item start in step.
@@ -313,6 +315,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/ai-keep-awake.sh` — AI 的调用和任务领不降速的那一份、领和还成对。
 - `checks/ai-work-queue-wiring.sh` — AI 起的导出 / 转写 / 翻译都经 `AIWorkQueue` 排队。
 - `checks/app-theme-wiring.sh` — 主题的浅 / 深：不交 nil、只有一处 `.preferredColorScheme`、不设 `NSApp.appearance`。
+- `checks/app-update-wiring.sh` — Updater wiring: one feed address, only the atomic swap.
 - `checks/audio-engine-idle-wiring.sh` — 音频引擎空闲停图、用户回来先起、换工程收引擎、主时钟自己收尾。
 - `checks/blocking-media-reads.sh` — 读采样的阻塞循环不许写在 async 函数里；`AudioWindowReader.extract` 只许字幕生成调。
 - `checks/check-all-shards.sh` — every guard and check script runs on CI exactly once; full-App checks in shards 1–3; the graphical steps after the App build; uploads can't fail a run.
@@ -392,6 +395,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/render-project-versions.sh <folder>` — Off-screen images of the Versions sheet and the AI banner's version line. Needs a graphical session.
 - `scripts/render-inspector-sound.sh <folder>` — Off-screen images of the clip inspector's sound section (volume, voice band, scene). Needs a graphical session.
 - `scripts/render-move-to-applications.sh <folder>` — Off-screen images of the move-to-Applications question and alerts in en / zh-Hans / es. Needs a graphical session.
+- `scripts/render-app-updates.sh <folder>` — Update UI images. Graphical session.
 - `scripts/render-paid-panels.sh <folder>` — Off-screen images of the upscale and change-voice panels holding a paid result (Download again, Make a new version). Needs a graphical session.
 - 官网（在 `website/`）：`tests/*.test.mjs` 和 `npm run check:seo` 在 CI 的网站那一步里；浏览器级的 `scripts/check-hero-browsers.mjs`、`scripts/check-legibility-browsers.mjs`（`npx -y -p playwright@1.65.0 node …`）是手动的、无头、只在 Mac 上；改了首屏场景的外观要 `npm run build:hero-still` 重烤。
 
@@ -504,6 +508,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [时间线上的复制 / 剪切 / 粘贴](docs/architecture/timeline-clipboard.md) — 剪贴板只有一套且不写纯文本、换新身份走编码往返、落点鼠标优先、撞上往上抬。
 - [工程文件与素材重链接](docs/architecture/video-edit-project-file.md) — Formats through v39, media paths, dirty state, autosave and upscale source records.
 - [Saved project versions](docs/architecture/project-versions.md) — Versions saved around each AI round: when (only if changed), where (per project file), pruning (30, 60 days), going back in one undo step, the AI's contract.
+- [App updates](docs/architecture/app-updates.md) — the feed, who updates, the atomic install, the quiet pill.
 - [时间线拖动手势](docs/architecture/timeline-drag-gestures.md) — 坐标系、吸附与对齐线、唯一落点、拖动会话不进 `@State`、框选、整条时间线只许一个拖放落点、插入缝与整轨换位。
 - [预览自由变换](docs/architecture/preview-free-transform.md) — `ClipPlacement` 与预览 / 导出同账；合成的一份时间账。
 - [关键帧动画](docs/architecture/keyframe-animation.md) — 源时间锚定、切片与 fill + matte、缓动、AI 接口。

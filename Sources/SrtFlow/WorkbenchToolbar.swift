@@ -73,6 +73,7 @@ struct WorkbenchToolToolbar: ViewModifier {
                 }
                 .workbenchChrome()
                 ToolbarItemGroup(placement: .primaryAction) {
+                    AppUpdatePill(project: nil).equatable()
                     WorkbenchSettingsLink()
                     WorkbenchMoreMenu()
                 }

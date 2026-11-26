@@ -107,7 +107,8 @@ enum MoveToApplicationsOffer {
         return (path.hasPrefix("/private/var/folders/") || path.hasPrefix("/var/folders/")) && components.count >= index + 3
     }
 
-    private static func isDevelopmentFolder(_ path: String) -> Bool {
+    /// dist/, .build, /tmp and the temporary folders (AppUpdateEligibility asks the same rule).
+    static func isDevelopmentFolder(_ path: String) -> Bool {
         let components = Set(path.split(separator: "/").map(String.init))
         if !components.isDisjoint(with: [".build", "dist"]) { return true }
         return ["/tmp/", "/private/tmp/", "/var/folders/", "/private/var/folders/"].contains { path.hasPrefix($0) }
