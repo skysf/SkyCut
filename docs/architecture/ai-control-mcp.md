@@ -229,6 +229,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    - **AI-written motion pages** (2026-11-17, item 64): new or changed page code asks once in request-approval mode and proceeds
      in full access. An approved stored page does not ask again for parameter-only rendering. The token binds the exact request;
      the network lock is never relaxed. This is approval to execute the page in the locked helper, separate from editing the timeline.
+   - **The 5th identical paid request in a row** (user, 2026-11-25; `SkyStudioRepeatGuard`) asks once in both modes, also in
+     change_voice and add_voiceover, which ask nothing else; one question with the draft or fee question when there is one, and a
+     yes covers only the identical-request question for the rest of that run ([Sky Studio jobs](sky-studio-jobs.md), "Identical
+     paid requests in a row").
    操作确认的入口是以下四处（设置权限另见其合同）（`AIFileTools`（含服务器角色删除）、`AIWorkspace.confirmReading`、`SkyStudioJobGate`、`AISettingsApproval`），`scripts/check-mcp.sh` 扫描钉着。
    `AIConfirmations`（自己的文件，时钟可注入）发的令牌绑着具体那件事（`action` 字符串），一次有效、**三十分钟**过期（2026-10-15 从十分钟延长），
    换一件事拿它来不认、也不消耗它；**同一件事还在等答复就回同一张**（有效期重新算：AI 等用户回话时又调一次，拿到的还是它，不会误以为过期）；

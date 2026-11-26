@@ -11,6 +11,8 @@ import Foundation
 // direct_change (2026-11-21, the user's request after the B07 clip whose speech SAM left in the background): when to pass
 // skip_separation, what it costs and returns, and what separation_failed means (voice-library.md section 11, item 12; the
 // contract is Sky Studio's docs/agents/skycut-api.md "voice_convert").
+// The one question (2026-11-26): the 5th identical change in a row (SkyStudioRepeatGuard; sky-studio-jobs.md "Identical paid
+// requests in a row").
 // 不管什么：名片（MCPVoiceChangeTool）、声音库（MCPGuideVoiceLibraryTopics）、配旁白（MCPGuideVoiceTopics）、怎么答（MCPGuide）。
 
 enum MCPGuideVoiceChangeTopic {
@@ -31,8 +33,10 @@ enum MCPGuideVoiceChangeTopic {
             """),
             MCPGuideSection(name: "cost_and_limits", about: "the quote, the daily credit limit, the longest clip, almost silent clips", text: """
             Cost. SkyCut quotes the clip's source seconds first and returns credits (the most it can cost) with job_id; tell \
-            the user the price. It never returns needs_confirmation: the only gate is the daily credit limit, in every \
-            permission mode. Over it, the result is status blocked with daily_budget_exceeded and nothing starts. The charge is \
+            the user the price. An ordinary change does not ask: the gate is the daily credit limit, in every permission mode. \
+            The one question is the 5th identical change in a row in a project: it returns needs_confirmation in every mode; \
+            repeat with confirm_token only if the user agrees. Over the limit, the result is status blocked with \
+            daily_budget_exceeded and nothing starts. The charge is \
             settled when the job ends (credits_charged): Sky Studio keeps only what ran and refunds the rest, so a job that \
             fails costs nothing, or only the separation after separation_failed.
 

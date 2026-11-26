@@ -139,6 +139,9 @@ enum SkyStudioGenerateTool {
                 "ai_access_mode": .string(AIAccessStore.shared.mode.rawValue), "charged": false,
                 "next_step": "No generation, upload or reservation was started. Present the specification and quote in the conversation language; submitting requires quote_only=false and follows permissions and hard budgets."])
         }
+        // What is sent, local files by their bytes: identical requests in a row are counted and the 5th asks (SkyStudioRepeatGuard).
+        let sent = try await SkyStudioRequestDigest.identity(generation.job(model: model.id),
+            files: references.files.map { .init(role: $0.role, url: $0.file) }, extra: references.webURL.map { ["web_url": .string($0)] } ?? [:])
         guard project.documentGeneration == projectGeneration, SkyStudioCharacterAccess.stamp(key) == accountStamp else {
             throw AIToolError("The project changed while SkyCut checked the price; nothing was started or reserved. Read the current project before retrying.")
         }
@@ -151,10 +154,12 @@ enum SkyStudioGenerateTool {
             "auto_fallback": false, "project_scope": .string(scope), "account_stamp": .string(accountStamp),
             "folder": .string(folder.standardizedFileURL.path), "name": .string(try args.string("name") ?? "")
         ])
+        let repeated = SkyStudioRepeatGuard.shared.check(.generateMedia, project: project.documentGeneration, identity: sent, credits: quote.credits)
         let reservation: SkyStudioJobGate.Reservation
         switch try SkyStudioJobGate.decide(credits: quote.credits, summary: generation.summary(modelTitle: model.title), identity: identity, args: args,
             reason: deviations.isEmpty ? nil : deviations.joined(separator: " "), overrides: overrides, project: scope,
-            profile: generation.character == nil ? AIDraftPolicy.profile(generation.job(model: model.id)) : "character:" + SkyStudioCharacterCache.digest(identity)) {
+            profile: generation.character == nil ? AIDraftPolicy.profile(generation.job(model: model.id)) : "character:" + SkyStudioCharacterCache.digest(identity),
+            repeated: repeated) {
         case .needsConfirmation(let ask): return ask
         case .reserved(let reserved): reservation = reserved
         }
@@ -165,6 +170,7 @@ enum SkyStudioGenerateTool {
             generation: generation, model: model, quote: quote, references: references, folder: folder, stem: stem, project: project, reservation: reservation, idempotencyKey: idempotencyKey, characterStamp: references.character == nil ? nil : accountStamp
         )
         let job = run.start()
+        SkyStudioRepeatGuard.shared.started(repeated)
         let store = SkyStudioSpendStore.shared
         let minutes = CloudJobProgress.minutes(quote.typicalSeconds ?? generation.typicalSeconds)
         var result: [String: JSONValue] = [
@@ -188,7 +194,7 @@ enum SkyStudioGenerateTool {
         ]
         if let usage = quote.characterUsage { result["character_usage"] = usage.json }
         if !generation.notes.isEmpty { result["notes"] = .array(generation.notes.map { .string($0) }) }
-        let response = AIToolResult.ok(.object(result))
+        let response = SkyStudioRepeatWords.adding(repeated, to: AIToolResult.ok(.object(result)))
         SkyStudioGenerationRequests.complete(idempotencyKey, result: response)
         return response
     }

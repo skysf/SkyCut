@@ -326,8 +326,9 @@ hold:
      version"): generate_media without that job's key (or with another), upscale_clip, change_voice and the upscale / voice change
      panels start a new paid job, even for identical input; nothing maps a new request to an old held job by its parameters (that
      once handed a 9:16 request the old 16:9 image, a Chinese voice change the old English one, and project B's upscale to project
-     A's clip). The upscale inspector shows the download line but offers no Download again (it finds jobs by their source file). A
-     guard for many identical repeats in a row is a separate change.
+     A's clip). The upscale inspector shows the download line but offers no Download again (it finds jobs by their source file). The
+     panels' paid button is labelled "Make a new version" next to their own clip's Download again, and the 5th identical AI request in
+     a row asks first: "Identical paid requests in a row" below.
    - Dismissing the row keeps generate_media's key as a way back; quitting SkyCut gives it up (the result stays in the user's Sky
      Studio library; a voice change's 60 days; voiceover's recovery file; the official receipt).
 
@@ -388,8 +389,8 @@ Checks:
   drops, Download again with no new upload or job, a stop held with its GETs.
 - `checks/sky-studio-wiring/download-retry.sh` pins the single GET inside the loop, identity bytes, the answer read first, the
   held-back rule, the wholeness check, `renew:` on every paid download, holding until the result came down, the key in a request's
-  identity, no lookup of a held job by parameters and no Download again on the panels, tools or inspector, the rows' buttons, the
-  hook's fence and the probe.
+  identity, no lookup of a held job by parameters and no Download again on the tools or inspector (the panels' own-clip Download
+  again is pinned in `repeat-requests.sh`), the rows' buttons, the hook's fence and the probe.
 
 **Smoke tests against the real Sky Studio: `SRTFLOW_TEST_DOWNLOAD_DROPS=N`, debug builds only** (`CloudDownloadFault`, reached only
 from `CloudResultDownload.fetch` inside `#if DEBUG`). The first N GETs of the process are cut once a quarter of the body (at most
@@ -406,8 +407,65 @@ Manual regression before a release (the checks cannot cut a real link):
 - [ ] Keep the network off through the download: after about 3 s the row shows the line in English, 简体中文 and Español with
       Download again, get_job has `code: download_network`, `download_attempts: 3` and the job's idempotency_key; network back,
       Download again: the same job id completes, the file is there and Sky Studio's billing shows one charge.
-- [ ] With a held upscale and a held voice change, open their panels for the same input: each offers its usual paid button (a new
-      job), and only the held job's own row offers Download again.
+- [ ] With a held upscale and a held voice change, open their panels on that clip: Download again is the default button and the
+      paid one reads "Make a new version (… credits)"; on a clip of the same source in another project, the panel offers only its
+      usual paid button. ("Identical paid requests in a row" below has the panels' own checklist.)
+
+### Identical paid requests in a row (2026-11-26)
+
+User, 2026-11-25 (the coordinator's refinements approved on 2026-11-26): an identical paid request sent again is a deliberate new
+version, a new paid job, charged; SkyCut only guards against a runaway loop (`SkyStudioRepeatGuard`, `SkyStudioRepeatWords`,
+`SkyStudioRequestDigest`; backlog B47 / B51):
+
+1. **Identity is the resolved request** (`SkyStudioRequestDigest`): the body SkyCut sends to Sky Studio (kind, model, prompt and every
+   param it worked out: the aspect and resolution from the canvas, the duration, language, voice, every option), a character's
+   revision, an upscale's source range, and each uploaded local file by its bytes (SHA-256; a file over 256 MiB by its size and 48 MiB
+   of samples), in order and with its role. Never the tool's raw arguments (an output name or folder is not sent), the
+   `idempotency_key`, `max_credits` or upload addresses. A call with an earlier job's key is that job (#554), not a repeat.
+2. **In a row per project + tool**: identical requests to one tool in one opening of a project (`documentGeneration`), one after
+   another. Calls to other tools in between do not break a run; a different request to that tool starts a new one. Only a request
+   that started a job counts: a quote, a question, a refusal or a same-key call neither counts nor breaks a run. In memory for the
+   App's run.
+3. **The AI hears early**: from the 2nd request of a run on, the tool's result carries `repeat_request` (`identical_in_a_row`,
+   `credits_each`, `asks_user_at` 5, `user_agreed`, a `note` to relay).
+4. **The 5th asks once**, before anything is uploaded, reserved or submitted, through the gate in every permission mode: inside
+   `SkyStudioJobGate.decide` (generate_media with its image operations, upscale_clip, manage_characters' create / headshot) or
+   `voiceOneTime` (manage_voices design, also under a standing grant) as one question with the draft or fee question when SkyCut asks
+   that anyway, so one token answers both and a token for the draft question alone never does; alone through `repeatConfirmation`
+   right before the reservation (change_voice, which now takes `confirm_token`, and add_voiceover with a Sky Studio voice). Over the
+   daily limit the result is `daily_budget_exceeded`, with no question. A yes covers the identical-request question for the rest of
+   that run (until a different request), nothing more: a draft or fee question it was merged into is still asked for each identical
+   request when its own yes covers only that one (this task's draft approval, a fee in ask mode), and the question says so; a
+   project approval or a standing grant covers them. A no starts nothing (the same call sent again gets the same question).
+5. **Panels are not counted** (a person's click is deliberate). After a failed download, the upscale and change-voice panels opened on
+   that clip make **Download again** (free: that job's own Download again) the main button and label the paid one "Make a new version
+   (N credits)" ("up to N credits" for a voice change), under one line saying which is which, in every UI language. The held job is
+   the clip's own, in that opening of the project (`SkyStudioPanelHeldDownload`: an upscale job covering the clip, the voice change last
+   started for it), never one found by a request's parameters or source file. An upscale held before a later upscale of the clip
+   landed is not offered: it is no longer the clip's last, and its Download again would swap the older result in over the newer
+   one (only its own row offers it; `UpscaleActivity.landedAfter`).
+6. No money threshold: the daily credit limit caps expensive loops.
+
+Not counted, by decision: the official film's submissions (each needs its own quote token from a separate quote with a seam review,
+and a caller-chosen key, so it cannot repeat by sending a call again); voice_enroll one-time fees (Sky Studio merges an open build of
+the same voice and language and charges once, and a built version has no fee); add_voiceover's recovery (`resume`,
+`generate_missing`: the same job's batches); free writes.
+
+Checks: `RepeatGuardChecks` in `scripts/check-sky-studio.sh` (counting, the words, identities with real files, the gate's questions in
+both modes and what a yes covers in each, design under a standing grant and its yes approving the run); `RepeatRequestChecks` and
+`RepeatPanelChecks` in `scripts/check-voice-recovery.sh` (the tool entries with POSTs counted: generate_media in both modes with the
+same key and another project, upscale_clip's one merged question, add_voiceover's 5th and its token, change_voice's own question,
+another language or voice, panels never counted, the panels' Download again after a failed download, not once a later upscale of
+the clip landed); `checks/sky-studio-wiring/repeat-requests.sh` (where each tool counts, asks and adds the line; only the gate
+approves; nothing on the panels' path counts; how the panels find a held job).
+
+Manual regression before a release:
+
+- [ ] Ask an AI client for the same image five times in one project: the 2nd–4th results carry `repeat_request`, the 5th asks in the
+      chat in both permission modes, and after a yes the 6th and 7th start without asking.
+- [ ] The panels' new buttons in English, 简体中文 and Español at the default window size: the line, Download again as the default
+      button and "Make a new version (…)" not clipped (both panels put the paid button on its own row; `scripts/render-paid-panels.sh`
+      draws them, though off-screen the default button is not tinted).
 
 ## 二、Sky Studio 那边实测的细节（2026-10-28 真服务器跑过 8 种活）
 
@@ -433,6 +491,7 @@ Manual regression before a release (the checks cannot cut a real link):
 | `SkyStudioJobAccess.swift` | 交活之前要的两样：Key（`SkyStudioJobKey`：`.prompting` 只给用户点了按钮起的、`.silent` 别的都用）、`/models` 记一份（`SkyStudioCatalogCache`） |
 | `SkyStudioSpend.swift` | 积分的每日上限和按天的账（`SkyStudioSpendStore`）、积分怎么写（`SkyStudioCredits`） |
 | `SkyStudioJobGate.swift` | AI 起的活花积分之前那一关（先守每日硬上限，超了回 `daily_budget_exceeded`；预算内的草稿越档按权限模式发确认码，第十一节）；不问、只守上限的一次预留（`reserveWithoutAsking`：旁白、变声、面板 / 按钮起的） |
+| `SkyStudioRepeatGuard.swift` / `SkyStudioRepeatWords.swift` / `SkyStudioRequestDigest.swift` / `SkyStudioPanelHeldDownload.swift` | Identical paid requests in a row: the run per project + tool, the words and token actions, the resolved request's identity (files by their bytes), the panels' own-clip held result (section 1, "Identical paid requests in a row") |
 | `SkyStudioApproval.swift` | 确认码对应的完整请求身份、输入文件身份；摘要只用于显示 |
 | `SkyStudioHeldCredits.swift` | 一单活记在本机积分账上的那一笔：没花出去退回（只退一次）、做完按实收换（实收记在预留的那一天，跨零点也不挪到今天，2026-11-11）；upscale 和生成共用 |
 | `SkyStudioSubmission.swift` | 交上了没有、任务号是多少（分清「没交上就停了」和「交上之后停不下来」，get_job 报 `skystudio_job_id`）；upscale 和生成共用 |

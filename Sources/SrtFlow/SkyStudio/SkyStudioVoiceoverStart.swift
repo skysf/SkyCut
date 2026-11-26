@@ -134,13 +134,21 @@ enum SkyStudioVoiceoverStart {
         ready.choice = AIVoiceChoice(engine: .skyStudio(voice: resolved.pick.voice),
                                      note: notes(resolved.pick, plan: plan, input: input, catalog: catalog))
         ready.ask = nil
+        // The same script read the same way (the segment sent) again: counted, and the 5th in a row asks once (SkyStudioRepeatGuard).
+        let repeated = SkyStudioRepeatGuard.shared.check(.addVoiceover, project: project.documentGeneration,
+            identity: SkyStudioRequestDigest.identity(draft.segment, extra: ["skip_one_time": .bool(skippingOneTime)]),
+            credits: plan.batchCredits.reduce(0, +))
+        if let question = SkyStudioJobGate.repeatConfirmation(repeated, summary: "Voiceover · \(resolved.pick.voice) · \(input.lines.count) lines",
+                                                              token: input.confirmToken) { return .result(question) }
         // 预留放在最后：从这里到交给任务之间不再有会失败的步骤，预留的积分不会落在半路（任务结束时没花出去的退回）。
         guard let budget = SkyStudioVoiceBudget.reserve(plan.batchCredits) else {
             return .result(SkyStudioJobGate.budgetBlocked(credits: plan.batchCredits.reduce(0, +), store: .shared))
         }
         let prepared = SkyStudioVoiceoverPrepared(plan: plan, quote: quote, budget: budget, key: resolved.key, locale: locale,
             installsTranscription: installs, modelTitle: modelTitle(plan, catalog: catalog), catalog: catalog)
-        return .result(SkyStudioVoiceoverRun(input: ready, project: project, prepared: prepared, services: services).start())
+        let started = SkyStudioVoiceoverRun(input: ready, project: project, prepared: prepared, services: services).start()
+        SkyStudioRepeatGuard.shared.started(repeated)
+        return .result(SkyStudioRepeatWords.adding(repeated, to: started))
     }
 
     /// 任务里装不上本机转写模型（交第一批之前，还一分没花）：照「这台 Mac 转写不了」重新定怎么读、分批、整段报价（声音方案第七节：

@@ -20,7 +20,8 @@ struct UpscalePresenter: View, Equatable {
             .frame(width: 0, height: 0)
             .sheet(item: mine(\.panel, owned: { project.state.clip(with: $0.id) != nil })) { target in
                 if let model = UpscalePanelModel(project: project, clipID: target.id) {
-                    UpscalePanel(project: project, model: model).appLanguage()
+                    UpscalePanel(project: project, model: model,
+                                 held: SkyStudioPanelHeldDownload.upscale(project: project, clipID: target.id)).appLanguage()
                 } else {
                     // 这一段已经不在了 / 不是画面段：什么都不摆（点错了也不该弹个空面板）。
                     Color.clear.frame(width: 1, height: 1).onAppear { activity.panel = nil }

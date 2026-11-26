@@ -198,6 +198,7 @@
 - [2026-10-05 上层轨带缓动的关键帧，成片里边缘错开](2026-10-05-overlay-matte-drops-keyframe-easing.md) — 从旧关键帧构造新关键帧只走 remapped / clipped / stretched。
 - [2026-11-10 AI 把「画质尽量好」当成点名规格，跳过确认](2026-11-10-overrides-best-quality-skips-approval.md) — 普通生成 / upscale / 角色越档要在 `user_request` 的原话里找得到规格的名字；官方原创短片只查带没带原话。
 - [2026-11-10 转写不了的 Mac 上合批旁白卡死](2026-11-10-packed-batch-without-word-times-stuck.md) — 拿不到字的时间就按字数估句界并报出来，不无限重试。
+- [2026-11-26 After a failed download, the upscale and change-voice panels offered only the paid button again](2026-11-26-panels-paid-button-after-failed-download.md) — Offer a held paid result only by the job's own identity (its clip and project); make the free path the default, name the paid one, and ask once before a loop of identical requests, never block them.
 - [2026-11-19 Two AI exports into one folder could pick the same name, and the second replaced the first](2026-11-19-parallel-ai-exports-pick-the-same-name.md) — A copy of shared state taken before an `await` is a snapshot: pick and reserve after it in one step, and claim the name atomically when writing.
 - [2026-09-26 字幕比声音早 0.9 秒、片段开头的词丢了](2026-09-26-pause-stretches-next-word.md) — 识别器给的词时间不是开口时间（停顿被并进相邻的词）：先估开口。
 - [2026-11-20 A click while playing and every drift correction re-seeked the picture under the running sound](2026-11-20-picture-reseeked-under-running-sound.md) — `setRate(_:time:atHostTime:)` is a seek in every form: keep a playing picture moving with `rate`; to move it elsewhere, hold the sound and place the picture.

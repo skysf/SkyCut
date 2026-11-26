@@ -76,6 +76,7 @@ The paid panels' Change Limit… (2026-11-24) edits the limit's own row in a pop
   不报错，免得代理编一段原话重试。App 看不到对话、不判断原话真假，只要求代理把规格明确归到用户的话上
   （[案例](../bugfixes/2026-11-10-overrides-best-quality-skips-approval.md)）。官方原创短片那一路暂时只查带没带原话。
 - 全部权限自动执行并通知；读外部文件与移入废纸篓复用现有工具执行而不再问。不改变系统权限、套餐、原文件不覆盖、服务能力、硬预算或原单结算规则。切回请求批准后，全部权限期间的外部读取不会被偷偷记成永久读取授权。
+  One exception in both modes (2026-11-26): the 5th identical paid request in a row asks once ([Sky Studio jobs](sky-studio-jobs.md), "Identical paid requests in a row").
 - `set_settings ai_access_mode=...` 的实际模式变更始终先回确认码，当前已是全部权限也一样；用户同意后携原码重调才写入。所有参数在确认前验完，未批准、错误或串码时整批不写。
   Since 2026-11-26 a token is checked before anything in the call is written. One that was used, expired or not issued writes nothing either,
   and a token is void after any change of the daily limit since its question ([Sky Studio jobs](sky-studio-jobs.md) section 11).
