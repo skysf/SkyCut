@@ -690,6 +690,14 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
   `npm run indexnow` accepted 64 addresses (200). `/docs` on `skycut.app` and `www` (which first 308s to the apex):
   zh-CN and zh-TW → `/zh/docs/`, es-ES → `/es/docs/`, de-DE → `/de/docs/`, ja-JP, ru-RU and no header → `/en/docs/`,
   each 307 to a 200 page in that language; the query string is kept.
+- The forest-green favicons and Apple touch icon (PR #561) went live on 2026-11-26 with the 0.18.68 release: main commit
+  `d3a6c9712ecd93c805e40029e8b2fc7197430285`, the same `POST /v13/deployments` path, Vercel deployment
+  `dpl_J93vHnKtGzW8tTkpRiQN7M6PNQTd` READY. No new article since the last deploy, so no redate. Checked live: all 64
+  sitemap addresses 200 with self canonicals, the live sitemap byte-identical to main's; `/ja`, `/zh-hant` 307 to their
+  guides; robots, `llms.txt` and the 404 page as before; every asset of the home page and an article page 200; `/docs`
+  on both hosts lands on the same languages as on 11-20; `favicon.ico`, `favicon-32.png`, `favicon-64.png` and
+  `apple-touch-icon.png` byte-identical to `public/`; no hard-coded version or DMG name anywhere in `website/` (the
+  buttons use the stable entry); `npm run indexnow` accepted 64 addresses (200).
 - `.vercel/`、`node_modules/` 和生成的语言 HTML 不入库。源是 `content/*.js` 和
   `scripts/*.mjs`，不能直接改生成页。
 - 下载沿用 `https://skylu.ai/download/skycut`。2026-11-05 用户单独授权更新 App，
