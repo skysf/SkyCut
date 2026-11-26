@@ -94,6 +94,8 @@ English first: English, 简体中文, 繁體中文, Español, 日本語, Рус�
 终端 `xattr` 兜底由 App 需要时自己显示，不放在安装图上。
 
 - 图稿唯一来源：`scripts/dmg/make-background.swift`，只用系统 AppKit / Core Text / Core Graphics 和系统字体。
+  Its one input is SkyCut's icon for the drag hint: `build-dmg.sh` makes it with the app icon's own generator,
+  `scripts/make-icon.swift` (from `packaging/icon-source-1024.png`), so the hint follows a new icon.
   配色是暖白 `#f3f0e8`、森林绿 `#123f32`、深色正文；所有像素使用自己的不透明底色，不跟随系统深浅色变色。
   每次打包现生成 760×510（72 dpi）和 1520×1020（144 dpi）的 PNG，再用
   `tiffutil -cathidpicheck` 合成 `/.background/background.tiff` 的两种分辨率。
@@ -106,9 +108,19 @@ English first: English, 简体中文, 繁體中文, Español, 日本語, Рус�
   - A line that would cross x 724 or come within 24 pt of the canvas bottom stops the build. Grow the canvas, the window
     frame and both checks together, keep the hidden `.background` folder's position below the window (`check-layout.py`
     asserts its icon's top is), and keep the window fitting the 13-inch MacBook Air (below).
+- The icon band (2026-11-26, the user's pick): nothing behind the icons, a still drag hint between them. Finder shows a
+  selected icon on a 144 pt grey square, its label in a pill of the accent colour, and the light circles that sat behind
+  both icons until then showed through it (user: 「这样叠在一起很难看」). A Finder background is a still image (a GIF
+  shows its first frame, nothing runs), so the hint is a still: SkyCut's icon three times like strobe frames, its 44 pt
+  rounded square fading in (12 / 25 / 45 %) towards Applications, a black pointer with a white edge on the last copy,
+  then the arrowhead on a short shaft, all within x 284–458. The pointer is a fixed outline, traced once from macOS 26's
+  arrow cursor, so the build needs no cursor image or window server.
+  - Both icons' selection areas (x 128–272 and 488–632, y 92–258) stay plain paper: `check-background.swift` asserts it.
+    It probes the hint only on its own ink (the arrow's shaft, the pointer's black), never on the icon copies, so a new
+    app icon needs no check edit.
 - 布局源：`packaging/dmg/DS_Store`，打包时拷成卷根的 `.DS_Store`。窗口框固定
   `{{120, 120}, {760, 598}}`（为标题栏及用户开启的路径 / 状态栏留出空间，图稿 760×510），图标 128 point，App / Applications
-  中心为 `(200, 164)` / `(560, 164)`，分别在箭头两头；隐藏工具栏和侧栏。The hidden `.background` folder sits at `(380, 800)`, below
+  中心为 `(200, 164)` / `(560, 164)`, the drag hint between them；隐藏工具栏和侧栏。The hidden `.background` folder sits at `(380, 800)`, below
   the window: a Finder that shows hidden files would otherwise put its icon on the first free spot, over the steps
   ([case](../bugfixes/2026-11-26-dmg-hidden-background-icon-over-steps.md)), and Finder hides it by default either way.
   模板同时声明关闭状态栏 / 路径栏；Finder 可能沿用用户的这两项全局偏好，窗口高度仍能容下完整引导。
@@ -127,7 +139,8 @@ English first: English, 简体中文, 繁體中文, Español, 日本語, Рус�
 - 扫描守卫：`checks/dmg-packaging.sh` 钉正常打包接线、命名和不带旧 txt / Finder 自动化，
   用标准库解析模板的实际叶记录检查窗口、背景 alias 和图标位置。
 - 产物检查：`scripts/check-dmg.sh` 不带参数时用小型 App 夹具真走生产组装器并挂载只读 DMG，
-  检查背景、布局、软链、无 txt，并解码 TIFF 验两种像素尺寸 / DPI 和完整图稿。带 DMG 路径时验完整包。
+  检查背景、布局、软链、无 txt，并解码 TIFF 验两种像素尺寸 / DPI 和完整图稿 (with the hint's own ink, and plain paper
+  under both icons' selection areas)。带 DMG 路径时验完整包。
   两条都在 `scripts/check-all.sh`，本地运行 `arch -arm64 /bin/bash scripts/check-local.sh dmg`。
 
 **路径栏 / 状态栏的已知限制（2026-11-06 实测与验收决定）**：macOS 26.5.2 上，模板的
@@ -142,7 +155,9 @@ Finder 的真实渲染属于人工回归，每次改图稿 / 模板后以及发�
 1. 用开发版本号（例如 `VERSION=0.18.60-dmgtest arch -arm64 /bin/bash scripts/build-app.sh`）
    打测试包，再运行 `arch -arm64 /bin/bash scripts/check-dmg.sh dist/SkyCut-0.18.60-dmgtest-arm64.dmg`。
 2. 挂载到独立临时目录，保留用户已打开的安装盘和 Finder 窗口；在 Finder 新窗口中打开测试卷。
-   确认背景自动显示、两图标在箭头两头、第 1 步六种语言和第 2 步的教程链接完整，Retina 屏上字体清楚、图标标签能读。
+   确认背景自动显示、the drag hint between the two icons、第 1 步六种语言和第 2 步的教程链接完整，Retina 屏上字体清楚、图标标签能读。
+   Select SkyCut (click it, or reveal it with `open -R <mount>/SkyCut.app`): Finder's grey square and label pill sit on
+   plain paper, with nothing of the art under them.
    深浅色下背景本身底色不变；不要为了验收打断用户工作、切换全系统外观。
    路径栏 / 状态栏必须按用户原有偏好重开检查；只在当前窗口手动隐藏后的截图不能证明模板生效。
    Look once with hidden files shown (Finder's ⇧⌘.): no item of the volume over the steps. With hidden files off, the status
