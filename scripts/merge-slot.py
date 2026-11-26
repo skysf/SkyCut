@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""The merge slot: merges pull requests labeled merge-slot one at a time, each only after a green checks run on the
-exact tree that lands (main + the pull request). .github/workflows/merge-slot.yml runs it; the rules are in
+"""The merge slot: merges pull requests labeled merge-slot, oldest label first, only after a green checks run on what
+lands: main + the pull request, or main + up to four of them tested as one batch and merged in that order
+(scripts/merge-slot-batch.py). One test runs at a time. .github/workflows/merge-slot.yml runs it; the rules are in
 docs/build/build-and-packaging.md "Merge slot" and AGENTS.md 「合并与分支」. checks/MergeSlot/MergeSlotChecks.py tests
 it against a fake GitHub.
 
-A labeled pull request, oldest label first:
+A labeled pull request, oldest label first (where step 4 would dispatch its test and more labeled pull requests are
+ready, Batches.form tests them all in one run instead; after a red batch its members go through these steps alone):
 1. waits until check-all on its head is green (red leaves the slot with a comment);
 2. builds the test merge X of the head into the current main on the branch merge-slot/pr-<N> with the Merges API
    (parents: main, head), once per main and head; a conflict leaves the slot with a comment. GitHub's own test merge
@@ -31,11 +33,17 @@ import re
 import sys
 import time
 
-# The shared verdict on red runs and the `gh api` wrapper, loaded by path (the workflow runs this with python3 -I).
-_spec = importlib.util.spec_from_file_location(
-    "ci_infra_rerun", os.path.join(os.path.dirname(os.path.abspath(__file__)), "ci-infra-rerun.py"))
-infra = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(infra)
+
+def _load(name, filename):
+    """A sibling script as a module, loaded by path (the workflow runs this with python3 -I)."""
+    spec = importlib.util.spec_from_file_location(name, os.path.join(os.path.dirname(os.path.abspath(__file__)), filename))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+infra = _load("ci_infra_rerun", "ci-infra-rerun.py")  # the shared verdict on red runs and the `gh api` wrapper
+batching = _load("merge_slot_batch", "merge-slot-batch.py")
 GitHub, GitHubError = infra.GitHub, infra.GitHubError
 
 LABEL = "merge-slot"
@@ -64,6 +72,8 @@ class Slot:
         self.refusals = {}  # number -> merges GitHub refused in a row
         self.left = {}  # number -> (head, label time) when it left: skipped until either changes
         self.workflows = {}  # (number, head) -> the .github/workflows/ files it changes
+        self.batches = batching.Batches(self, GitHubError, LABEL, SLOT_PREFIX, WORKFLOW, WORKFLOW_PATH,
+                                        MARKER_MAX_AGE, TEST_TIMEOUT)
 
     # ---- reading GitHub ----
     def queue(self):
@@ -158,6 +168,21 @@ class Slot:
                              "again; don't merge it yourself.")
         return "left"
 
+    def conflict(self, pull, text):
+        return self.leave(pull, "it conflicts with main: merge origin/main into the branch, resolve, push, wait "
+                                f"for check-all to be green. (GitHub: {text})")
+
+    def refused(self, pull, error):
+        """GitHub refused a merge (405: a rule, a check; 409: the head changed): "moved" to try again on the next
+        pass, "left" at the third refusal in a row."""
+        number = pull["number"]
+        self.refusals[number] = self.refusals.get(number, 0) + 1
+        if self.refusals[number] >= 3:
+            self.refusals.pop(number)
+            return self.leave(pull, f"GitHub refused the merge three times: {error}")
+        self.log(f"#{number}: GitHub refused the merge ({error}), trying again")
+        return "moved"
+
     def point(self, ref, sha):
         """Moves (or creates) a branch to a commit."""
         try:
@@ -224,12 +249,7 @@ class Slot:
         except GitHubError as error:
             if error.status not in (405, 409):  # 409: the head changed; 405: GitHub refused (a rule, a check)
                 raise
-            self.refusals[number] = self.refusals.get(number, 0) + 1
-            if self.refusals[number] >= 3:
-                self.refusals.pop(number)
-                return self.leave(pull, f"GitHub refused the merge three times: {error}")
-            self.log(f"#{number}: GitHub refused the merge ({error}), trying again")
-            return "moved"
+            return self.refused(pull, error)
         self.refusals.pop(number, None)
         self.gh.call("POST", f"repos/{{repo}}/actions/workflows/{WORKFLOW}/dispatches", {"ref": "main"})
         self.drop_ref(f"{SLOT_PREFIX}{number}")
@@ -241,8 +261,9 @@ class Slot:
         self.log(f"#{number} merged")
         return "merged"
 
-    def advance(self, pull):
-        """Moves one pull request as far as it can go now."""
+    def advance(self, pull, partners=()):
+        """Moves one pull request as far as it can go now. partners: the waiting pull requests after it, which may be
+        tested with it in one batch where it would get its own test."""
         number = pull["number"]
         pull = self.gh.call("GET", f"repos/{{repo}}/pulls/{number}")
         if pull["state"] != "open" or not any(label["name"] == LABEL for label in pull["labels"]):
@@ -277,8 +298,7 @@ class Slot:
         base = self.main_sha()
         built = self.test_merge(number, base, head)
         if isinstance(built, tuple) and built[0] == "conflict":
-            return self.leave(pull, "it conflicts with main: merge origin/main into the branch, resolve, push, wait "
-                                    f"for check-all to be green. (GitHub: {built[1]})")
+            return self.conflict(pull, built[1])
         if built == "contained":
             return self.leave(pull, f"main `{base[:10]}` already contains its head `{head[:10]}`: nothing to merge.")
         merge_sha, tree = built
@@ -290,7 +310,7 @@ class Slot:
             sent = self.dispatched.get((number, merge_sha))
             if sent and self.now() - sent < dt.timedelta(minutes=10):
                 return "testing"  # dispatched; GitHub lists the run a little later
-            return self.test(pull, merge_sha)
+            return (self.batches.form(pull, base, built, partners) if partners else None) or self.test(pull, merge_sha)
         if run["status"] != "completed":
             if self.now() - when(run.get("run_started_at") or run["created_at"]) > TEST_TIMEOUT:
                 return self.leave(pull, f"the test run {run['html_url']} hasn't finished in "
@@ -311,18 +331,22 @@ class Slot:
                                 f"(`gh run rerun {run['id']} --failed`) and add the label again: a green re-run of "
                                 "that run counts while main hasn't moved.")
 
-    def holder(self, waiting):
+    def dispatch_runs(self):
+        """The newest dispatched checks runs: the slot's tests and its runs on main."""
+        return self.gh.call("GET", f"repos/{{repo}}/actions/workflows/{WORKFLOW}/runs?event=workflow_dispatch"
+                                   "&per_page=50")["workflow_runs"]
+
+    def holder(self, waiting, runs=None):
         """The waiting pull request that holds the slot, the earliest if several, or None. A pull request holds it
         while its slot test runs and for ten minutes after the test ends or this job dispatches one (GitHub lists a
         dispatched run a little later; a green test merges next, a red one sends its pull request back). Read from
         GitHub every pass, so the workflow's next job holds the same one. Only the holder moves: on 2026-11-19 the slot
-        dispatched #531's test while #532's ran, because each pass started again from the oldest label."""
+        dispatched #531's test while #532's ran, because each pass started again from the oldest label. A batch's run
+        (merge-slot/pr-batch) holds it through Batches.step instead."""
         by_number = {pull["number"]: pull for pull in waiting}
         recent = self.now() - dt.timedelta(minutes=10)
         found = []
-        runs = self.gh.call("GET", f"repos/{{repo}}/actions/workflows/{WORKFLOW}/runs?event=workflow_dispatch"
-                                   "&per_page=50")["workflow_runs"]
-        for run in runs:
+        for run in self.dispatch_runs() if runs is None else runs:
             number = run["head_branch"][len(SLOT_PREFIX):] if run["head_branch"].startswith(SLOT_PREFIX) else ""
             if not (number.isdigit() and int(number) in by_number):
                 continue
@@ -334,10 +358,13 @@ class Slot:
         return by_number[min(found)[1]] if found else None
 
     def sweep(self):
-        """Deletes merge-slot/pr-<N> branches of pull requests that are no longer open."""
+        """Deletes merge-slot/pr-<N> branches of pull requests that are no longer open (the batch's branch is the
+        batch's: Batches.step drops it when the batch is done)."""
         open_numbers = {p["number"] for p in self.gh.call("GET", "repos/{repo}/pulls?state=open&per_page=100")}
         for ref in self.gh.call("GET", f"repos/{{repo}}/git/matching-refs/heads/{SLOT_PREFIX}") or []:
             name = ref["ref"][len("refs/heads/"):]
+            if name == batching.BATCH_REF:
+                continue
             if not name[len(SLOT_PREFIX):].isdigit() or int(name[len(SLOT_PREFIX):]) not in open_numbers:
                 self.drop_ref(name)
 
@@ -350,15 +377,19 @@ class Slot:
             if not queue:
                 self.log("the queue is empty")
                 return
-            moved = False
             waiting = [p for p in queue
                        if self.left.get(p["number"]) != (p["head"]["sha"], self.label_times[p["number"]])]
             if not waiting:
                 self.log("only pull requests that left are labeled (their label couldn't be removed)")
                 return
-            held = self.holder(waiting)
-            for pull in [held] if held else waiting:  # one that left comes back with a new head or a new label
-                state = self.advance(pull)
+            runs = self.dispatch_runs()
+            batch = self.batches.step(waiting, runs)  # a batch's run holds the slot like a single test's
+            moved, free = batch in ("merged", "moved"), batch in (None, "fallback")
+            held = self.holder(waiting, runs) if free else None
+            for pull in ([held] if held else waiting) if free else []:
+                # A batch forms where nothing holds the slot, and not while a red batch's members are tested alone.
+                partners = waiting[waiting.index(pull) + 1:] if batch is None and not held else []
+                state = self.advance(pull, partners)  # one that left comes back with a new head or a new label
                 if state in ("merged", "left", "gone", "moved"):
                     moved = True
                     break

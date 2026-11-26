@@ -1008,6 +1008,8 @@ check is in: only check-all.sh does, and a shard number written elsewhere goes s
 
 The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged one at a time, each only after a green
 `checks.yml` run on the exact tree that lands. GitHub's merge queue isn't available to a personal-account repository.
+Since 2026-11-26 ready pull requests are tested together, up to four in one run, and merged in label order ("Batches"
+below).
 
 - **Why.** Merge-when-green let two PRs land minutes apart, neither tested on top of the other: on 11-18 #476 and #481
   left main uncompilable for about 1.5 hours. Staying current cost even more. In the week to 11-19, authors merged main
@@ -1029,13 +1031,58 @@ The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged o
      on the PR, not when main moves ([case](../bugfixes/2026-11-20-merge-slot-waits-for-stale-test-merge.md)).
   3. If a green run already tested X's tree, it merges at once. The proof is a `verified-tree-<tree>` marker: from the
      PR's own run when main hasn't moved since, or from an earlier slot test.
-  4. Otherwise it dispatches `checks.yml` on `merge-slot/pr-<N>`, which holds X. That is the same
-     workflow file on the same tree as a pull_request run on main + head, docs-only fast path included. Nothing else
-     is tested or merges while it runs ("One at a time" below). A red or cancelled run sends the PR back with its link;
+  4. Otherwise it dispatches `checks.yml` on `merge-slot/pr-<N>`, which holds X (or, when other labeled PRs are
+     ready too, one batch run for all of them: "Batches" below). That is the same workflow file on the same tree as a
+     pull_request run on main + head, docs-only fast path included. Nothing else is tested or merges while it runs
+     ("One at a time" below). A red or cancelled run sends the PR back with its link;
      the branch stays, so re-running the run's failed jobs can still prove the tree. A run GitHub's infrastructure
      failed is re-run in place first, as in 1., and holds the slot meanwhile.
   5. It merges with `--merge`, the head pinned, only while main is still X's first parent. Then it dispatches
      `checks.yml` on main and deletes the PR's branch and `merge-slot/pr-<N>`.
+- **Batches** (since 2026-11-26, the user's 「先做A和B好了」; `scripts/merge-slot-batch.py`). Where the slot would dispatch
+  the oldest ready PR's own test (step 4) and other labeled PRs are ready too, it tests up to four of them in one run
+  and merges them in label order. Measured that afternoon: the account runs at most five macOS jobs at once and every
+  checks run takes all five, so runs queued 11–17 minutes before running 15–18 (14 full runs since 12:00); and every
+  merge made the next labeled PR's finished test stale (#562's 39-minute test was thrown away when #559 merged).
+  - **Forming.** The oldest ready PR plus up to three more ready ones after it, in label order: open, labeled, its own
+    `check-all` green, no workflow files. A PR whose check is red or still running doesn't join; the slot gets to it as
+    before. `merge-slot/pr-batch` is pointed at the first PR's test merge X and each next head is merged into it with
+    the Merges API. A PR that conflicts with the ones before it stays out and waits for the next pass; it is sent back
+    with the usual comment only when it also conflicts with main alone. When nobody joins, the PR gets its own test.
+  - **The batch commit.** One commit made with the Git Data API: its tree is that chain (main + PR 1 + PR 2 + …), its
+    parents are main and the members' heads in label order. So `checks.yml` sees main as `HEAD^1`, as for a single
+    test merge: the docs-only classifier and the preview perf ratchet compare the whole batch with main. Its message
+    lists each member's head and the tree main must have right after merging it. It is dispatched once, on
+    `merge-slot/pr-batch`; that run holds the slot like a single test, and nothing else is tested or merges meanwhile.
+  - **Green.** The members merge in label order with `--merge`, the head pinned, each only while main is the batch's
+    previous merge (main itself for the first). Main's tree after each must be the chain's tree after that PR; after
+    the last it is the tested tree. Each gets a comment naming the run and the other members, its branches are
+    deleted, and `checks.yml` runs on main once, after the batch. The trees between the batch's merges weren't tested
+    on their own: a batch is tested as a whole, like any merge queue's batches.
+  - **Changes stop it.** A member pushed, unlabeled, closed or merged some other way, or main moved by someone else's
+    merge: the members before it stay merged (main holds a prefix of the tested chain), it and the rest go back to
+    waiting. While the run goes, a change to the first member or to main leaves nothing the result could merge: the
+    slot cancels the run and tests nothing else until GitHub has stopped it. A later member changing lets the run
+    finish for the ones before it. A main move in the second between the slot's last read and a merge lands an
+    untested tree, the same window as for a single PR; the slot sees main's tree differ, says so on that PR and stops.
+  - **Red.** A red batch sends nobody back. A run GitHub's infrastructure failed is re-run in place first, as for a
+    single test. Otherwise (a check failed, the run was cancelled or ran out its three hours) the slot falls back to
+    one test at a time from the oldest: each member still at the head the batch tested goes through steps 1–5 alone,
+    and only one whose own test fails gets the usual comment. No new batch forms until each member is done. That costs
+    one extra run in the red case: n + 1 runs for n PRs instead of n.
+  - **Why four.** A red batch costs one run per member on top, about half an hour each with queueing, so four take
+    about 2.5 hours to clear. Slot tests rarely fail (from 11-19 to 11-26: 13 slot tests, one red, one cancelled); for
+    a red rate p of 5–15% the expected runs per PR, 1/k + 1 − (1 − p)^k, are lowest at k = 3–5 and within about 2% of
+    that at k = 4. And since 11-19 at most four PRs carried the label at once (two for 36% of the time any did, three
+    for 13%).
+  - **Main's run after a batch runs in full.** `scripts/ci-verified-tree.sh` takes a slot run's marker only when its
+    commit has exactly the merge's two parents, and a batch commit has more (`checks/ci-verified-tree.sh` pins that).
+    Teaching it the batch's chain would make that run short; until then a batch costs its test plus one full run on
+    main.
+  - Its state is all on GitHub: the branch, its commit and the runs on it, so the workflow's next job carries on
+    mid-run, mid-merge, mid-fallback, or with a batch built but never dispatched. `sweep` leaves `merge-slot/pr-batch`
+    to the batch, which deletes it when done. `scripts/merge-slot-wait.sh N` means the same for a member: 0 merged,
+    1 sent back with the slot's comment, 3 still waiting.
 - **PRs that change `.github/workflows/` can't use the slot.** GitHub doesn't let the workflow token create or update
   workflow files, so the slot can neither build their test merge nor merge them. It reads each PR's files and sends
   such a PR back at once with the by-hand path: merge origin/main into the branch, push, and once `check-all` is green
@@ -1045,26 +1092,31 @@ The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged o
 - **The workflow token.** The slot merges with `GITHUB_TOKEN`, and a merge made with it starts no push run. So the slot
   dispatches `checks.yml` on main itself. `scripts/ci-docs-only.sh` and `scripts/ci-verified-tree.sh` treat that run
   like a push: never docs-only, and the usual verified short run when a marker proves the tree. The cache is saved on
-  `github.ref == 'refs/heads/main'`. `checks.yml` takes dispatches on main and on `merge-slot/pr-<N>` only. On any other
-  ref every shard is skipped, so `check-all` fails: a skipped required check would count as passed.
+  `github.ref == 'refs/heads/main'`. `checks.yml` takes dispatches on main and on `merge-slot/pr-*` only (the slot's
+  tests, the batch's `merge-slot/pr-batch` included). On any other ref every shard is skipped, so `check-all` fails: a
+  skipped required check would count as passed.
 - **One at a time.** The job has `concurrency: merge-slot` with `cancel-in-progress: false`, so a run that finds the
   slot busy waits. Every run reads the whole queue from GitHub (labels, runs, markers), so nothing is lost when a newer
   waiting run replaces an older one. The script stops after 320 minutes; a new label or the half-hourly cron starts it
   again.
-  - **One PR is under test at a time.** A PR holds the slot while a `merge-slot/pr-<N>` run of it is queued or in
-    progress, for ten minutes after that run ends (a green test merges next, a red one sends the PR back), and for ten
-    minutes after the job dispatched it (GitHub lists a dispatched run a little later). Only the holder moves, even
-    when a PR with an older label turns green meanwhile. Of several holders, the earliest test holds.
+  - **One test at a time.** A PR holds the slot while a `merge-slot/pr-<N>` run of it is queued or in progress, for
+    ten minutes after that run ends (a green test merges next, a red one sends the PR back), and for ten minutes after
+    the job dispatched it (GitHub lists a dispatched run a little later). Only the holder moves, even when a PR with an
+    older label turns green meanwhile. Of several holders, the earliest test holds. A batch's run
+    holds it the same way, and so does any run on `merge-slot/pr-batch` that no batch needs any more, until GitHub has
+    stopped it. A PR whose own test holds the slot is never batched: when main moves under it, it is tested again
+    alone.
   - `holder()` reads the runs from GitHub every pass, so the workflow's next job keeps the same holder. Until 2026-11-20
     each pass started again from the oldest label, and on 11-19 #531's test was dispatched while #532's ran
     ([case](../bugfixes/2026-11-20-merge-slot-tested-two-prs-at-once.md)).
-- **Safety.** It merges only a tree that a green run tested, with the head pinned and main read just before merging. A
-  manual merge in the second between those two calls could still land an untested tree, so nobody merges by hand. It
-  never runs a pull request's code: `pull_request_target` runs main's copy of the workflow, and the job checks out main.
-  The ruleset still requires `check-all` on the head.
-- **Cost.** One ubuntu job while the queue isn't empty, polling every 90 seconds. That is about six API calls a pass,
-  under the token's 1,000 an hour. A PR whose own run tested the current main gets no second run; otherwise it gets one
-  slot test, which costs what a pull_request run does.
+- **Safety.** It merges only a tree that a green run tested (for a batch member, the tested chain up to it), with the
+  head pinned and main read just before merging. A manual merge in the second between those two calls could still
+  land an untested tree, so nobody merges by hand. It never runs a pull request's code: `pull_request_target` runs
+  main's copy of the workflow, and the job checks out main. The ruleset still requires `check-all` on the head.
+- **Cost.** One ubuntu job while the queue isn't empty, polling every 90 seconds. That is about seven API calls a
+  pass (the batch's branch is read too), under the token's 1,000 an hour. A PR whose own run tested the current main
+  gets no second run; otherwise it gets one slot test, which costs what a pull_request run does, shared with up to
+  three more ready PRs in a batch. A red batch costs one run more, and main's run after a batch runs in full (above).
 - `checks/MergeSlot/MergeSlotChecks.py` runs the slot against an in-memory GitHub (`FakeGitHub.py`) and pins both
   workflows. The fake copies GitHub's quirk that broke the first version: the test merge isn't recomputed when main
   moves, and its token can't write workflow files. Reverse verification on 2026-11-20: 24 mutations of the script each
@@ -1072,3 +1124,11 @@ The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged o
   or head, rebuilding it every pass, not detecting a workflow PR, an unpinned head, FIFO by number, not holding the
   slot during a test, and squash. It also runs `InfraRerunCases.py` (the automatic re-runs in "CI" above). Since
   2026-11-20 its slot tests can last 12 polls and be listed late, like GitHub's, so overlapping tests show.
+  Since 2026-11-26 it runs `BatchCases.py` (the [check catalog](../testing/check-catalog.md) lists the cases): the
+  fake also creates commits, cancels runs two polls late, answers 204 when a branch already contains the head, lets
+  PRs conflict with each other, and fails every run of a commit that contains a breaking head. Reverse verification
+  on 2026-11-26: 28 mutations of the
+  batch code and the serve loop each turned it red, among them batching while a single test holds the slot or during
+  a fallback, a batch commit whose first parent isn't main, a red batch dropped instead of falling back, no cancel when
+  the first member or main changes mid-run, a stray run not holding the slot, merging a pushed or unlabeled member,
+  ignoring main's moves between merges or main's tree after one, and a cap of six.
