@@ -433,13 +433,17 @@ version, a new paid job, charged; SkyCut only guards against a runaway loop (`Sk
    `voiceOneTime` (manage_voices design, also under a standing grant) as one question with the draft or fee question when SkyCut asks
    that anyway, so one token answers both and a token for the draft question alone never does; alone through `repeatConfirmation`
    right before the reservation (change_voice, which now takes `confirm_token`, and add_voiceover with a Sky Studio voice). Over the
-   daily limit the result is `daily_budget_exceeded`, with no question. A yes approves the rest of that run; a no starts nothing (the
-   same call sent again gets the same question).
+   daily limit the result is `daily_budget_exceeded`, with no question. A yes covers the identical-request question for the rest of
+   that run (until a different request), nothing more: a draft or fee question it was merged into is still asked for each identical
+   request when its own yes covers only that one (this task's draft approval, a fee in ask mode), and the question says so; a
+   project approval or a standing grant covers them. A no starts nothing (the same call sent again gets the same question).
 5. **Panels are not counted** (a person's click is deliberate). After a failed download, the upscale and change-voice panels opened on
    that clip make **Download again** (free: that job's own Download again) the main button and label the paid one "Make a new version
    (N credits)" ("up to N credits" for a voice change), under one line saying which is which, in every UI language. The held job is
    the clip's own, in that opening of the project (`SkyStudioPanelHeldDownload`: an upscale job covering the clip, the voice change last
-   started for it), never one found by a request's parameters or source file.
+   started for it), never one found by a request's parameters or source file. An upscale held before a later upscale of the clip
+   landed is not offered: it is no longer the clip's last, and its Download again would swap the older result in over the newer
+   one (only its own row offers it; `UpscaleActivity.landedAfter`).
 6. No money threshold: the daily credit limit caps expensive loops.
 
 Not counted, by decision: the official film's submissions (each needs its own quote token from a separate quote with a seam review,
@@ -448,11 +452,12 @@ the same voice and language and charges once, and a built version has no fee); a
 `generate_missing`: the same job's batches); free writes.
 
 Checks: `RepeatGuardChecks` in `scripts/check-sky-studio.sh` (counting, the words, identities with real files, the gate's questions in
-both modes, design under a standing grant); `RepeatRequestChecks` and `RepeatPanelChecks` in `scripts/check-voice-recovery.sh` (the
-tool entries with POSTs counted: generate_media in both modes with the same key and another project, upscale_clip's one merged
-question, change_voice's own question, another language or voice, panels never counted, the panels' Download again after a failed
-download); `checks/sky-studio-wiring/repeat-requests.sh` (where each tool counts, asks and adds the line; only the gate approves;
-nothing on the panels' path counts; how the panels find a held job).
+both modes and what a yes covers in each, design under a standing grant and its yes approving the run); `RepeatRequestChecks` and
+`RepeatPanelChecks` in `scripts/check-voice-recovery.sh` (the tool entries with POSTs counted: generate_media in both modes with the
+same key and another project, upscale_clip's one merged question, add_voiceover's 5th and its token, change_voice's own question,
+another language or voice, panels never counted, the panels' Download again after a failed download, not once a later upscale of
+the clip landed); `checks/sky-studio-wiring/repeat-requests.sh` (where each tool counts, asks and adds the line; only the gate
+approves; nothing on the panels' path counts; how the panels find a held job).
 
 Manual regression before a release:
 

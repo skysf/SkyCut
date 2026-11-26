@@ -14,7 +14,8 @@
 #   - panels are never counted: nothing on the panels' path (the panels, their models, the shared voice change start, the upscale job,
 #     the design dialog) touches the run registry; the official film's own submission flow does not count either (each submission
 #     needs its own quote token and seam review, so an identical one cannot be sent again by repeating a call);
-#   - the panels reach a held paid result only through SkyStudioPanelHeldDownload, by the job's own clip and project opening.
+#   - the panels reach a held paid result only through SkyStudioPanelHeldDownload, by the job's own clip and project opening;
+#   - the voice-recovery suite they run in keeps room under its watchdog and prints the binary's own seconds.
 # Long-term rules: docs/architecture/sky-studio-jobs.md, "Identical paid requests in a row".
 
 REPEAT_GUARD="Sources/SrtFlow/SkyStudio/SkyStudioRepeatGuard.swift"
@@ -98,3 +99,11 @@ grep -qF 'Button("Download again") { held.downloadAgain(); dismiss() }' Sources/
 noters="$(code_files_with 'VoiceChangeActivity\.shared\.noteJob\(' | LC_ALL=C sort -u | tr '\n' ' ' || true)"
 [ "${noters}" = "Sources/SrtFlow/VoiceChange/VoiceChangeOrder.swift " ] \
   || fail "a voice change's job is noted for its clip only where both entries start it (VoiceChangeOrder.start): ${noters:-none}"
+
+# The suite RepeatRequestChecks / RepeatPanelChecks run in keeps room under its watchdog and prints the binary's own seconds, so each
+# CI log shows the margin (FBR1 on PR #557: these checks took the CI step from 213 to 240 s, and nothing printed the binary's share).
+VOICE_RECOVERY="scripts/check-voice-recovery.sh"
+watchdog="$(grep -E '^WATCHDOG = [0-9]+$' "${VOICE_RECOVERY}" | grep -oE '[0-9]+' || true)"
+{ [ -n "${watchdog}" ] && [ "${watchdog}" -ge 480 ] && grep -qF 'timeout=WATCHDOG' "${VOICE_RECOVERY}" \
+    && grep -qF 'print(f"voice-recovery binary: ' "${VOICE_RECOVERY}"; } \
+  || fail "${VOICE_RECOVERY}: the watchdog keeps at least 480 s and the wrapper prints the binary's elapsed seconds"

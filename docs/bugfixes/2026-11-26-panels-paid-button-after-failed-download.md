@@ -25,11 +25,14 @@ told the AI it was repeating itself or stopped a runaway loop of them (B51).
 - Panels: `SkyStudioPanelHeldDownload` finds the clip's own held job by the job's own identity (an upscale job covering the clip in
   that opening of the project; the voice change last started for the clip, noted in `VoiceChangeActivity` by `VoiceChangeOrder.start`),
   never by parameters. When there is one, the panel makes Download again its default button and labels the paid one "Make a new
-  version (N credits)", under one line saying which is which, in English, 简体中文 and Español.
+  version (N credits)", under one line saying which is which, in English, 简体中文 and Español. An upscale held before a later
+  upscale of the clip landed is not offered: it is no longer the clip's last, and its Download again would swap the older result in
+  over the newer one (the first review, FBR1; `UpscaleActivity.landedAfter`).
 - AI tools: `SkyStudioRepeatGuard` counts identical resolved requests (`SkyStudioRequestDigest`) per project and tool. From the
   2nd the result says which one in a row and its credits; the 5th asks once through `SkyStudioJobGate` in every permission mode (one
-  question with the draft question when there is one); a yes covers the rest of that run. change_voice takes `confirm_token` for
-  it. Panels are never counted.
+  question with the draft question when there is one); a yes covers the identical-request question for the rest of that run, and
+  a draft or fee question whose yes covers one request is still asked for each (the question says so). change_voice takes
+  `confirm_token` for it. Panels are never counted.
 - The rules: [Sky Studio jobs](../architecture/sky-studio-jobs.md), "Identical paid requests in a row".
 
 ## Verification
@@ -37,7 +40,8 @@ told the AI it was repeating itself or stopped a runaway loop of them (B51).
 - `scripts/check-voice-recovery.sh` → `RepeatPanelChecks`: after three dropped GETs the change-voice panel on that clip holds
   Download again and another project's does not, and its Download again lands the change with no new POST; an upscale held after
   three drops is offered on its clip in project A, not on the same source's clip in project B or on a clip it did not cover, and its
-  Download again sends no new upload or POST; identical changes and upscales from the panels are never counted.
+  Download again sends no new upload or POST; once a later upscale of that clip lands, the older held one is no longer offered;
+  identical changes and upscales from the panels are never counted.
 - `RepeatRequestChecks` (the tool entries, POSTs counted) and `RepeatGuardChecks` (`scripts/check-sky-studio.sh`) cover the AI side;
   `checks/sky-studio-wiring/repeat-requests.sh` pins the wiring. Each was reverse-verified (see the PR description).
 - Off-screen images of both panels with a held result, in en and zh-Hans, were rendered for the user before merge.

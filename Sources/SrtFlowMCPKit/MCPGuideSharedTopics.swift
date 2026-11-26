@@ -106,7 +106,7 @@ enum MCPGuideSharedTopics {
 
         Identical requests. The same request sent again to the same tool in a project is a new paid job; from the 2nd in a row the \
         result says which one it is, and the 5th returns needs_confirmation in every mode (one question with any other): a yes \
-        covers the identical requests after it.
+        stops this question until a different request; another question still comes for each one it applies to.
 
         The daily budget. SkyCut's own daily credit limit (a SkyCut setting, not the Sky Studio balance) applies in every mode: over \
         it, the result is status blocked with daily_budget_exceeded and nothing starts. Tell the user plainly; next_step has the \

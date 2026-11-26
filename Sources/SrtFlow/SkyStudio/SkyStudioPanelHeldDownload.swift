@@ -6,8 +6,9 @@ import Foundation
 // this opening of the project, from the panel or by the AI) was made by Sky Studio but did not come down, the panel makes Download
 // again its main button (free: that job's own Download again, only GETs) and labels the paid button "Make a new version (N credits)",
 // with one line saying which is which. The job is found by its own identity: the project's opening and the clip it was started for,
-// never by matching a new request's parameters (that once handed project B's upscale to project A's clip, PR #554). Read once when
-// the panel opens, as the panel's other state of the clip's last job (VoiceChangeActivity.separationFailed).
+// never by matching a new request's parameters (that once handed project B's upscale to project A's clip, PR #554). A held upscale
+// older than a later upscale of the clip that landed is not offered: it is no longer the clip's last. Read once when the panel opens,
+// as the panel's other state of the clip's last job (VoiceChangeActivity.separationFailed).
 // Panels are never counted as identical requests (a person's click is deliberate; SkyStudioRepeatGuard).
 // What it does not cover: drawing (UpscalePanel, VoiceChangePanel), the download itself (UpscaleJob, VoiceChangeJob).
 
@@ -16,11 +17,12 @@ struct SkyStudioPanelHeldDownload {
     /// Download again of that job's own paid result.
     let downloadAgain: () -> Void
 
-    /// The upscale held for this clip in this opening of the project (its row's Download again).
+    /// The upscale held for this clip in this opening of the project (its row's Download again), unless a later upscale of the clip
+    /// has landed since: the held one is then no longer the clip's last upscale, and only its own row offers it (FBR1 on PR #557).
     static func upscale(project: VideoEditProject, clipID: UUID) -> SkyStudioPanelHeldDownload? {
         guard let job = UpscaleActivity.shared.jobs.last(where: {
             $0.projectGeneration == project.documentGeneration && $0.clipIDs.contains(clipID) && $0.canRetryDownload
-        }) else { return nil }
+        }), !UpscaleActivity.shared.landedAfter(job, clipID: clipID) else { return nil }
         return SkyStudioPanelHeldDownload { UpscaleActivity.shared.downloadAgain(job) }
     }
 

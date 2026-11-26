@@ -191,10 +191,15 @@ private func gateChecks() {
         for _ in 1..<number { SkyStudioRepeatGuard.shared.started(SkyStudioRepeatGuard.shared.check(tool, project: project, identity: identity, credits: 20)) }
         return SkyStudioRepeatGuard.shared.check(tool, project: project, identity: identity, credits: 20)
     }
-    func decide(_ repeated: SkyStudioRepeatGuard.Check, reason: String? = nil, token: String? = nil) -> SkyStudioJobGate.Decision? {
-        try? SkyStudioJobGate.decide(credits: 20, summary: "Fixture · 5 s", identity: "approval:\(repeated.project)",
-            args: AIToolArguments(.object(token.map { ["confirm_token": .string($0)] } ?? [:])), store: store, access: access,
-            reason: reason, repeated: repeated)
+    /// `scope`: the approval scope the AI asks for (with a project to approve it in); nil asks for this task only.
+    func decide(_ repeated: SkyStudioRepeatGuard.Check, reason: String? = nil, token: String? = nil,
+                scope: String? = nil) -> SkyStudioJobGate.Decision? {
+        var args: [String: JSONValue] = [:]
+        if let token { args["confirm_token"] = .string(token) }
+        if let scope { args["approval_scope"] = .string(scope) }
+        return try? SkyStudioJobGate.decide(credits: 20, summary: "Fixture · 5 s", identity: "approval:\(repeated.project)",
+            args: AIToolArguments(.object(args)), store: store, access: access, reason: reason,
+            project: scope == nil ? nil : "repeat-gate-\(repeated.project)", repeated: repeated)
     }
     func asked(_ decision: SkyStudioJobGate.Decision?) -> AIToolResult? {
         if case .needsConfirmation(let result) = decision { return result }
@@ -217,6 +222,8 @@ private func gateChecks() {
     check(text.contains("5th identical request in a row") && text.contains("Keep making identical versions?") && token != nil
           && question?.payload["repeat_request"]?["identical_in_a_row"] == 5,
           "full access: the 5th asks with the repeat question and its fields: \(question?.payload ?? .null)")
+    check(text.contains("A yes also stops this identical-request question until a different request.")
+          && !text.contains("its own approval"), "the question alone says what a yes covers: the identical-request question: \(text)")
     checkEqual(store.spentToday(), spent, "the question reserves nothing")
     check(reserved(decide(fifth, token: token)), "the token lets the 5th through")
     check(SkyStudioRepeatGuard.shared.check(.generateMedia, project: fifth.project, identity: fifth.identity, credits: 20).approved,
@@ -234,6 +241,14 @@ private func gateChecks() {
     let both = draftToken?.payload["question"]?.stringValue ?? ""
     check(both.contains("Higher resolution.") && both.contains("5th identical request in a row") && both.contains("Approve this task?"),
           "ask mode: one question with the draft reason and the repeat sentence: \(both)")
+    // What the yes covers (FBR1 on PR #557): the identical-request question until a different request, not this task's approval,
+    // which is asked again for each identical request; a project approval does cover them, and its question does not say otherwise.
+    check(both.contains("stops this identical-request question until a different request, but each identical request after it "
+                        + "still needs its own approval.") && !both.contains("covers the identical requests after it"),
+          "a once approval's merged question says each identical request after it still needs its own approval: \(both)")
+    let projectWide = asked(decide(run(5), reason: "Higher resolution.", scope: "project"))?.payload["question"]?.stringValue ?? ""
+    check(projectWide.contains("for this project") && projectWide.contains("stops this identical-request question until a different request.")
+          && !projectWide.contains("its own approval"), "a project approval's merged question does not say they need their own: \(projectWide)")
     check((draftToken?.payload["next_step"]?.stringValue ?? "").contains("The same answer covers the identical-request question"),
           "its next step covers both")
     // The same request asked when it was not the 5th (the draft question alone): that token never answers the merged question.
@@ -280,4 +295,16 @@ private func gateChecks() {
     let combined = asked(feeAndRepeat)?.payload["question"]?.stringValue ?? ""
     check(combined.hasPrefix("Design the voice “N”?") && combined.contains("5th identical request in a row"),
           "ask mode: the fee question carries the repeat sentence: \(combined)")
+    check(combined.contains("still needs its own approval")
+          && (asked(standing)?.payload["question"]?.stringValue ?? "").contains("its own approval") == false,
+          "ask mode asks the fee again for each identical design and says so; a standing grant does not: \(combined)")
+    // Its yes approves the run: the 6th identical design goes through without asking again (FBR1 on PR #557).
+    let designYes = try? SkyStudioJobGate.voiceOneTime(credits: 20, action: "design:\(design.project)", question: "Design the voice “N”?",
+        token: asked(feeAndRepeat)?.payload["confirm_token"]?.stringValue, ask: .standing, store: store, repeated: design)
+    SkyStudioRepeatGuard.shared.started(design)
+    let sixth = SkyStudioRepeatGuard.shared.check(.manageVoices, project: design.project, identity: design.identity, credits: 20)
+    let sixthDecision = try? SkyStudioJobGate.voiceOneTime(credits: 20, action: "design:\(design.project)", question: "Design the voice “N”?",
+        token: nil, ask: .standing, store: store, repeated: sixth)
+    check(reserved(designYes) && sixth.number == 6 && sixth.approved && reserved(sixthDecision),
+          "the 5th identical design's yes approves its run: the 6th goes through without asking (number \(sixth.number), approved \(sixth.approved))")
 }

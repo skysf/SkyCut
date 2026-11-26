@@ -11,8 +11,8 @@ import Foundation
 // (user, 2026-11-25); SkyCut only guards against a runaway loop:
 // - from the 2nd request of a run on, the tool's result says which one it is and its credits (SkyStudioRepeatWords.fields);
 // - the 5th stops before anything is submitted and asks once through the gate's confirm flow, in every permission mode, as one
-//   question with the draft question when SkyCut asks that anyway (SkyStudioJobGate); a yes covers the rest of the run, a no
-//   starts nothing and charges nothing.
+//   question with the draft question when SkyCut asks that anyway (SkyStudioJobGate); a yes covers this question for the rest of
+//   the run (not the draft question, which keeps its own scope), a no starts nothing and charges nothing.
 // Only what was started counts: a quote, a question, a refusal or a call with an earlier job's idempotency_key (that job, #554)
 // neither counts nor breaks a run. In memory for this run of the App. Panels are never counted (a person's click is deliberate).
 // No money threshold: the daily credit limit already caps expensive loops.
@@ -80,7 +80,7 @@ final class SkyStudioRepeatGuard {
                      run: run.serial, credits: credits)
     }
 
-    /// The user said yes to this request at its question: the rest of its run goes through without asking.
+    /// The user said yes to this request at its question: the rest of its run is not asked about identical requests again.
     func approve(_ check: Check) {
         let key = Self.key(check.tool, check.project)
         guard var run = runs[key], run.identity == check.identity, run.serial == check.run else { return }

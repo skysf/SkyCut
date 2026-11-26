@@ -422,11 +422,15 @@
   asks and a yes covers only its run; the line and notes; identities: the canvas aspect, language, voice, options, model, prompt,
   a character's revision, a source range, files by their bytes (a copy is the same, a changed file is not), never the key or price
   cap, large files by samples; the gate: the 5th asks in full access and as one question with the draft reason in ask mode, a
-  draft-only token refused, the daily limit first, the lone question, design under a standing grant).
+  draft-only token refused, the daily limit first, the lone question, design under a standing grant and its yes approving the run,
+  what a yes covers in each question: a once approval or a fee in ask mode still asked for each identical request, a project
+  approval or a standing grant not).
   `scripts/check-voice-recovery.sh` → `RepeatRequestChecks` / `RepeatPanelChecks` (the tool entries with POSTs counted: generate_media
   2nd–4th lines, the 5th asking before any POST, the same question when unanswered, the token, the 6th / 7th, an earlier job's key,
-  another project, 9:16 then 16:9, ask mode; upscale_clip's one merged question; change_voice's own question, another language or
-  voice; panels never counted; the panels' Download again for their own clip after a failed download, not for another project).
+  another project, 9:16 then 16:9, ask mode; upscale_clip's one merged question; add_voiceover's 5th asking before any reservation
+  or POST and its token starting it; change_voice's own question, another language or voice; panels never counted; the panels'
+  Download again for their own clip after a failed download, not for another project, and not once a later upscale of the clip
+  landed).
   `checks/sky-studio-wiring/repeat-requests.sh` (sourced from download-retry.sh) pins where each tool counts, asks and adds the line,
   that only the gate approves, that nothing on the panels' path counts, and how the panels find a held job.
 - Reference-image fitting: `scripts/check-sky-studio.sh` → `ReferenceFitChecks` (which records allow fitting, also on Sky

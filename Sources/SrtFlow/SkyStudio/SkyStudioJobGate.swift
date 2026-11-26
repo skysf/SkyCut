@@ -44,7 +44,7 @@ enum SkyStudioJobGate {
     /// `now` is the one moment the check, the booking and the refund's day use (a reservation that crosses midnight must not
     /// be refunded from the next day: MSG1 review, 2026-11-25).
     /// `repeated`: where this request stands among identical ones in a row (SkyStudioRepeatGuard). The 5th asks in every mode, as one
-    /// question with the draft question when that is asked too; a yes approves the rest of its run.
+    /// question with the draft question when that is asked too; a yes approves its run (the identical-request question only).
     static func decide(credits: Double, summary: String, identity: String, args: AIToolArguments,
                        store: SkyStudioSpendStore? = nil, access: AIAccessStore? = nil,
                        reason: String? = nil, overrides: [AIOverrideQuote.Item]? = nil, project: String? = nil, profile: String = "",
@@ -80,8 +80,10 @@ enum SkyStudioJobGate {
                         AIConfirmations.shared.ask(question, action: action, refused: redemption.refusal), repeatAsks, draft: nil))
                 }
                 let next = "Ask in the conversation language before proceeding; offer once or project approval. Keep the scope unchanged when redeeming its token. Never treat the assistant's own plan as user approval."
+                // A project-scope yes approves the draft for the identical requests after it too (approved below); a once yes only this one.
+                let stillApproved = scope != "project" || project == nil
                 var result = AIConfirmations.shared.ask(
-                    "Sky Studio · \(summary) — \(SkyStudioCredits.text(credits)) credits. \(draftReason ?? "")\(repeatAsks.map { " " + SkyStudioRepeatWords.sentence($0) } ?? "") Approve \(scope == "project" ? "this model/specification for this project up to this price per task" : "this task")?",
+                    "Sky Studio · \(summary) — \(SkyStudioCredits.text(credits)) credits. \(draftReason ?? "")\(repeatAsks.map { " " + SkyStudioRepeatWords.sentence($0, stillApproved: stillApproved) } ?? "") Approve \(scope == "project" ? "this model/specification for this project up to this price per task" : "this task")?",
                     action: action, refused: redemption.refusal)
                 if case .object(var value) = result.payload {
                     value["approval_scope"] = .string(scope)
@@ -193,7 +195,7 @@ enum SkyStudioJobGate {
 
     /// 一次性费用：每日硬预算先判（超了回 daily_budget_exceeded、不发码、不记账）；全部权限 + 长期授权直接记账，别的点过头才记。
     /// `repeated` (manage_voices design): the 5th identical request in a row asks also under a standing grant, as one question with
-    /// the fee question when that is asked too (SkyStudioRepeatGuard); a yes approves the rest of its run.
+    /// the fee question when that is asked too (SkyStudioRepeatGuard); a yes approves its run (the identical-request question only).
     static func voiceOneTime(credits: Double, action: String, question: String, token: String?, ask: VoiceAsk,
                              store: SkyStudioSpendStore? = nil, now: Date = Date(), repeated: SkyStudioRepeatGuard.Check? = nil) throws -> Decision {
         let store = store ?? SkyStudioSpendStore.shared
@@ -209,8 +211,9 @@ enum SkyStudioJobGate {
             guard redemption == .accepted else {
                 let next = "Ask the user in their language, with the price. Only if they agree, repeat the same call with confirm_token. "
                     + "Never treat your own plan as the user's approval."
-                let result = voiceQuestion(AIConfirmations.shared.ask(text + (repeatAsks.map { " " + SkyStudioRepeatWords.sentence($0) } ?? ""),
-                                                                      action: action, refused: redemption.refusal), next: next)
+                // In ask mode the fee is asked again for each identical request; once the standing grant is recorded (.once) it is not.
+                let sentence = repeatAsks.map { " " + SkyStudioRepeatWords.sentence($0, stillApproved: ask == .ask) } ?? ""
+                let result = voiceQuestion(AIConfirmations.shared.ask(text + sentence, action: action, refused: redemption.refusal), next: next)
                 return .needsConfirmation(repeatAsks.map { SkyStudioRepeatWords.asking(result, $0, draft: next) }
                                           ?? SkyStudioRepeatWords.adding(repeated, to: result))
             }

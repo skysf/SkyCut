@@ -47,6 +47,9 @@ final class UpscaleJob: ObservableObject, Identifiable {
     var projectGeneration: Int { owner.generation }
     let approval: Approval
     var aiJobID: String?
+    /// The order jobs are made in, app-wide: which of two upscales of a clip is the later one (UpscaleActivity.landedAfter).
+    let order: Int
+    private static var lastOrder = 0
 
     @Published private(set) var state: State
     @Published private(set) var outcome: UpscaleOutcome?
@@ -85,6 +88,8 @@ final class UpscaleJob: ObservableObject, Identifiable {
         self.owner = owner
         self.title = title
         self.approval = approval
+        Self.lastOrder += 1
+        order = Self.lastOrder
         state = .running(CloudJobProgress(phase: .preparing, typicalSeconds: request.typicalSeconds))
     }
 
@@ -195,6 +200,7 @@ final class UpscaleJob: ObservableObject, Identifiable {
         if let charged = result.creditsCharged { held?.settle(charged: charged) }
         outcome = result
         state = .done
+        UpscaleActivity.shared.landed(self)
         onFinished?(self)
         onEnded?(self)
     }
@@ -313,6 +319,10 @@ final class UpscaleActivity: ObservableObject {
     @Published private(set) var jobs: [UpscaleJob] = []
     @Published var panel: UpscalePanelTarget?
     @Published var compare: UpscaleCompareTarget?
+    /// Per clip and project opening, the latest job (by `UpscaleJob.order`) whose result reached this Mac. A result held from an older
+    /// job is then no longer the clip's last upscale, and the panel does not offer it (its default Download again would swap the older
+    /// result in over the newer one; FBR1 on PR #557).
+    private var latestLanded: [String: Int] = [:]
 
     /// `opensCompare`：面板起的做完先弹对比窗口（方案第 15 条）；AI 起的（upscale_clip）自己接 `onFinished` 直接换源，不弹。
     func add(_ job: UpscaleJob, opensCompare: Bool = true) {
@@ -340,6 +350,21 @@ final class UpscaleActivity: ObservableObject {
         job.retryDownload()
     }
 
+    /// The job's result reached this Mac (UpscaleJob.complete, also after Download again).
+    func landed(_ job: UpscaleJob) {
+        for clip in job.clipIDs {
+            let key = Self.landingKey(job.projectGeneration, clip)
+            latestLanded[key] = max(latestLanded[key] ?? 0, job.order)
+        }
+    }
+
+    /// An upscale of this clip made after `job`, in the same opening of its project, has landed.
+    func landedAfter(_ job: UpscaleJob, clipID: UUID) -> Bool {
+        (latestLanded[Self.landingKey(job.projectGeneration, clipID)] ?? 0) > job.order
+    }
+
+    private static func landingKey(_ generation: Int, _ clip: UUID) -> String { "\(generation):\(clip.uuidString)" }
+
     /// 这个原片有没有在做 / 做完还没处理的任务。
     func job(forOriginal url: URL) -> UpscaleJob? {
         jobs.first { $0.request.originalURL == url }
@@ -353,6 +378,7 @@ final class UpscaleActivity: ObservableObject {
         let closing = jobs.filter { $0.projectGeneration == projectGeneration }
         for job in closing { job.cancel() }
         jobs.removeAll { $0.projectGeneration == projectGeneration }
+        latestLanded = latestLanded.filter { !$0.key.hasPrefix("\(projectGeneration):") }
         if case .job(let shown)? = compare, shown.projectGeneration == projectGeneration { compare = nil }
     }
 }

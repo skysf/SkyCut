@@ -22,10 +22,14 @@ enum SkyStudioRepeatWords {
         "skystudio-repeat:" + check.tool.rawValue + ":" + check.identity + ":credits:" + String(check.credits) + tokenSuffix(check)
     }
 
-    /// The sentence the question carries (merged into the draft question when SkyCut asks that too).
-    static func sentence(_ check: SkyStudioRepeatGuard.Check) -> String {
+    /// The sentence the question carries (merged into the draft or fee question when SkyCut asks that too). A yes covers the
+    /// identical-request check for the rest of the run, nothing more. `stillApproved`: the question it is merged into covers this
+    /// request only (this task's draft approval, a fee in ask mode), so it is still asked for each identical request after it, and the
+    /// sentence says so (FBR1 on PR #557: it once said a yes covered them).
+    static func sentence(_ check: SkyStudioRepeatGuard.Check, stillApproved: Bool = false) -> String {
         "This is the \(ordinal(check.number)) identical request in a row (\(SkyStudioCredits.text(check.credits)) credits each); each "
-            + "one is a new paid version, and a yes also covers the identical requests after it."
+            + "one is a new paid version. A yes also stops this identical-request question until a different request"
+            + (stillApproved ? ", but each identical request after it still needs its own approval." : ".")
     }
 
     /// The question when only the repeat asks.
@@ -50,7 +54,8 @@ enum SkyStudioRepeatWords {
         let lead = "This is the \(ordinal(check.number)) identical \(check.tool.rawValue) request in a row in this project, "
             + "\(SkyStudioCredits.text(check.credits)) credits each; each one is a new paid job."
         if check.approved {
-            return lead + " The user agreed to keep making identical versions, so SkyCut does not ask again until a different request."
+            return lead + " The user agreed to keep making identical versions, so SkyCut does not ask about identical requests again "
+                + "until a different request."
         }
         if check.asks { return lead + " SkyCut asks the user before starting it: nothing was started or charged." }
         return lead + " The \(ordinal(SkyStudioRepeatGuard.asksAt)) identical request in a row asks the user first."
@@ -59,8 +64,9 @@ enum SkyStudioRepeatWords {
     /// The next step of the question (`draft`: the gate's own next step when it asks about the draft too).
     static func nextStep(draft: String?) -> String {
         let repeatPart = "Ask the user in their conversation language whether to keep making identical versions of this request (each "
-            + "is a new paid job). Only if they agree, repeat this same call with this confirm_token; the identical requests after it "
-            + "then start without asking. If they do not agree, stop sending this request: nothing was started or charged."
+            + "is a new paid job). Only if they agree, repeat this same call with this confirm_token; SkyCut then does not ask about "
+            + "identical requests again until a different request. If they do not agree, stop sending this request: nothing was "
+            + "started or charged."
         guard let draft else { return repeatPart }
         return draft + " The same answer covers the identical-request question: " + repeatPart
     }

@@ -70,7 +70,7 @@ enum SkyStudioRequestDigest {
         var hasher = SHA256()
         let size = (values[.size] as? NSNumber)?.uint64Value ?? 0
         if size <= wholeFileLimit {
-            while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty { hasher.update(data: chunk) }
+            while try hashChunk(handle, upTo: 1 << 20, into: &hasher) > 0 {}
         } else {
             hasher.update(data: Data("sampled:\(size)".utf8))
             let edge: UInt64 = 16 << 20, slice: UInt64 = 512 << 10, slices: UInt64 = 32
@@ -80,15 +80,27 @@ enum SkyStudioRequestDigest {
             for (offset, count) in offsets {
                 try handle.seek(toOffset: offset)
                 var left = count
-                while left > 0, let chunk = try handle.read(upToCount: Int(min(left, 1 << 20))), !chunk.isEmpty {
-                    hasher.update(data: chunk)
-                    left -= UInt64(chunk.count)
+                while left > 0 {
+                    let read = try hashChunk(handle, upTo: Int(min(left, 1 << 20)), into: &hasher)
+                    guard read > 0 else { break }
+                    left -= UInt64(read)
                 }
             }
         }
         let digest = hex(hasher.finalize())
         known.remember(digest, for: key)
         return digest
+    }
+
+    /// One chunk of at most `count` bytes into the hash; returns how many were read (0 at the end of the file). FileHandle hands each
+    /// chunk back autoreleased: without a pool around each one a whole read kept every chunk until it ended, and hashing a 250 MiB
+    /// original took about 270 MB for a moment (FBR1 on PR #557).
+    private static func hashChunk(_ handle: FileHandle, upTo count: Int, into hasher: inout SHA256) throws -> Int {
+        try autoreleasepool {
+            guard let chunk = try handle.read(upToCount: count), !chunk.isEmpty else { return 0 }
+            hasher.update(data: chunk)
+            return chunk.count
+        }
     }
 
     private static func hex<D: Sequence>(_ digest: D) -> String where D.Element == UInt8 {

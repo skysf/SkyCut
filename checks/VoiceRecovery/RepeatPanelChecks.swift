@@ -12,7 +12,8 @@ import SrtFlowMCPKit
 //   for the same clip number in another project; the panel's Download again lands it with no new POST, and nothing is held after;
 // - upscale: an identical upscale from the panel is never counted (the AI's next is the 3rd); after a failed download the panel for
 //   that clip in that project holds Download again, the same source's clip in another project and a clip the job did not cover do
-//   not; its Download again gets the same result with no new upload or POST.
+//   not; its Download again gets the same result with no new upload or POST; a held upscale is no longer offered once a later
+//   upscale of the clip landed, and a landing before it never hides it.
 
 @MainActor
 func runRepeatPanelChecks(_ root: URL) async throws {
@@ -152,6 +153,25 @@ private func upscalePanelChecks(_ folder: URL) async throws {
         require(UpscaleHTTP.count("POST", "/uploads") == uploads && UpscaleHTTP.count("POST", "/jobs") == jobs
                 && SkyStudioPanelHeldDownload.upscale(project: a, clipID: clipA) == nil,
                 "the panel's Download again gets the same result with no new upload or POST, and nothing is held after")
+
+        // A later upscale of that clip landed (as the panel's "Make a new version" makes one): the older held result is no longer the
+        // clip's last upscale, and the panel stops offering it (its Return would swap the older result in over the newer one; FBR1 on
+        // PR #557). A landing before the held job (the one just above) never hides it.
+        @MainActor func panelUpscale() -> UpscaleJob {
+            let job = UpscaleJob(request: request, clipIDs: request.range.coveredClipIDs, owner: CloudTasksActivity.owner(of: a), title: model.clipName)
+            UpscaleActivity.shared.add(job)
+            return job
+        }
+        UpscaleHTTP.lock.withLock { UpscaleHTTP.drops = 3 }
+        let older = panelUpscale()
+        await eventually("the older upscale's download to give up") { older.canRetryDownload }
+        require(SkyStudioPanelHeldDownload.upscale(project: a, clipID: clipA) != nil, "an upscale held after an earlier one landed is offered")
+        let newer = panelUpscale()
+        await eventually("the newer upscale to land") { newer.state == .done }
+        require(older.canRetryDownload && SkyStudioPanelHeldDownload.upscale(project: a, clipID: clipA) == nil,
+                "a later upscale of that clip landed: the panel no longer offers the older held result (its own row still does)")
+        UpscaleActivity.shared.compare = nil
+        for job in [newer, older] { UpscaleActivity.shared.remove(job) }
     }
 }
 

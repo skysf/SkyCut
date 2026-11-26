@@ -12,8 +12,12 @@ import SrtFlowMCPKit
 //   POST) and neither counts nor breaks the run; the same request in another project is that project's 1st; the canvas turned to
 //   9:16 is a different request (a new run), and back to 16:9 is a new run again; in ask mode the 5th asks too;
 // - upscale_clip: four in full access, then the 5th in ask mode is one question (the draft reason and the identical-request
-//   sentence), with no upload or POST; its one token starts it.
-// Both need a key on the account (SkyStudioAccount.hasKey), so these run after PaidToolEntryChecks marked one.
+//   sentence, which says each identical request after it still needs its own approval), with no upload or POST; its one token
+//   starts it;
+// - add_voiceover with a Sky Studio voice: the same script four times, then the 5th asks before anything is reserved or POSTed, and
+//   its token starts it.
+// generate_media and upscale_clip need a key on the account (SkyStudioAccount.hasKey), so these run after PaidToolEntryChecks
+// marked one.
 
 @MainActor
 func runRepeatRequestChecks(_ root: URL) async throws {
@@ -23,7 +27,41 @@ func runRepeatRequestChecks(_ root: URL) async throws {
     SkyStudioSpendStore.shared.setDailyLimit(100_000)
     try await generateRepeatChecks(root.appendingPathComponent("repeat-generate", isDirectory: true))
     try await upscaleRepeatChecks(root.appendingPathComponent("repeat-upscale", isDirectory: true))
+    try await voiceoverRepeatChecks(root.appendingPathComponent("repeat-voiceover", isDirectory: true))
     try await runRepeatPanelChecks(root)
+}
+
+/// add_voiceover: the same script read the same way, the 5th asks before anything is reserved or POSTed, and its token starts it
+/// (FBR1 on PR #557: a token never passed on left every check green).
+@MainActor
+private func voiceoverRepeatChecks(_ folder: URL) async throws {
+    let fixture = try VoiceRecoveryFixture(folder: folder)
+    SkyStudioSpendStore.shared.setDailyLimit(100_000)   // the fixture's 1,000 can be below what the checks before spent today
+    AIAccessStore.shared.setMode(.full)
+    let lines = ["Hello world."]
+    func finished(_ result: AIToolResult) async throws {   // a call that started nothing fails its own line, not the checks after it
+        if result.payload["job_id"] != nil { _ = try await fixture.wait(result) }
+    }
+    for number in 1...4 {
+        let started = try fixture.started(try await fixture.narrate(lines, subtitles: false))
+        require(started.payload["job_id"] != nil && repeatNumber(started) == (number == 1 ? nil : Double(number)),
+                "identical narration \(number) starts with its line: \(started.payload["repeat_request"] ?? .null)")
+        try await finished(started)
+    }
+    let posts = VoiceRecoveryHTTP.posts, spent = SkyStudioSpendStore.shared.spentToday()
+    let fifth = try fixture.started(try await fixture.narrate(lines, subtitles: false))
+    let token = fifth.payload["confirm_token"]?.stringValue
+    require(fifth.payload["status"] == "needs_confirmation" && repeatNumber(fifth) == 5 && token != nil
+            && (fifth.payload["question"]?.stringValue ?? "").contains("Voiceover · ")
+            && VoiceRecoveryHTTP.posts == posts && SkyStudioSpendStore.shared.spentToday() == spent,
+            "the 5th identical narration asks before anything is reserved or POSTed: \(fifth.payload)")
+    var yes = fixture.input(lines: lines, subtitles: false)
+    yes.confirmToken = token
+    let agreed = try fixture.started(try await SkyStudioVoiceoverStart.start(yes, project: fixture.project, services: fixture.services))
+    require(agreed.payload["job_id"] != nil && agreed.payload["repeat_request"]?["user_agreed"] == true,
+            "its token starts the 5th: \(agreed.payload)")
+    try await finished(agreed)
+    require(VoiceRecoveryHTTP.posts > posts, "the 5th was sent once the user agreed")
 }
 
 /// The number in a row a result says (nil without a line).
@@ -141,7 +179,7 @@ private func upscaleRepeatChecks(_ folder: URL) async throws {
         let asked = try await call(args)
         let question = asked.payload["question"]?.stringValue ?? ""
         require(asked.payload["status"] == "needs_confirmation" && question.contains("Paid upscaling exceeds draft settings.")
-                && question.contains("5th identical request in a row") && repeatNumber(asked) == 5
+                && question.contains("5th identical request in a row") && question.contains("still needs its own approval") && repeatNumber(asked) == 5
                 && UpscaleHTTP.count("POST", "/uploads") == uploads && UpscaleHTTP.count("POST", "/jobs") == jobs,
                 "ask mode: the 5th identical upscale is one question with the draft reason, before any upload or POST: \(question)")
         var yes = args
