@@ -111,6 +111,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
   [阻塞的媒体读取](blocking-media-reads.md)）。那条线程用信号量等主线程做完，它本来就是专门等这件事的。
 - **小程序找 App**：从自己的路径往上找 `.app`，读它的 bundle id 算 socket；连不上就 `open -g -a <那个 App>`
   （不抢前台），最多等 45 秒。测试用的环境变量：`SRTFLOW_MCP_SOCKET`、`SRTFLOW_MCP_NO_LAUNCH`、`SRTFLOW_MCP_APP`。
+  Since 2026-11-26 the launch carries `--env SRTFLOW_AI_LAUNCH=1`: a SkyCut started this way from the installer disk never
+  asks to move itself to Applications ([build and packaging](../build/build-and-packaging.md) «Installing from the DMG»).
 - **拉起来的那一次，结果最前面加一句**（`MCPBridge.relaunchNote`，2026-10-03）：之前打开的工程、文件夹都不在了，叫 AI 重新
   `open_folder` / `open_project`。不加的话它只看到「文件不存在」「没有这个 id」，要自己去猜（南极工程那一次就是这样）。
 - **每个请求带着「这一次要的是这个会话的哪个工程」**（`Request.project` + 会话号 `session`，2026-10-14；2026-10-17 起一个会话一组工程，第四节第 46 条）：

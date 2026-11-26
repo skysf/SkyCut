@@ -214,6 +214,65 @@ runtime is on and Apple notarizes them, so a download opens directly. The rules,
   not notarized, with ⚠️ warnings, and **such a build never goes to a user or a release**.
 - A build that fails after it began writing `dist/` deletes the app and DMG it wrote (`build-beta-app.sh` its Beta).
 
+## Installing from the DMG: SkyCut offers to move itself (since 2026-11-26)
+
+The user, 2026-11-26: 「…再加上「直接打开时主动帮忙」」. Someone who double-clicks SkyCut in the install window instead of
+dragging it is asked once to move it into Applications. Written in SkyCut, no third-party code.
+
+- **When it asks**, one pure rule (`MoveToApplicationsOffer.decide`): only when the launch runs from a read-only volume
+  backed by a disk image (`InstallerDisk`: DiskArbitration's device model «Disk Image») or from an App Translocation path
+  (`/private/var/folders/…/AppTranslocation/…`, a quarantined download). Never from `/Applications` or `~/Applications`;
+  never for a bundle other than `com.srtflow.SrtFlow` and `com.srtflow.SrtFlow.beta`, or one in `dist/`, `.build`, `/tmp` or a
+  temporary folder; never when the AI helper started it (`skycut-mcp` launches with `open -g --env SRTFLOW_AI_LAUNCH=1`:
+  nobody may be there to answer, and the AI's call would wait behind the question); never with another `SRTFLOW_*`
+  variable or `CI` in the environment (checks, smokes, E2E).
+- **Connect AI** in Settings, and its two setup copies (the prompt, the JSON), refuse while SkyCut runs from the disk
+  (`runsFromInstallerDisk`, the same rule whoever started it): a client's config would name the helper on the disk, gone
+  once the disk is ejected. «Move SkyCut to the Applications folder first…».
+- **Before asking**, first in `applicationDidFinishLaunching`, before the AI channel or anything else starts
+  (`MoveToApplicationsLaunch`; every decision is `MoveToApplicationsFlow`'s, pure and checked): when the app of that name
+  in Applications is open (`RunningBundleProbe`: a process whose executable is in its `Contents/MacOS/`, any session,
+  letter case ignored), SkyCut says so instead of asking, and this copy quits (one button, Quit), so «quit it, then open
+  the copy on the installer disk again» holds. The question never promises the Trash for an open app. A helper running
+  from `Contents/Helpers/` doesn't count: an AI client keeps its `skycut-mcp` running while SkyCut is closed, and moving
+  the bundle to the Trash under it is harmless (a rename; it keeps running and opens the new copy at the same path next).
+- **The question**: «Move SkyCut to the Applications folder?» and its reason, «It's running from the installer disk, so it
+  won't open once the disk is ejected.»; Move to Applications (Return) and Not Now (Escape), plus a line when a stopped app
+  of that name there goes to the Trash. Not Now continues from the disk, and the next launch from the disk asks again:
+  nothing is remembered. Words in every UI language (`MoveToApplicationsAlerts`).
+- **The move** (`AppBundleMover`): the running bundle, the translocated view if that is where it runs, is copied under its own
+  name (SkyCut Beta keeps its name) into a staging folder on the Applications folder's volume. The copy's download
+  quarantine is cleared: copies from a quarantined image carry `com.apple.quarantine` (0281, measured), and macOS could
+  translocate the moved app, which would then ask again. The copy's signature is checked strictly against the original's
+  designated requirement (`AppBundleSignature`; for the Developer ID, the team, so permissions recorded by team and
+  identifier stay valid). Then:
+  - the probe is asked again right before the Trash (an AI client may have started the app meanwhile); the app open
+    there: nothing is moved, SkyCut says so, and this copy quits;
+  - an app of that name that is not running goes to the Trash (recoverable) and the copy is renamed into place; if the
+    rename fails, the old app is put back, and if that fails too, the alert says it is in the Trash;
+  - a folder this user can't write: SkyCut says so and offers Show Applications Folder. It never asks for administrator rights;
+  - any other failure leaves the destination as it was and names the step, with macOS's reason.
+- **After the move**, macOS opens the moved copy as a new instance and this one quits, before anything else started. When
+  SkyCut ran from the top of a disk image, a small shell that outlives it ejects the image once this process has exited
+  (`hdiutil detach` without `-force`: an image still in use stays mounted; it gives up after 60 s). A translocated download
+  is not ejected. If the copy does not open, an alert says so and that this copy keeps running from the disk.
+- A move faster than 0.4 s shows no progress panel (a warm image copied and checked a 65 MB bundle in about 0.1 s on the
+  M1, 2026-11-26). A slower one shows «Moving SkyCut to the Applications folder…».
+- Checks: `scripts/check-move-to-applications.sh`. Images: `scripts/render-move-to-applications.sh <folder>` (graphical session).
+- **Manual regression**, before a release that changes this (no check reaches Gatekeeper, a real download or the real
+  `/Applications`):
+  1. Download the notarized DMG (quarantined) and double-click SkyCut in the install window: the question appears once,
+     in the in-app language, before any other SkyCut window. Escape answers Not Now.
+  2. Not Now: SkyCut runs from the disk. Quit, open it from the disk again: it asks again.
+  3. Move to Applications with an older SkyCut in `/Applications` not running: the old one is in the Trash, the new one
+     opens from `/Applications` (About shows its version), the disk is ejected, and the next launch from `/Applications`
+     asks nothing and needs no permission again.
+  4. With SkyCut open from `/Applications`, open the disk's copy: no question; «SkyCut is open from the Applications
+     folder», Quit, this copy quits, nothing changed.
+  5. Running from the disk, Settings › Connect AI: refused with «Move SkyCut to the Applications folder first…».
+  6. With Claude or Codex open (its `skycut-mcp` running from `/Applications/SkyCut.app`) and SkyCut closed, open the disk's
+     copy: the question appears (not «SkyCut is open»), and Move replaces the app while the helper keeps running.
+
 ## 测试版（SkyCut Beta）
 
 没合并的功能要给用户在自己机器上实测时：`VERSION=x.y.z scripts/build-app.sh && scripts/build-beta-app.sh`，得到 `dist/SkyCut Beta.app`（re-signed with the same Developer ID and notarized on its own）。换了名字和 bundle id（`com.srtflow.SrtFlow.beta`：bundle id 沿用旧名），设置、AI 的通道都和正式版分开；每种文档类型都只做「备选」，双击工程文件仍由正式版打开。`build-app.sh` 会顺手打一个同版本号的 DMG、覆盖 `dist/SkyCut.app` —— 只出测试版时记得把它们删掉 / 换回去，别让 `dist/` 里留着贴了未发布版本号的包。
