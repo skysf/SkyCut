@@ -657,22 +657,37 @@
   (runtime on all four pieces, entitlements on the app only, stray code refused). The older sections stay:
   录自定义区域请求授权之前先删钉着旧签名的记录、`tccutil` 只在一处、文案不再叫人「关掉再打开」. Reverse verification (48
   sabotages after the FBS1 review, each red): [the Developer ID report](../reports/2026-11-26-developer-id-signing.md).
-- Moving SkyCut from the installer disk into Applications (2026-11-26): `scripts/check-move-to-applications.sh`. The launch
-  wiring (the offer first in `applicationDidFinishLaunching`, the AI channel only after it, the eject waits for the process
-  and never uses `-force`, no administrator rights); the launch rule in 24 cases (disk image and translocated paths ask;
-  `/Applications`, `~/Applications`, `dist/`, `.build`, `/tmp`, temporary folders, other bundle identifiers, `SRTFLOW_*` and
-  `CI` never do); `AppBundleMover` against scratch folders with ad-hoc signed fixture bundles (an empty destination: in
-  place, `codesign --verify --deep --strict` and the original's requirement pass, no quarantine left; a stopped app of that
-  name to a scratch Trash, and another build fails the requirement; a running app, an unwritable folder, an unreadable file
-  that breaks the copy off, a tampered original, a Trash that refuses, a failed install with and without putting the old
-  app back: each leaves the old app in place, or in the Trash only when it couldn't be put back, and no staging folder);
-  `InstallerDisk` on real scratch images (compressed read-only ones, HFS+ like the installer and APFS, found with their mount
-  point and whole disk, a writable one and a folder not; the eject waits for the given process, then detaches the whole
-  image). Reverse verification (2026-11-26): 20
-  sabotages (each rule of the launch rule, each step of the move, the device model, read-only, the eject's wait, the
-  wiring), each red; a missing zh-Hans or en string turns `scripts/check-localization-coverage.sh` red. Off-screen images:
-  `scripts/render-move-to-applications.sh <folder>` (graphical session, **not in `check-all.sh`**). Rules:
-  [build and packaging](../build/build-and-packaging.md) «Installing from the DMG».
+- Moving SkyCut from the installer disk into Applications (2026-11-26): `scripts/check-move-to-applications.sh`.
+  - **Scans**: the offer first in `applicationDidFinishLaunching` and the AI channel only after it; the launch performing the
+    flow's decisions (the live running probe before asking and in the mover, Not Now carrying on, `NSApp.terminate` only
+    where the end says the launch stops); the AI helper's launches marked `SRTFLOW_AI_LAUNCH=1`, the name the rule reads;
+    Connect AI and both setup copies refusing from the disk; the eject waiting for the process and never using `-force`;
+    no administrator rights.
+  - **The rule**: 26 cases (disk image and translocated paths ask; `/Applications`, `~/Applications`, `dist/`, `.build`,
+    `/tmp`, temporary folders, other bundle identifiers, an AI-started launch, `SRTFLOW_*` and `CI` never do), plus Connect
+    AI's `runsFromInstallerDisk`.
+  - **`MoveToApplicationsFlow`'s decisions**: a running app there gets the running alert, not the question; Not Now carries
+    on; only the image SkyCut ran from the top of is ejected; a launch that quits never carries on.
+  - **The alerts' buttons**, built for real: Return moves, Escape answers Not Now / OK, the running alert's one Quit.
+  - **`AppBundleMover`** against scratch folders with ad-hoc signed fixture bundles. An empty destination: in place,
+    `codesign --verify --deep --strict` and the original's requirement pass, no quarantine left. A stopped app of that
+    name goes to a scratch Trash, and another build fails the requirement. Each of these leaves the old app in place (in
+    the Trash only when it couldn't be put back) and no staging folder:
+    - a running app, before the copy or started during it;
+    - an unwritable folder;
+    - an unreadable file that breaks the copy off;
+    - a tampered original, or a copy of another build;
+    - a Trash that refuses;
+    - a failed install, with and without putting the old app back.
+  - **`RunningBundleProbe`** on real processes (copies of `/bin/sleep`): a helper inside the bundle counts, by any letter
+    case, until it exits; a sibling folder's process doesn't.
+  - **`InstallerDisk`** on real scratch images: compressed read-only ones, HFS+ like the installer and APFS, are found with
+    their mount point and whole disk; a writable one and a folder are not. The eject waits for the given process, then the
+    whole image is gone (polled in `hdiutil info`: the volume goes first).
+  - **Reverse verification** (2026-11-26): every sabotage of round 1 and round 2 is red; a missing zh-Hans or en string
+    turns `scripts/check-localization-coverage.sh` red. Counts and runs: the PR. Off-screen images:
+    `scripts/render-move-to-applications.sh <folder>` (graphical session, **not in `check-all.sh`**). Rules:
+    [build and packaging](../build/build-and-packaging.md) «Installing from the DMG».
 - 产品名与代码名（看得见的叫 SkyCut；bundle id、UTType、数据文件夹、钥匙串、AI 通道这些身份沿用 SrtFlow，改了就丢用户的授权、设置和数据）：
   `checks/product-name.sh`。
 - 工程不再是单例（全仓没有 `VideoEditProject.shared`、工程只由 `OpenProjects` 建、撤销不退到键窗口、工程代号全 App 一个计数、

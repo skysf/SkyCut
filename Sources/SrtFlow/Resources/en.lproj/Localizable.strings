@@ -1729,13 +1729,13 @@
 
 /* Moving SkyCut from the installer disk into Applications (MoveToApplicationsAlerts, 2026-11-26). */
 "Move %@ to the Applications folder?" = "Move %@ to the Applications folder?";
-"It's running from the installer disk, but updates and the permissions you give it expect it in the Applications folder." = "It's running from the installer disk, but updates and the permissions you give it expect it in the Applications folder.";
+"It's running from the installer disk, so it won't open once the disk is ejected." = "It's running from the installer disk, so it won't open once the disk is ejected.";
 "The %@ that's there now goes to the Trash." = "The %@ that's there now goes to the Trash.";
 "Move to Applications" = "Move to Applications";
 "Not Now" = "Not Now";
 "Moving %@ to the Applications folder…" = "Moving %@ to the Applications folder…";
 "%@ is open from the Applications folder" = "%@ is open from the Applications folder";
-"Quit it, then open the copy on the installer disk again to replace it. Nothing was changed." = "Quit it, then open the copy on the installer disk again to replace it. Nothing was changed.";
+"To replace it, quit it, then open the copy on the installer disk again. Nothing was changed, and this copy quits now." = "To replace it, quit it, then open the copy on the installer disk again. Nothing was changed, and this copy quits now.";
 "%@ can't be moved to the Applications folder" = "%@ can't be moved to the Applications folder";
 "You don't have permission to change the Applications folder. Drag %@ into it in Finder instead." = "You don't have permission to change the Applications folder. Drag %@ into it in Finder instead.";
 "Show Applications Folder" = "Show Applications Folder";
@@ -1748,4 +1748,6 @@
 "Nothing in the Applications folder was changed." = "Nothing in the Applications folder was changed.";
 "The %@ that was there before is in the Trash: put it back from there." = "The %@ that was there before is in the Trash: put it back from there.";
 "%@ was moved but didn't open" = "%@ was moved but didn't open";
-"It's in the Applications folder now: open it from there." = "It's in the Applications folder now: open it from there.";
+"It's in the Applications folder now: open it from there. This copy keeps running from the installer disk." = "It's in the Applications folder now: open it from there. This copy keeps running from the installer disk.";
+"Quit" = "Quit";
+"Move %@ to the Applications folder first: it's running from the installer disk, and the AI app couldn't find it once the disk is ejected." = "Move %@ to the Applications folder first: it's running from the installer disk, and the AI app couldn't find it once the disk is ejected.";
