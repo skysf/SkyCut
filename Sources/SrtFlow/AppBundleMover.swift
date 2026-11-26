@@ -16,8 +16,9 @@ import Foundation
 struct AppBundleMover {
     /// Where the app goes: /Applications for SkyCut, a scratch folder in the checks.
     var destinationFolder: URL
-    /// Is anything running from the bundle at this path? Asked twice, the second time right before the Trash, off the main
-    /// thread (SkyCut: RunningBundleProbe, live).
+    /// Is the app itself open from the bundle at this path? Asked twice, the second time right before the Trash, off the main
+    /// thread (SkyCut: RunningBundleProbe, live; a helper running from the bundle doesn't count, and trashing under it is
+    /// harmless: see that file).
     var isRunning: (URL) -> Bool
     /// Moves an item to the Trash and says where it went (SkyCut: the person's Trash; the checks: a scratch folder).
     var trash: (URL) throws -> URL
