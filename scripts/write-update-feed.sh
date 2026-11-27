@@ -9,17 +9,24 @@
 #   notes.json: {"zh-Hans": ["…", "…"], "en": ["…", "…"], "es": ["…", "…"]}, 3 to 5 short lines each (at most 8, 300 characters).
 #   The DMG URL is its immutable object on https://downloads.skylu.ai. --test-feed (the manual two-build test, never a
 #   release): the feed is checked as SkyCut checks one from that test hook, so the DMG may also be served from its origin.
-# Not in check-all (it needs the signed release DMG); scripts/check-app-update.sh runs FeedWriter on fixture values.
+#   Relative paths are taken from the folder it is run in.
+# Not in check-all (it needs the signed release DMG). scripts/check-app-update.sh runs FeedWriter on fixture values, and
+# runs this wrapper and its mount (scripts/update-feed/mount.sh) on a scratch image.
 set -euo pipefail
 TEST_FEED=""
 if [ "${1:-}" = "--test-feed" ]; then
-  TEST_FEED="${2:?--test-feed needs the test feed's own URL}"
+  TEST_FEED="${2:?--test-feed needs the URL of the test feed itself}"
   shift 2
 fi
 DMG="${1:?usage: scripts/write-update-feed.sh [--test-feed <url>] <verified.dmg> <immutable DMG URL> <notes.json> <out.json>}"
-URL="${2:?the DMG's immutable URL on downloads.skylu.ai}"
+URL="${2:?the immutable URL of the DMG on downloads.skylu.ai}"
 NOTES="${3:?the notes file (zh-Hans, en, es)}"
 OUT="${4:?where to write the feed}"
+# Made absolute before the cd below, which would otherwise resolve them against the repository.
+absolute() { case "$1" in /*) printf '%s\n' "$1" ;; *) printf '%s\n' "${PWD}/$1" ;; esac; }
+DMG="$(absolute "${DMG}")"
+NOTES="$(absolute "${NOTES}")"
+OUT="$(absolute "${OUT}")"
 cd "$(dirname "$0")/.."
 [ -f "${DMG}" ] || { echo "✗ write-update-feed: no DMG at ${DMG}" >&2; exit 1; }
 [ -f "${NOTES}" ] || { echo "✗ write-update-feed: no notes file at ${NOTES}" >&2; exit 1; }
@@ -29,21 +36,16 @@ if [ -z "${TEST_FEED}" ]; then
     *) echo "✗ write-update-feed: the DMG URL must be its immutable object on https://downloads.skylu.ai (never the redirect): ${URL}" >&2; exit 1 ;;
   esac
 fi
-WORK="$(mktemp -d "${TMPDIR:-/tmp/}skycut-feed.XXXXXX")"
-MOUNT="${WORK}/mount"
-cleanup() {
-  if mount | grep -F " on ${MOUNT} " >/dev/null 2>&1; then /usr/bin/hdiutil detach -quiet -force "${MOUNT}" || true; fi
-  rm -rf "${WORK}"
-}
-trap cleanup EXIT
+. scripts/update-feed/mount.sh
+feed_mount_init
+trap feed_cleanup EXIT
 
 if ! /usr/sbin/spctl --assess --type open --context context:primary-signature -vv "${DMG}" 2>&1 | grep -F 'source=Notarized Developer ID' >/dev/null; then
   echo "✗ write-update-feed: Gatekeeper doesn't accept ${DMG} as notarized Developer ID" >&2
   exit 1
 fi
-mkdir -p "${MOUNT}"
-/usr/bin/hdiutil attach -quiet -readonly -nobrowse -noautoopen -mountpoint "${MOUNT}" "${DMG}"
-APP="${MOUNT}/SkyCut.app"
+feed_attach "${DMG}"
+APP="${FEED_MOUNT}/SkyCut.app"
 PLIST="${APP}/Contents/Info.plist"
 [ -f "${PLIST}" ] || { echo "✗ write-update-feed: no SkyCut.app at the top of ${DMG}" >&2; exit 1; }
 read_key() { /usr/libexec/PlistBuddy -c "Print :$1" "${PLIST}"; }
@@ -56,7 +58,7 @@ if ! /usr/sbin/spctl --assess --type execute -vv "${APP}" 2>&1 | grep -F 'source
   echo "✗ write-update-feed: Gatekeeper doesn't accept the DMG's app as notarized Developer ID" >&2
   exit 1
 fi
-/usr/bin/hdiutil detach -quiet "${MOUNT}"
+feed_detach
 SIZE="$(stat -f %z "${DMG}")"
 SHA="$(shasum -a 256 "${DMG}" | awk '{ print $1 }')"
 
@@ -65,9 +67,9 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 \
   Sources/SrtFlow/AppUpdate/AppUpdateFeed.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateRecords.swift \
   scripts/update-feed/FeedWriter.swift \
-  -o "${WORK}/feed-writer"
+  -o "${FEED_WORK}/feed-writer"
 if [ -n "${TEST_FEED}" ]; then
-  "${WORK}/feed-writer" "${OUT}" "${VERSION}" "${BUILD}" "${MINIMUM}" "${URL}" "${SIZE}" "${SHA}" "${NOTES}" "${TEST_FEED}"
+  "${FEED_WORK}/feed-writer" "${OUT}" "${VERSION}" "${BUILD}" "${MINIMUM}" "${URL}" "${SIZE}" "${SHA}" "${NOTES}" "${TEST_FEED}"
 else
-  "${WORK}/feed-writer" "${OUT}" "${VERSION}" "${BUILD}" "${MINIMUM}" "${URL}" "${SIZE}" "${SHA}" "${NOTES}"
+  "${FEED_WORK}/feed-writer" "${OUT}" "${VERSION}" "${BUILD}" "${MINIMUM}" "${URL}" "${SIZE}" "${SHA}" "${NOTES}"
 fi

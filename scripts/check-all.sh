@@ -208,6 +208,7 @@ run_check "product-name（扫描守卫：看得见的名字是 SkyCut，bundle i
 run_check "shell-var-boundary（扫描守卫）" checks/shell-var-boundary.sh
 run_check "shell-pipe-grep-q（扫描守卫）" checks/shell-pipe-grep-q.sh
 run_check "shell-brace-in-nested-quotes（扫描守卫：命令替换里带花括号和逗号的双引号串会被 bash 3.2 拆开）" checks/shell-brace-in-nested-quotes.sh
+run_check "shell-syntax (scan guard: every shell script parses under /bin/bash 3.2; no lone apostrophe in the word of a parameter expansion)" checks/shell-syntax.sh
 run_check "exported-types-declared（扫描守卫）" checks/exported-types-declared.sh
 run_check "hover-pointer-style（扫描守卫）" checks/hover-pointer-style.sh
 run_check "hit-shape-before-offset（扫描守卫：可点范围写在 .offset 之前）" checks/hit-shape-before-offset.sh
