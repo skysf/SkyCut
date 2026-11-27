@@ -76,6 +76,8 @@ struct AppThemeChecks {
         }
         // On / off, current and selected tell apart at a glance (StateRuleChecks.swift, docs/architecture/app-themes.md).
         StateRuleChecks.run(check)
+        // The shared looks as laid out and as VoiceOver reads them (StateViewChecks.swift).
+        StateViewChecks.run(check)
         if failures > 0 { exit(1) }
         print("PASS: theme defaults, persistence, isolation, classic colors, forest palette, light / dark rule (never nil to SwiftUI), native toolbar symbols and the on / off rule.")
     }

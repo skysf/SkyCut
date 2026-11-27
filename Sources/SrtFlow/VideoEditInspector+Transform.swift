@@ -280,6 +280,7 @@ extension VideoEditInspectorView {
         }
         .stateToggle(classicTint: AppThemePalette.current.toggleAccent)
         .controlSize(.small)
+        .accessibilityLabel(Text(horizontal ? "Flip horizontally" : "Flip vertically"))
         .instantHelp(horizontal ? "Flip horizontally" : "Flip vertically")
     }
 

@@ -62,14 +62,23 @@ struct AppThemePalette {
     /// its accent (a light fill would melt into the current line's chip on a row that is both).
     var rowSelectionFill: Color { isForest ? .clear : Color.accentColor.opacity(0.18) }
     var rowSelectionStroke: Color? { isForest ? accent : nil }
-    /// Selection drawn over the video (the text frame box, the Burn In margin guides) reads on any picture: Forest uses the clip
-    /// transform box's white with its dark glow (never the dark Forest accent alone); Classic keeps the macOS accent.
+    /// Selection drawn over the video (the text frame box, the Burn In margin guides) reads on any picture: Forest draws it
+    /// white in a dark casing 1 pt beyond each side (on white and on black, review FBG1 U2; the clip transform box gets the
+    /// same casing in Forest); Classic keeps the macOS accent and no casing.
     var overVideo: Color { isForest ? .white : Color.accentColor }
-    var overVideoGlow: Color? { isForest ? dragAccent.opacity(0.8) : nil }
+    var overVideoCasing: Color? { isForest ? .black.opacity(0.75) : nil }
     /// Inside a hollow handle over the video (Classic: white, as always).
     var overVideoHollow: Color { isForest ? .black.opacity(0.45) : .white }
     /// Behind the Burn In margin guides' white numbers.
     var overVideoLabel: Color { isForest ? .black : Color.accentColor }
+
+    /// A selected transition cap in Forest is look A's chip with the accent's ring and icon, so it shows over dark footage
+    /// too (review FBG1 U3); nil in Classic: its black cap and white icon, as before.
+    var selectedCapFill: Color? { isForest ? onChip : nil }
+    var selectedCapIcon: Color? { isForest ? accent : nil }
+    /// Inside the dark selection outline of a timeline shape block in Forest, a light line, so a dark shape's selection shows
+    /// too (review FBG1 E3); nil in Classic.
+    var selectionInnerStroke: Color? { isForest ? .white.opacity(0.9) : nil }
 
     func blockLabel(classic: Color) -> Color {
         isForest ? Self.color(0x243c2f) : classic

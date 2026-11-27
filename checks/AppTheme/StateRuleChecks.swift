@@ -116,6 +116,8 @@ enum StateRuleChecks {
         let toggleOn = StateRule.Look(mark: rgb(forest.accent, light), area: rgb(forest.onChip, light))
         let toggleOff = StateRule.Look(mark: rgb(forest.secondaryText, light), area: panel)
         check(StateRule.tellsApart(toggleOn, toggleOff), "Forest: an icon toggle's on and off tell apart (\(report("toggle", toggleOn, toggleOff)))")
+        // Look A is the chip: the icon colour alone must not carry "on" (review FBG1, G3).
+        check(StateRule.deltaE(toggleOn.area, toggleOff.area) >= StateRule.areaMinimum, "Forest: an on toggle shows its chip (\(report("toggle", toggleOn, toggleOff)))")
         check(StateRule.deltaE(rgb(forest.onChip, light), window) >= StateRule.areaMinimum,
               "Forest: the on chip shows on the window colour too (the workbench buttons)")
         let currentOn = StateRule.Look(mark: rgb(forest.accent, light), area: rgb(forest.onChip, light))
@@ -133,6 +135,38 @@ enum StateRuleChecks {
         check(StateRule.deltaE(rgb(forest.selectionFill, light), panel) < StateRule.areaMinimum, "Forest: selectionFill alone is too faint for a selected row (why it is outlined)")
         check(forest.highlight == forest.accent && forest.overVideo == .white && forest.overVideoLabel == .black,
               "Forest: selections draw Forest colours, never the macOS accent")
+
+        // Over the video, on a white picture and on a black one (review FBG1 U2): the white mark in its dark casing.
+        let white = StateRGB(hex: 0xffffff), black = StateRGB(hex: 0x000000), core = rgb(forest.overVideo, light)
+        if let casing = forest.overVideoCasing.map({ rgb($0, light) }) {
+            let onWhite = casing.over(white), onBlack = casing.over(black)
+            check(StateRule.contrast(onWhite, white) >= StateRule.textMinimum && StateRule.contrast(core, onWhite) >= StateRule.textMinimum,
+                  String(format: "Forest over a white picture: the casing %.1f : 1 on white, the line %.1f : 1 on its casing",
+                         StateRule.contrast(onWhite, white), StateRule.contrast(core, onWhite)))
+            check(StateRule.contrast(core, black) >= StateRule.textMinimum && StateRule.contrast(core, onBlack) >= StateRule.textMinimum,
+                  String(format: "Forest over a black picture: the line %.1f : 1 on black", StateRule.contrast(core, black)))
+        } else {
+            check(false, "Forest over the video: white marks need a dark casing (a white line on a white picture is 1 : 1)")
+        }
+        // Selected marks on dark content (review FBG1 U3, E3): the selected cap is the chip, its icon reads on it; a dark shape
+        // block's selection has a light inner line, a light one the dark outline.
+        let clip = rgb(forest.trackFill(index: 0, audio: false, classic: .clear), light)
+        if let capFill = forest.selectedCapFill.map({ rgb($0, light) }), let capIcon = forest.selectedCapIcon.map({ rgb($0, light) }) {
+            let unselectedOnDark = StateRGB(r: 0, g: 0, b: 0, a: 0.35).over(black), unselectedOnClip = StateRGB(r: 0, g: 0, b: 0, a: 0.35).over(clip)
+            check(StateRule.deltaE(capFill, unselectedOnDark) >= StateRule.areaMinimum && StateRule.deltaE(capFill, unselectedOnClip) >= StateRule.areaMinimum,
+                  "Forest: a selected transition cap shows over dark footage and over a clip")
+            check(StateRule.contrast(capIcon, capFill) >= StateRule.textMinimum, "Forest: the selected cap's icon reads on its chip")
+        } else {
+            check(false, "Forest: a selected transition cap needs its chip (a dark ring alone melts into dark footage)")
+        }
+        let darkShape = StateRGB(r: 0, g: 0, b: 0, a: 0.55).over(StateRGB(hex: 0xebe8df))
+        let lightShape = StateRGB(r: 1, g: 1, b: 1, a: 0.55).over(StateRGB(hex: 0xebe8df))
+        if let inner = forest.selectionInnerStroke.map({ rgb($0, light).over(darkShape) }) {
+            check(StateRule.deltaE(inner, darkShape) >= StateRule.areaMinimum, "Forest: a selected dark shape block shows its light inner line")
+        } else {
+            check(false, "Forest: a selected dark shape block needs a light inner line")
+        }
+        check(StateRule.deltaE(rgb(forest.selectionStroke, light), lightShape) >= StateRule.areaMinimum, "Forest: a selected light shape block shows its outline")
 
         // Classic, its own colours (AppKit's toggles with the teal tint; the macOS accent: default blue measured).
         for (name, appearance, accent) in [("light", light, StateRGB(hex: 0x007aff)), ("dark", dark, StateRGB(hex: 0x0a84ff))] {
@@ -154,7 +188,8 @@ enum StateRuleChecks {
         // Classic keeps what it drew: the accent sites are `Color.accentColor` itself, the workbench chip is the old one.
         check(classic.highlight == Color.accentColor && classic.overVideo == Color.accentColor && classic.overVideoLabel == Color.accentColor
               && classic.rowSelectionFill == Color.accentColor.opacity(0.18) && classic.rowSelectionStroke == nil
-              && classic.overVideoGlow == nil && classic.overVideoHollow == .white && classic.onChip == classic.selectionFill
-              && classic.selectionStroke == .white, "Classic: every state colour is what it was before")
+              && classic.overVideoCasing == nil && classic.overVideoHollow == .white && classic.onChip == classic.selectionFill
+              && classic.selectionStroke == .white && classic.selectedCapFill == nil && classic.selectedCapIcon == nil
+              && classic.selectionInnerStroke == nil, "Classic: every state colour is what it was before")
     }
 }

@@ -38,10 +38,11 @@ either theme, while the Library button next to it had a chip.
 
 ## Verification
 
-- Classic before (775cef18 + one access line) and after, rendered off-screen with an always-key window in system light and
-  dark: the toolbar group, the flip row, both subtitle lists (selected, current and both), the timeline (a selected clip and
-  shape, the selected transition cap), the library cards and the over-video marks are **pixel-identical**; only the
-  workbench buttons differ (the Subtitles button's new chip). Forest's pictures: `impl-briefs/status/U2-final/` (local).
+- Classic before (this branch's Part A commit `ad74a70c`, before any Part B commit, with one access line added only for
+  rendering) and after (`72e5e2bd`, `8b66d79a`, `a1898af9` and the review round), rendered off-screen with an always-key
+  window in system light and dark: the toolbar group, the flip row, both subtitle lists (selected, current and both), the
+  timeline (a selected clip and shape, the selected transition cap), the library cards and the over-video marks are
+  **pixel-identical**; only the workbench buttons differ (the Subtitles button's new chip).
 - `scripts/check-app-theme.sh` measures on vs off on the palette's values: the old Forest pair fails (mark ΔE 13.4, area 0).
   Reverse-verified: the old look put back into the palette turns 4 cases red; the selected row without its outline, a
   Forest highlight equal to the macOS accent and a changed Classic chip each turn one red.
@@ -50,9 +51,28 @@ either theme, while the Library button next to it had a chip.
 - Not reachable by any check: a real window, Classic's teal on tint, the system's own accent. Manual items in
   [界面主题](../architecture/app-themes.md) "On / off at a glance".
 
+## Review round 1
+
+The first review found what the first pictures (four lines, no dark content) couldn't show, all in Forest's new look:
+
+- The chip's padding came out of the numbers' fixed columns: from #10 the edit page's numbers wrapped, from 256 the Burn In
+  table's truncated. Now the chip is drawn around the text and both columns fit the list's largest number
+  (`SubtitleIndexColumn`; this also ends the edit page's older wrap from #100 on, in both themes).
+- A counted ToggleStyle body and a counted modifier would have raised the preview-perf counts the bench gates on: the
+  marks are now plain functions and `makeBody` counts nothing, so the bench's paths count what they counted before.
+- VoiceOver read an image plus an unnamed switch per toggle (the accessibility representation): now one named toggle
+  button with its value and the chip's frame.
+- White marks over a bright picture were nearly invisible (1.07 : 1 on near-white); now they sit in a dark casing (also the
+  clip transform box in Forest). The selected transition cap, a selected card on a dark thumbnail and a selected dark shape
+  now carry the chip or a light inner line.
+- get_status answered "up to date" after a newer release's download failed: it now stays `available`, with the reason and
+  SkyCut's own retry in the hint, quoting the App's buttons in its language.
+
 ## Lessons
 
 - A state that is only a colour needs a measured difference, and a regression sample of the colours that failed.
 - `Color.accentColor` is the system's, whatever the theme root says: theme colours come from the palette only.
 - Offscreen pictures show SwiftUI's drawing truthfully but AppKit's controls as inactive: judge AppKit's states in a real
   window. Rules: [界面主题](../architecture/app-themes.md) "On / off at a glance".
+- Test a look on the content it will meet: ten-plus lines and four-digit numbers, white and black pictures, dark
+  thumbnails and shapes. A new counted body on a bench path changes the ratchet's exact counts.

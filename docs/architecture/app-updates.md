@@ -194,7 +194,10 @@ Views subscribe to `AppUpdater` only (never a project or the player clock); ever
 **Who reads the state** (since 2026-11-27, MCP-85): the toolbar pill and its popovers, the app menu, Settings' status line, and
 a connected AI through get_status's `app_update` (`AppUpdater.statusReport` → `AppUpdateStatusReport`, pure; the fields and
 states: [AI 接口（MCP）](ai-control-mcp.md) section 4 item 69). get_status reads the state as it is on the main actor and
-says what the pill and Settings say (a copy an earlier run staged stays unseen until this launch's first check, there too).
+says what the pill and Settings say (a copy an earlier run staged stays unseen until this launch's first check, there too),
+and one thing more: a newer release a check found stays `available` after its automatic download failed or the retry record
+held its DMG back (`AppUpdateState.lastFound`, read by nothing but the report). The hints quote the App's buttons in its
+language.
 Reading it never starts a check, a download or an install, and nothing lets the AI install, restart or quit SkyCut: it
 passes on the hint, the user's own steps. Its guide topic tells it to mention updates only when the user asks or a newer
 version may fix what they hit, once (the quiet rule above).

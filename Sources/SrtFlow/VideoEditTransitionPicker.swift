@@ -244,7 +244,7 @@ private struct TransitionCard: View, Equatable {
                 Text(LocalizedStringKey(kind.title))
                     .font(.caption2)
                     .lineLimit(1)
-                    .foregroundStyle(isSelected ? AppThemePalette.current.highlight : .primary)
+                    .chipText(isSelected, normal: Color.primary, semibold: false)
             }
         }
         .buttonStyle(.plain)

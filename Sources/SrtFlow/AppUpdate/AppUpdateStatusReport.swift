@@ -37,6 +37,8 @@ struct AppUpdateStatusReport: Encodable, Equatable, Sendable {
     enum Reason: String, Encodable, CaseIterable, Sendable {
         case automaticOff = "automatic_off"
         case downloadFailed = "download_failed"
+        /// The DMG came down whole and failed its check; the retry record holds it back from automatic checks.
+        case heldBack = "held_back"
         // A copy that can only tell (AppUpdateEligibility.CannotUpdate).
         case installerDisk = "installer_disk"
         case translocated
@@ -98,9 +100,20 @@ struct AppUpdateStatusReport: Encodable, Equatable, Sendable {
         case restartPending = "restart_pending"
     }
 
-    /// `decision`: who this copy is (nil until the launch's reading is in); `language`: the App's current language code.
+    /// The App's button names the hints quote, in the App's language (the same strings as the UI; review FBG1, E2).
+    struct Buttons: Equatable, Sendable {
+        var update = "Update"
+        var newVersion = "New Version"
+        var restartAndUpdate = "Restart and Update"
+        var downloadInstallButton = "Download and Install"
+        var openDownloadPage = "Open Download Page"
+        var checkForUpdates = "Check for Updates…"
+    }
+
+    /// `decision`: who this copy is (nil until the launch's reading is in); `language`: the App's current language code;
+    /// `buttons`: the UI's names for the buttons the hints mention.
     static func make(_ state: AppUpdateState, decision: AppUpdateEligibility.Decision?, automatic: Bool, lastUpToDate: Date?,
-                     language: String) -> AppUpdateStatusReport {
+                     language: String, buttons: Buttons = Buttons()) -> AppUpdateStatusReport {
         let mode: AppUpdateMode
         switch decision {
         case nil: return AppUpdateStatusReport(state: .notChecked)
@@ -108,7 +121,10 @@ struct AppUpdateStatusReport: Encodable, Equatable, Sendable {
         case .notifyOnly(let why)?: mode = .notifyOnly(why)
         case .updates?: mode = .install(automatic: automatic)
         }
-        var report = release(state, mode: mode, language: language) ?? quiet(state, lastUpToDate: lastUpToDate, language: language)
+        let hints = Hint(buttons: buttons)
+        var report = release(state, mode: mode, language: language, hints: hints)
+            ?? known(state, language: language, hints: hints)
+            ?? quiet(state, lastUpToDate: lastUpToDate, language: language)
         if case .install(let automatic) = mode { report.automatic = automatic }
         return report
     }
@@ -123,7 +139,7 @@ struct AppUpdateStatusReport: Encodable, Equatable, Sendable {
     // MARK: The states
 
     /// A release in play: downloading, ready or available (as the pill and Settings' status line show it).
-    private static func release(_ state: AppUpdateState, mode: AppUpdateMode, language: String) -> AppUpdateStatusReport? {
+    private static func release(_ state: AppUpdateState, mode: AppUpdateMode, language: String, hints: Hint) -> AppUpdateStatusReport? {
         guard let offer = state.offer else { return nil }
         let version = offer.version.description
         let notes = Self.lines(offer.notes(forLanguage: language))
@@ -133,10 +149,10 @@ struct AppUpdateStatusReport: Encodable, Equatable, Sendable {
         case .downloading:
             return AppUpdateStatusReport(state: .downloading, version: version, percent: state.progress.flatMap(Self.percent))
         case .ready:
-            var report = AppUpdateStatusReport(state: .ready, version: version, notes: notes, hint: Hint.ready)
+            var report = AppUpdateStatusReport(state: .ready, version: version, notes: notes, hint: hints.ready)
             if state.restartPending {
                 report.restartPending = true
-                report.hint = Hint.restartPending
+                report.hint = hints.restartPending
             }
             return report
         case .available:
@@ -146,8 +162,21 @@ struct AppUpdateStatusReport: Encodable, Equatable, Sendable {
             // Auto install on and still available: an asked download that didn't finish (the switch on starts a download).
             case .install(let automatic): reason = state.downloadFailed || automatic ? .downloadFailed : .automaticOff
             }
-            return AppUpdateStatusReport(state: .available, version: version, reason: reason, notes: notes, hint: Hint.available(reason))
+            return AppUpdateStatusReport(state: .available, version: version, reason: reason, notes: notes, hint: hints.available(reason))
         }
+    }
+
+    /// No release in play, but a check found a newer one this launch: the automatic download failed, or the retry record
+    /// holds its DMG back. Still `available`, with SkyCut's own retry in the hint (reporting only; review FBG1, E1).
+    private static func known(_ state: AppUpdateState, language: String, hints: Hint) -> AppUpdateStatusReport? {
+        guard let found = state.lastFound, state.phase == .idle, state.offer == nil else { return nil }
+        let notes = Self.lines(found.notes(forLanguage: language))
+        if let retry = state.retry, retry.dmgSHA256 == found.dmgSHA256 {
+            return AppUpdateStatusReport(state: .available, version: found.version.description, reason: .heldBack, notes: notes,
+                                         hint: hints.heldBack(failures: retry.failures))
+        }
+        return AppUpdateStatusReport(state: .available, version: found.version.description, reason: .downloadFailed, notes: notes,
+                                     hint: hints.retrying)
     }
 
     /// Nothing in play: the first launch after an update, else the last check's result.
@@ -170,21 +199,44 @@ struct AppUpdateStatusReport: Encodable, Equatable, Sendable {
 
     private static func lines(_ notes: [String]) -> [String]? { notes.isEmpty ? nil : notes }
 
-    /// The user's own steps, named as the App names them (app-updates.md "What the person sees").
-    enum Hint {
-        static let ready = "It installs when SkyCut quits. To install it now, the user clicks Update in the toolbar, then Restart and Update."
-        static let restartPending = "The user chose Restart and Update: SkyCut restarts by itself once running work (exports, AI rounds, cloud tasks) has finished."
-        static let automaticOff = "Automatic updates are off: the user clicks New Version in the toolbar, then Download and Install."
-        static let downloadFailed = "The download didn't finish: New Version in the toolbar, then Download and Install, tries again."
-        static let cannotUpdate = "This copy can't update itself: the user clicks New Version in the toolbar, then Open Download Page ("
-            + AppUpdateFeed.downloadPageURL.absoluteString + ")."
+    /// The user's own steps, with the App's button names in its language (app-updates.md "What the person sees").
+    struct Hint {
+        let buttons: Buttons
+        var restartPending: String {
+            "The user chose \(buttons.restartAndUpdate): SkyCut restarts by itself once running work (exports, AI rounds, cloud tasks) has finished."
+        }
         static let moving = " Moved into the Applications folder, SkyCut updates itself."
 
-        static func available(_ reason: Reason) -> String {
+        var ready: String {
+            "It installs when SkyCut quits. To install it now, the user clicks \(buttons.update) in the toolbar, then \(buttons.restartAndUpdate)."
+        }
+        var automaticOff: String {
+            "Automatic updates are off: the user clicks \(buttons.newVersion) in the toolbar, then \(buttons.downloadInstallButton)."
+        }
+        var downloadFailed: String {
+            "The download didn't finish: \(buttons.newVersion) in the toolbar, then \(buttons.downloadInstallButton), tries again."
+        }
+        var cannotUpdate: String {
+            "This copy can't update itself: the user clicks \(buttons.newVersion) in the toolbar, then \(buttons.openDownloadPage) ("
+                + AppUpdateFeed.downloadPageURL.absoluteString + ")."
+        }
+        /// An automatic download that didn't finish: nothing is shown, SkyCut tries again at its next check.
+        var retrying: String {
+            "The download didn't finish; SkyCut tries again by itself at its next check (within a day), or the user chooses \(buttons.checkForUpdates) in the SkyCut menu."
+        }
+        /// A DMG that failed its check, held back by the retry record (AppUpdateRetryRecord).
+        func heldBack(failures: Int) -> String {
+            guard failures < AppUpdateRetryRecord.maxFailures else {
+                return "The download failed its check \(failures) times; SkyCut no longer fetches it by itself: the user chooses \(buttons.checkForUpdates) in the SkyCut menu to try again."
+            }
+            return "The download failed its check; SkyCut tries again by itself a day after that failure, or the user chooses \(buttons.checkForUpdates) in the SkyCut menu."
+        }
+
+        func available(_ reason: Reason) -> String {
             switch reason {
             case .automaticOff: return automaticOff
             case .downloadFailed: return downloadFailed
-            default: return cannotUpdate + (reason.movingHelps ? moving : "")
+            default: return cannotUpdate + (reason.movingHelps ? Self.moving : "")
             }
         }
     }

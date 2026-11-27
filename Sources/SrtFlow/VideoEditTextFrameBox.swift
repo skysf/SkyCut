@@ -68,6 +68,7 @@ struct TextFrameBox: View {
         ZStack {
             Rectangle()
                 .strokeBorder(AppThemePalette.current.overVideo, lineWidth: 1)
+                .overVideoOutlineCasing(Rectangle(), lineWidth: 1)
                 .frame(width: frame.width, height: frame.height)
 
             ForEach(Corner.allCases, id: \.self) { corner in
@@ -85,11 +86,13 @@ struct TextFrameBox: View {
             Rectangle()
                 .fill(AppThemePalette.current.overVideo)
                 .frame(width: 1, height: Self.rotateHandleGap)
+                .overVideoCasing(Rectangle())
                 .offset(y: -frame.height / 2 - Self.rotateHandleGap / 2)
                 .allowsHitTesting(false)
             Circle()
                 .fill(AppThemePalette.current.overVideo)
                 .frame(width: Self.handleSize + 2, height: Self.handleSize + 2)
+                .overVideoCasing(Circle())
                 // 可点范围必须写在 `.offset` **之前**：`.offset` 只挪画面、不挪布局框，
                 // 写在它后面的 `contentShape` 按的是没挪过的框 —— 旋转区会留在文字
                 // 正中间（一个看不见的 22pt 圆），黄点本身反倒点不动。2026-09-24 用户
@@ -100,7 +103,6 @@ struct TextFrameBox: View {
         }
         // 框线本身不拦事件：框比文字大一圈，点在文字旁边的空白不该开始拖。
         // 移动由调用方那块命中矩形收（见 VideoEditTextOverlayCanvas）。
-        .overVideoGlow()
         .rotationEffect(.degrees(rotationDegrees))
         .position(center)
     }
@@ -116,6 +118,7 @@ struct TextFrameBox: View {
             .fill(filled ? AppThemePalette.current.overVideo : AppThemePalette.current.overVideoHollow)
             .overlay(Circle().strokeBorder(AppThemePalette.current.overVideo, lineWidth: 1))
             .frame(width: Self.handleSize, height: Self.handleSize)
+            .overVideoCasing(Circle())
             // 把手才 8 点宽，不撑开命中范围根本按不住。
             .contentShape(Circle().inset(by: -6))
     }

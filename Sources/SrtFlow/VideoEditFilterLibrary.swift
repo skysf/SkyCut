@@ -234,7 +234,7 @@ private struct FilterCard: View {
             Text(LocalizedStringKey(preset.title))
                 .font(.caption2)
                 .lineLimit(1)
-                .foregroundStyle(isSelected ? AppThemePalette.current.highlight : .primary)
+                .chipText(isSelected, normal: Color.primary, semibold: false)
         }
         // 整张卡片可点：点 = 应用（选中着某段就换种类）。`+` 在它上面，
         // 自己把点击吃掉，所以两个动作不会互相触发。

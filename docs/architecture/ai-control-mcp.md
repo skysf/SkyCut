@@ -1439,12 +1439,17 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     `from` (just_updated); `reason` (available, off); `last_checked` (up_to_date: when a check last found nothing newer, ISO
     8601 UTC); `automatic` (the Settings switch, only for a copy that installs); `restart_pending` (ready: the user chose
     Restart and Update, SkyCut waits for running work); `notes` (ready, available, just_updated: the release's lines in the
-    App's language, falling back to English); `hint` (ready and available only: the user's own steps in the App's words).
+    App's language, falling back to English); `hint` (ready and available only: the user's own steps, quoting the App's
+    buttons in its language, the same strings as the UI).
     - States: `up_to_date`, `not_checked` (no check yet this launch and none known), `checking`, `check_failed`,
       `downloading`, `ready` (verified; installs at quit or with Restart and Update), `available`, `just_updated` (this whole
       first launch after an update), `off` (a copy that never updates). A release in play wins over just_updated, which wins
       over checking, which wins over the last check's result.
-    - Reasons: available in a copy that installs: `automatic_off`, `download_failed`; in a copy that only tells
+    - Reasons: available in a copy that installs: `automatic_off`, `download_failed` (an asked download that didn't finish;
+      or an automatic one: nothing is shown and SkyCut tries again at its next check), `held_back` (the DMG came down whole
+      and failed its check: the retry record keeps automatic checks off it for a day, for good after three; the hint says
+      which); a newer release SkyCut found this launch stays `available` after such a failure, until a check finds nothing
+      newer (`AppUpdateState.lastFound`, reporting only); in a copy that only tells
       (`AppUpdateEligibility.CannotUpdate`): `installer_disk`, `translocated`, `protected_folder` (these three add that a copy
       in the Applications folder updates itself), `folder_not_writable`, `bundle_not_writable`, `volume_cannot_swap`,
       `staging_on_other_volume`; off: `other_build` (SkyCut Beta, test bundles), `development_build` (source, local or dev

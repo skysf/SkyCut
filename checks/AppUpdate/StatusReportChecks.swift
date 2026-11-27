@@ -43,12 +43,16 @@ enum StatusReportChecks {
     private static let restartHint = "The user chose Restart and Update: SkyCut restarts by itself once running work (exports, AI rounds, cloud tasks) has finished."
     private static let offHint = "Automatic updates are off: the user clicks New Version in the toolbar, then Download and Install."
     private static let failedHint = "The download didn't finish: New Version in the toolbar, then Download and Install, tries again."
+    private static let retryHint = "The download didn't finish; SkyCut tries again by itself at its next check (within a day), or the user chooses Check for Updates… in the SkyCut menu."
+    private static let heldHint = "The download failed its check; SkyCut tries again by itself a day after that failure, or the user chooses Check for Updates… in the SkyCut menu."
+    private static let heldForGoodHint = "The download failed its check 3 times; SkyCut no longer fetches it by itself: the user chooses Check for Updates… in the SkyCut menu to try again."
     private static let cannotHint = "This copy can't update itself: the user clicks New Version in the toolbar, then Open Download Page (\(page))."
     private static let movingHint = cannotHint + " Moved into the Applications folder, SkyCut updates itself."
 
     private static func make(_ state: AppUpdateState, _ decision: AppUpdateEligibility.Decision? = installs, automatic: Bool = true,
-                             last: Date? = nil, language: String = "en") -> AppUpdateStatusReport {
-        AppUpdateStatusReport.make(state, decision: decision, automatic: automatic, lastUpToDate: last, language: language)
+                             last: Date? = nil, language: String = "en",
+                             buttons: AppUpdateStatusReport.Buttons = .init()) -> AppUpdateStatusReport {
+        AppUpdateStatusReport.make(state, decision: decision, automatic: automatic, lastUpToDate: last, language: language, buttons: buttons)
     }
 
     private static func vocabulary(_ check: (Bool, String) -> Void) {
@@ -56,7 +60,7 @@ enum StatusReportChecks {
                                                                          "downloading", "ready", "available", "just_updated", "off"],
               "app_update: the state vocabulary is the documented one (ai-control-mcp.md section 4 item 69)")
         check(AppUpdateStatusReport.Reason.allCases.map(\.rawValue) == [
-            "automatic_off", "download_failed", "installer_disk", "translocated", "protected_folder", "folder_not_writable",
+            "automatic_off", "download_failed", "held_back", "installer_disk", "translocated", "protected_folder", "folder_not_writable",
             "bundle_not_writable", "volume_cannot_swap", "staging_on_other_volume", "other_build", "development_build",
             "updates_folder", "scripted_run"], "app_update: the reason vocabulary is the documented one")
         check(AppUpdateFeed.downloadPageURL.absoluteString == page, "app_update: the hint names AppUpdateFeed's download page")
@@ -177,10 +181,36 @@ enum StatusReportChecks {
         _ = fresh.apply(.downloadProgress(0.5), mode: auto)
         expect(make(fresh), #"{"automatic":true,"percent":50,"state":"downloading","version":"0.19.0"}"#, "downloading through apply")
         _ = fresh.apply(.downloadFailed, mode: auto)
-        expect(make(fresh), #"{"automatic":true,"state":"not_checked"}"#, "an automatic download that failed is silent")
+        // E1 (review FBG1): the pill shows nothing, but SkyCut knows the version and tries again by itself.
+        let retrying = #"{"automatic":true,"hint":"\#(retryHint)","notes":["Faster export","Two fixes"],"reason":"download_failed","state":"available","version":"0.19.0"}"#
+        expect(make(fresh, last: lastUpToDate), retrying, "an automatic download that failed: still available, SkyCut retries")
         _ = fresh.apply(.checkStarted(.schedule), mode: auto)
         _ = fresh.apply(.checkFinished(.failed, at: StateChecks.t0), mode: auto)
-        expect(make(fresh), #"{"automatic":true,"state":"check_failed"}"#, "a failed check through apply")
+        expect(make(fresh), retrying, "a failed check later keeps the known version")
+        _ = fresh.apply(.checkFinished(.upToDate, at: StateChecks.t0), mode: auto)
+        expect(make(fresh), #"{"automatic":true,"state":"not_checked"}"#, "a check that finds nothing newer forgets it")
+        var failedCheck = AppUpdateState()
+        _ = failedCheck.apply(.checkStarted(.schedule), mode: auto)
+        _ = failedCheck.apply(.checkFinished(.failed, at: StateChecks.t0), mode: auto)
+        expect(make(failedCheck), #"{"automatic":true,"state":"check_failed"}"#, "a failed check through apply")
+        // E1: a DMG the retry record holds back (it came down whole and failed its check): nothing downloads, still available.
+        for (failures, hint, what) in [(1, heldHint, "after one failure"), (3, heldForGoodHint, "after three failures")] {
+            var held = AppUpdateState()
+            held.retry = AppUpdateRetryRecord(dmgSHA256: feed.dmgSHA256, failures: failures, lastFailure: StateChecks.t0)
+            let effects = held.apply(.checkFinished(.offer(feed), at: StateChecks.t0.addingTimeInterval(3600)), mode: auto)
+            check(!effects.contains(.download(feed)) && held.phase == .idle, "app_update fixture: the retry record holds the DMG back \(what)")
+            expect(make(held), #"{"automatic":true,"hint":"\#(hint)","notes":["Faster export","Two fixes"],"reason":"held_back","state":"available","version":"0.19.0"}"#,
+                   "a held-back DMG \(what): still available, with SkyCut's own retry")
+        }
+        // E2: the hints quote the buttons as the App names them in its language.
+        let chinese = AppUpdateStatusReport.Buttons(update: "更新", newVersion: "新版本", restartAndUpdate: "重启并更新",
+                                                   downloadInstallButton: "下载并安装", openDownloadPage: "打开下载页面", checkForUpdates: "检查更新…")
+        var readyState = AppUpdateState()
+        (readyState.phase, readyState.offer) = (.ready, feed)
+        check(make(readyState, buttons: chinese).hint == "It installs when SkyCut quits. To install it now, the user clicks 更新 in the toolbar, then 重启并更新.",
+              "app_update: the ready hint quotes the App's own button names (zh-Hans)")
+        check(make(retryingState(feed), buttons: chinese).hint?.contains("检查更新…") == true,
+              "app_update: the retry hint quotes the menu's Check for Updates… in the App's language")
         let manual = AppUpdateMode.install(automatic: false)
         var asked = AppUpdateState()
         _ = asked.apply(.checkFinished(.offer(feed), at: StateChecks.t0), mode: manual)
@@ -190,6 +220,15 @@ enum StatusReportChecks {
         expect(make(asked, automatic: false), #"{"automatic":false,"state":"downloading","version":"0.19.0"}"#, "Download and Install: downloading")
         _ = asked.apply(.downloadFailed, mode: manual)
         check(make(asked, automatic: false).reason == .downloadFailed, "an asked download that failed: available, download_failed")
+    }
+
+    /// A state where the automatic download failed after a check found `feed`.
+    private static func retryingState(_ feed: AppUpdateFeed) -> AppUpdateState {
+        var state = AppUpdateState()
+        let auto = AppUpdateMode.install(automatic: true)
+        _ = state.apply(.checkFinished(.offer(feed), at: StateChecks.t0), mode: auto)
+        _ = state.apply(.downloadFailed, mode: auto)
+        return state
     }
 
     // MARK: Reading the JSON

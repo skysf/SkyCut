@@ -69,10 +69,18 @@ final class AppUpdater: ObservableObject {
     /// The release the pill, popovers and menu talk about.
     var offerVersion: String? { state.offer?.version.description }
 
+    /// The UI's names of the buttons get_status's hints quote, in the App's language (the same keys as the pill, popovers
+    /// and menu).
+    static var buttonNames: AppUpdateStatusReport.Buttons {
+        AppUpdateStatusReport.Buttons(update: L10n("Update"), newVersion: L10n("New Version"), restartAndUpdate: L10n("Restart and Update"),
+                                      downloadInstallButton: L10n("Download and Install"), openDownloadPage: L10n("Open Download Page"),
+                                      checkForUpdates: L10n("Check for Updates…"))
+    }
+
     /// get_status's `app_update`: what the pill and Settings show, read as it is now. Never a check, a download or an install.
     var statusReport: AppUpdateStatusReport {
         AppUpdateStatusReport.make(state, decision: decision, automatic: automatic, lastUpToDate: lastUpToDate,
-                                   language: AppLanguageStore.shared.language.resolvedCode)
+                                   language: AppLanguageStore.shared.language.resolvedCode, buttons: Self.buttonNames)
     }
 
     // MARK: Starting and checking

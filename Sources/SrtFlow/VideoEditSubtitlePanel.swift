@@ -168,6 +168,7 @@ struct VideoEditSubtitlePanel: View {
                         Image(systemName: "text.line.last.and.arrowtriangle.forward")
                     }
                     .stateToggle(classicTint: nil)
+                    .accessibilityLabel(Text("Scroll to the line being spoken during playback"))
                     .instantHelp("Scroll to the line being spoken during playback")
                     .onChange(of: followsPlayback) { _, follows in EditorToggles.write(.subtitleListFollows, follows) }
                 }
@@ -228,12 +229,14 @@ struct VideoEditSubtitlePanel: View {
     private var table: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                // The number column fits the largest number in the list (SubtitleIndexColumn).
+                let indexTemplate = SubtitleIndexColumn.editTemplate(largest: rows.map(\.cue.index).max() ?? 0)
                 LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(rows, id: \.cue.id) { row in
                         // 身份就是 cue.id（两条轨上互不相同）：行里已经没有本地草稿要重建（草稿在工程
                         // 上），拿文本当身份只会让每次提交都重建一次行、顺带丢焦点。
                         // 它同时是跟随播放滚动的锚点。
-                        self.row(row.cue, track: row.track).id(row.cue.id)
+                        self.row(row.cue, track: row.track, indexTemplate: indexTemplate).id(row.cue.id)
                     }
                 }
                 .padding(.vertical, 6)
@@ -252,7 +255,7 @@ struct VideoEditSubtitlePanel: View {
         }
     }
 
-    private func row(_ cue: SubtitleCue, track: SubtitleTrack) -> some View {
+    private func row(_ cue: SubtitleCue, track: SubtitleTrack, indexTemplate: Int) -> some View {
         let companion = project.state.subtitleCompanion
         return VideoEditSubtitleCueRow(
             project: project,
@@ -264,6 +267,7 @@ struct VideoEditSubtitlePanel: View {
             isHidden: companion?.hiddenCueIDs.contains(cue.id) == true,
             isCurrent: currentCueIDs.contains(cue.id),
             isSelected: project.selectedSubtitleCueIDs.contains(cue.id),
+            indexTemplate: indexTemplate,
             canEdit: project.state.canEditSubtitleTrack(track),
             onSelect: { select(cue) },
             focusedCueID: $focusedCueID
