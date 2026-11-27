@@ -88,7 +88,7 @@ export default {
     ['检查并导出', '播放检查、打磨细节，然后导出。导出面板会提示是否带水印。云端生成另行消耗 Sky Studio 积分。']
   ],
   docsCompatibility: '保持最新',
-  docsCompatibilityBody: '以上步骤按当前公开下载的版本写。如果你的 SkyCut 里没有 Sky Studio 设置，请重新下载安装最新版。',
+  docsCompatibilityBody: '以上步骤按当前公开下载的版本写。SkyCut 0.18.70 及以后的版本会自动更新：新版本在后台下载，退出 SkyCut 时安装，也可以点「重启并更新」立即安装。更早的版本需要从本站再下载一次。在「设置 → 通用 → 软件更新」里可以关掉「自动下载并安装更新」，关掉后 SkyCut 仍会检查，并在工具栏显示「新版本」。',
   docsClients: '支持的 AI 客户端',
   docsClientsBody: '内置 Claude Desktop、Claude Code 和 Codex 的连接设置。其他客户端需要支持本地 stdio MCP。普通 ChatGPT 网页对话无法直接连接本机 SkyCut MCP 服务器。',
   docsKey: '打开 Sky Studio',
@@ -99,7 +99,7 @@ export default {
     ['保留时间与退订', '我们保留登记数据，直到你退订或要求删除。退订或删除数据，请写信给 support@skycut.app。'],
     ['网站偏好', '我们在浏览器中保存语言和动画偏好，不添加广告追踪器。托管和邮件服务商可能处理提供服务所需的技术信息。'],
     ['短片与下载', '播放演示时会从 downloads.skylu.ai 加载视频。下载 Mac App 会跳转到现有的 Sky Lu 下载服务。'],
-    ['Mac App', '本页说明的是网站。连接的 AI 工具和 Sky Studio 服务有各自的数据处理方式。剪辑工程保存在 Mac 上；云端请求所需的内容可能发送到你选择的服务。']
+    ['Mac App', '本页说明的是网站。连接的 AI 工具和 Sky Studio 服务有各自的数据处理方式。剪辑工程保存在 Mac 上；云端请求所需的内容可能发送到你选择的服务。为了检查新版本，SkyCut 会在启动约一分钟后读取 skylu.ai 上的一个小文件，之后在运行期间每天读取一次；新版本从 downloads.skylu.ai 下载。这些请求不带账号信息和 Sky Studio Key，也不带任何能识别你或你的 Mac 的标识；和所有网络请求一样，它们会带上你的 IP 地址和语言偏好。']
   ],
   errorTitle: '稍微偏离了时间线。', errorBody: '这个页面不存在，回首页看看吧。'
 };

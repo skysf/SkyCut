@@ -502,7 +502,10 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
   `tests/seo.test.mjs`、`tests/guides.test.mjs` 在渲染那一层也拦。功能表里给测试用的合同链接（`feature-matrix.js` 的 `sources`）不上页面，不受影响。
 - **搜索结果里的标题和摘要是正常句子**（2026-11-11 协调者定）：文档页、隐私页的 `<title>` 用 `content/seo.js` 的 `titles`（说清这是什么页），页面上的大标题不变；
   四种语言的摘要带标点。首页可见文案仍然不用标点。首页问答多了「SkyCut 是什么」「多少钱」两条，价格从 `pricing.js` 取。文档页不再写具体版本号
-  （原来写着 0.18.47，早就过期）。
+  （原来写着 0.18.47，早就过期）。Since 2026-11-27 it names one version, as a threshold and never as the current
+  release: SkyCut 0.18.70 and later update themselves ([App updates](app-updates.md)); a threshold doesn't go stale. The
+  privacy page's Mac app section states that doc's update check (§1–§3: what is fetched, from where, how often, what the
+  requests carry), so it changes with it.
 - **IndexNow**（2026-11-11 协调者定：做，部署后手动跑）：key 是公开的，在 `site-config.mjs` 的 `INDEXNOW_KEY`，对应 `public/<key>.txt`。
   **部署成功之后**在 `website/` 跑 `npm run indexnow`（把 sitemap 里的地址交给 IndexNow；`-- --only=/guides/` 只交文章，`-- --dry-run` 只看不交）。
   脚本先去线上读 key 文件，读不到就停（所以部署前跑不了）；构建和 CI 从不调它。Bing 和用 Bing 索引的 ChatGPT 搜索靠它尽快知道新页面。
