@@ -37,9 +37,10 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
      next to every window a person took longer over, and nobody knew what it meant). Nothing pops up by itself.
    - **The strip comes only when the person asks for another file window while one is up**, and only while that window is
      on screen. That is the one sign SkyCut gets that the window may be stuck: macOS says nothing when its panel service
-     hangs, and the window just stops answering. The strip stands next to the open window: "A macOS file window is still
-     open. If it isn't responding, close it here." with **Close It**, which cancels the window even when its service hangs
-     (rule 2) and offers the fallback below. ⌘Q quits as usual.
+     hangs, and the window just stops answering. The strip stands next to the open window: "If the window for choosing a
+     file is stuck or not responding, click here to close it." (「选文件的窗口卡住或没反应，点这里关闭。」, wording approved by the user
+     on 2026-11-27) with **Close** (关闭), which cancels the file window, never SkyCut, even when its service hangs (rule 2),
+     and offers the fallback below. ⌘Q quits as usual.
    - After a failure, a small window offers **the same job without the system window**: type or paste a path (quotes, `~`,
      `\ `, `file://` accepted), drag the files or a folder from Finder, or **Try Again**. `TypedPath` decides a typed or
      dropped answer without touching a drive (allowed types by extension; a folder for a folder request, or a dropped
@@ -107,12 +108,13 @@ The real panel service can't be driven from a check (it needs the window server,
    output folder), batch convert (files and output folder), the subtitle editor's "Export As", the screen recording's save
    location, a new voice's sample file. Cancel changes nothing.
 2. With a window open, the rest of SkyCut responds (timeline, playback), and nothing appears next to the window however long
-   it stays open (leave it a minute). Ask for another file window (Add Media… again): the strip "A macOS file window is still
-   open…" stands next to the open one, and Close It closes it (the helper then offers the typed path and Try Again). ⌘Q
-   quits.
+   it stays open (leave it a minute). Ask for another file window (Add Media… again): the strip "If the window for choosing
+   a file is stuck…" stands next to the open one, and Close closes it (the helper then offers the typed path and Try
+   Again); SkyCut stays open. ⌘Q quits.
 3. Freeze the panel service while a window is open (Activity Monitor: "Open and Save Panel Service (SkyCut)", or the
    `openAndSavePanelService` process that appeared, then `kill -STOP` it): SkyCut stays usable; ask for the same window
-   again and the strip appears next to the frozen one; Close It closes the window and the helper offers the typed path; typing a path or dropping a file from Finder answers the request. Then ask for another
+   again and the strip appears next to the frozen one; Close closes the window and the helper offers the typed path;
+   typing a path or dropping a file from Finder answers the request. Then ask for another
    window with the service still stopped: SkyCut may hang up to about a minute inside AppKit (not fixable), then shows the
    helper; force quit during that wait → reopen SkyCut → the next window request goes straight to the helper. Kill the
    stopped service afterwards.

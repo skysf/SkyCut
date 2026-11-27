@@ -24,8 +24,8 @@ import UniformTypeIdentifiers
 /// What the helper next to the system window can show (a seam: the checks record what would be shown).
 @MainActor
 protocol FileWindowHelping: AnyObject {
-    /// Next to the open system window, when the person asked for another one meanwhile: "A macOS file window is still
-    /// open. If it isn't responding, close it here."
+    /// Next to the open system window, when the person asked for another one meanwhile: "If the window for choosing a file
+    /// is stuck or not responding, click here to close it." with Close.
     func showStrip(near frame: NSRect, close: @escaping () -> Void)
     /// The system window failed: the same job without it.
     func showFallback(

@@ -313,7 +313,8 @@ the user's Play at the end replays from 0 (peek ended, timeline told to scroll l
 接线：`checks/audio-engine-idle-wiring.sh`（十节，含一个判断只读一次图的状态：引擎交给管空闲的、空了就收、2 分钟、后台起 / 当场起、待钉的锚点和
 「报过时间没有」的内存序、主时钟自己收尾且不听「播到头」通知、「回来了」的信号齐全且启动就看、日志不在主线程上写、
 起不来不空转）。Section 11 (since 2026-11-27, every Swift file under `Sources`): a tracking area's callback that isn't an
-`override` carries AppKit's selector (`@objc(mouseEntered:)`).
+`override` carries AppKit's selector (`@objc(mouseEntered:)`) among the attributes right before it. It reads whole
+declarations (they may wrap; comments don't count), and a scan that fails or skips a file is red (review CXC1).
 
 反向验证（2026-11-11，各自弄坏一处、确认变红、再恢复）：
 

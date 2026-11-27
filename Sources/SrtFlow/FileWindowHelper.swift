@@ -79,19 +79,19 @@ final class FileWindowHelper: NSObject, FileWindowHelping, NSWindowDelegate {
     }
 }
 
-/// The person asked for another file window while the system window is up: it is still open, and a way to close it if it
-/// stopped responding.
+/// The person asked for another file window while the system window is up: a way to close that window if it is stuck. It
+/// names the file window and says the button closes it (never SkyCut); the user approved the wording on 2026-11-27.
 struct FileWindowStripView: View {
     let close: () -> Void
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         HStack(spacing: 10) {
-            Text("A macOS file window is still open. If it isn't responding, close it here.")
+            Text("If the window for choosing a file is stuck or not responding, click here to close it.")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("Close It") { close() }
-                .instantHelp("Close the macOS window")
+            Button("Close") { close() }
+                .instantHelp("Close the window for choosing a file")
         }
         .padding(12)
         .frame(width: 420)

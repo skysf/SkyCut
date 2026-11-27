@@ -27,7 +27,8 @@
 #   9. get_status's app_update (MCP-85) reads, never acts: one line in AIProjectTools.status takes AppUpdater.statusReport,
 #      which only builds AppUpdateStatusReport (pure, Foundation only: no check, download, install, restart or quit).
 #  10. The menu check's answer window runs its modal loop from the run loop (RunLoop.main.perform), never inside a Swift
-#      task or a dispatch block, and nothing else shows it (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md).
+#      task or a dispatch block, and nothing else shows it: exactly one executable call, comments not counted
+#      (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md).
 # Usage: checks/app-update-wiring.sh
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -250,11 +251,16 @@ if [ -z "${REPORT_LINE}" ] || [ -z "${MAKE_LINE}" ] || [ $((MAKE_LINE - REPORT_L
   fail "${UPDATER}: statusReport only builds AppUpdateStatusReport from the published state"
 fi
 
-# 10. The answer window's modal loop runs from the run loop, outside any Swift task.
-[ "$(count 'RunLoop.main.perform { MainActor.assumeIsolated { AppUpdateAlerts.show(answer) } }' "${UPDATER}")" = 1 ] \
-  || fail "${UPDATER}: the menu check's answer is shown from the run loop (RunLoop.main.perform), not in a Task or DispatchQueue.main.async: an exception under its modal loop unwinds a task and crashes SkyCut at the next isolation check, and one escaping a dispatch block ends the app"
-SHOWN="$(grep -rlF 'AppUpdateAlerts.show(' Sources --include='*.swift' | tr '\n' ' ')"
-[ "${SHOWN}" = "${UPDATER} " ] || fail "only AppUpdater's answer effect shows the answer window (found in: ${SHOWN:-nothing})"
+# 10. The answer window's modal loop runs from the run loop, outside any Swift task. Executable code only (review CXC1: a
+#     count of raw text let the right call sit in a comment while the old Task ran, and a list of file names let a second
+#     call through): exactly one display call in Sources, and it is the first code line under `case .answer(let answer):`.
+SHOW_CALLS="$(grep -rnE '^[^/]*AppUpdateAlerts\.show\(' Sources --include='*.swift' || true)"
+SHOW_COUNT="$(grep -c . <<<"${SHOW_CALLS}" || true)"
+ANSWER_LINE="$(awk '/^[[:space:]]*case \.answer\(let answer\):/ { found = 1; next } found && /^[[:space:]]*(\/\/.*)?$/ { next } found { sub(/^[[:space:]]+/, ""); print; exit }' "${UPDATER}")"
+if [ "${SHOW_COUNT}" != 1 ] || [ "${SHOW_CALLS%%:*}" != "${UPDATER}" ] \
+  || [ "${ANSWER_LINE}" != 'RunLoop.main.perform { MainActor.assumeIsolated { AppUpdateAlerts.show(answer) } }' ]; then
+  fail "${UPDATER}: the menu check's answer is shown by exactly one call, RunLoop.main.perform { MainActor.assumeIsolated { AppUpdateAlerts.show(answer) } }, as the first code line under case .answer (comments don't count), never in a Task or DispatchQueue.main.async: an exception under its modal loop unwinds a task and crashes SkyCut at the next isolation check, and one escaping a dispatch block ends the app (found: ${SHOW_CALLS:-no call})"
+fi
 
 if [ "${FAILED}" -ne 0 ]; then exit 1; fi
 echo "✓ app-update-wiring: one feed address, the atomic swap only, deletes inside Updates only, wired at start / quit / menu / Settings / toolbars, the coordinator pinned, get_status read only, no admin rights, no network in the check"

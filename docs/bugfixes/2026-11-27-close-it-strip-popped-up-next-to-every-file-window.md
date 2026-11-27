@@ -32,13 +32,17 @@ it here." / "Close It").
   `SystemFileWindows.phaseChanged(.choosing)` does nothing, and `stripDelay` is gone.
 - **The strip comes only when the person asks for another file window while one is up** (`offerToCloseOpenWindow`, from
   `start`), and only while that window is on screen. Asking again is the sign a stuck window gives; it used to be a silent
-  no-op. Close It cancels the window, which works even when the service hangs (0.09 s measured on 2026-11-18), and
+  no-op. Its button cancels the window, which works even when the service hangs (0.09 s measured on 2026-11-18), and
   offers the fallback for the first request: type a path, drag from Finder, or Try Again.
-- **The strip says what it is about**: "A macOS file window is still open. If it isn't responding, close it here."
-  - zh-Hans: 「macOS 的文件窗口还开着。如果它没有反应，在这里关掉它。」
-  - es: "Una ventana de archivos de macOS sigue abierta. Si no responde, ciérrala aquí."
+- **The strip names the file window and says its button closes it** (never SkyCut). The wording was approved by the user
+  on 2026-11-27 (「可以」):
+  - zh-Hans: 「选文件的窗口卡住或没反应，点这里关闭。」, with the button 「关闭」;
+  - en: "If the window for choosing a file is stuck or not responding, click here to close it.", with "Close";
+  - es: "Si la ventana para elegir un archivo se ha quedado colgada o no responde, haz clic aquí para cerrarla.", with
+    "Cerrar".
 
-  It replaces "If the macOS window stops responding, close it here." in all three string tables.
+  The text replaces "If the macOS window stops responding, close it here." in all three string tables. The button reuses
+  the existing "Close" key instead of "Close It" (关掉它), which the export panel's row keeps.
 - **Considered and not chosen:**
   - the strip when the person clicks back into a SkyCut window while the system window is open: the windows are
     non-modal since 2026-11-19, so clicking the timeline meanwhile is normal use and would pop it up;
@@ -52,9 +56,9 @@ it here." / "Close It").
 
 What the person sees now:
 - **Normal:** the macOS window, and nothing else, however long they take. If they ask for another file window while it is
-  open, the strip stands next to it, and Close It closes it.
+  open, the strip stands next to it, and Close (关闭) closes that window; SkyCut stays open.
 - **Stuck:** the macOS window's buttons do nothing. Asking for the window again (the same menu item or button) brings the
-  strip next to it; Close It closes the stuck window at once and offers the typed path, a drop from Finder, or Try Again.
+  strip next to it; Close closes the stuck window at once and offers the typed path, a drop from Finder, or Try Again.
   ⌘Q quits, as before.
 
 Rule: [system file windows](../architecture/system-file-windows.md) rule 5.
@@ -66,9 +70,10 @@ Each guard was reverse-verified: red with its part of the fix undone, green with
 - **`scripts/check-export-profile.sh`** (`FileWindowsChecks`), 203 assertions green:
   - a pick the person cancels after 1.2 s shows nothing;
   - a window up 1.5 s without an answer shows nothing;
-  - asking for another window while one is up opens nothing, answers nothing, and puts Close It next to the open window
+  - asking for another window while one is up opens nothing, answers nothing, and puts the strip next to the open window
     (at its frame);
-  - Close It cancels it and offers the fallback for the first request, and Try Again's answer reaches the first caller;
+  - the strip's button cancels it and offers the fallback for the first request, and Try Again's answer reaches the first
+    caller;
   - a second request while the window isn't on screen yet shows nothing.
 - **`checks/file-io-off-main-wiring.sh`:** `.showStrip(` appears once, inside `offerToCloseOpenWindow`, which is called only
   from `start`; no sleep or timer in `SystemFileWindows.swift`.
@@ -76,9 +81,9 @@ Each guard was reverse-verified: red with its part of the fix undone, green with
   - the timer back (0.4 s, the delay the check used to pass): the guard (two lines) and 3 assertions red;
   - no strip on a second request: the guard and 3 assertions red;
   - a strip even when the window isn't on screen: 1 assertion red.
-- **Localization coverage** green: the new key is in all three tables.
-- **Pictures:** the strip is rendered off-screen in en / zh-Hans / es for the user to approve before the push (not in the
-  repository).
+- **Localization coverage** green: the new text is in all three tables, and the button reuses "Close".
+- **Pictures:** the strip rendered off-screen in en / zh-Hans / es with the approved wording, to settle with the user before
+  the push (not in the repository).
 - **Not verified:** a real panel service frozen under SkyCut. That stays manual:
   [system file windows](../architecture/system-file-windows.md), manual regression items 2 and 3.
 

@@ -88,13 +88,19 @@ Each guard was reverse-verified: red with its part of the fix undone, green with
   event, it notes the user and counts a return; `mouseExited:` changes nothing. With Swift's own names back: 1 failure
   in 332 checks.
 - **`checks/audio-engine-idle-wiring.sh` section 11** (every Swift file under `Sources`). A non-`override`
-  `func mouseEntered` / `mouseExited` / `mouseMoved` / `cursorUpdate` `(with` without `@objc(<name>:)`, on its line or
-  the line above, is red.
+  `func mouseEntered` / `mouseExited` / `mouseMoved` / `cursorUpdate` `(with` without `@objc(<name>:)` among the
+  attributes right before it is red. The scan reads whole files, so the declaration may wrap; comments don't count.
   - Selectors undone: red, both lines named.
   - A throwaway `NSObject` subclass in another file: red.
   - The name on the line above, or an `override` in an `NSView`: green.
-- **`checks/app-update-wiring.sh` section 10.** The answer is shown by exactly the run-loop line, and nowhere else. Back to
-  the `Task`: red. As `DispatchQueue.main.async`: red.
+  - Review round 1 (Codex, CXC1), which found the first line-by-line scan missed two shapes:
+    - a declaration with `with event:` on the next line: now red (it was green);
+    - an `@objc(mouseEntered:)` that belongs to another member on the line above: now red (it was green);
+    - a perl program that fails, or a scan that reads fewer files than exist: red (both were swallowed).
+- **`checks/app-update-wiring.sh` section 10.** Executable code only (comments don't count): exactly one display call in
+  `Sources`, the run-loop line, as the first code line under `case .answer`.
+  - Red: back to the `Task`; as `DispatchQueue.main.async`; the right call left in a comment while the old `Task` runs, and
+    a second call in the same file. The last two were green before review round 1.
 - **Local checks:** `scripts/check-local.sh audio-engine app-update app-update-wiring` green.
 - **Manual, before the next release:** a real modal window crossed by a real pointer can't be driven from a check.
   [App updates](../architecture/app-updates.md) §10 step 19 clicks the menu's Check for Updates… with a newer version

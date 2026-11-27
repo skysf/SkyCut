@@ -210,24 +210,35 @@ TWICE="$(grep -nE 'run\.state.*run\.state|graphState.*graphState' <<<"${ENGINE_C
 [ -z "${TWICE}" ] || fail "同一句里读了两次图的状态（先 let state = … 再判）：${TWICE}"
 
 # 11. A tracking area's callbacks name AppKit's selector unless they override NSResponder's (any Swift file in Sources).
+# Whole files, so a declaration may wrap (its attributes on the lines above, `with event:` on the next line); comments are
+# blanked out with spaces so line numbers stay right; only the attributes and modifiers right before `func` count (an
+# @objc(mouseEntered:) on another member doesn't). Review CXC1: the line-by-line scan missed a wrapped declaration and a
+# name borrowed from the line above, and swallowed a failing perl.
 read -r -d '' UNNAMED_CALLBACKS <<'PERL' || true
-my $prev = '';
-while (my $line = <>) {
-    (my $code = $line) =~ s{//.*}{};
-    if ($code =~ /\bfunc\s+(mouseEntered|mouseExited|mouseMoved|cursorUpdate)\s*\(\s*with\b/) {
-        my $named = qr/\@objc\(\Q$1\E:\)/;
-        print "$ARGV:$.: $line" unless $code =~ /\boverride\b/ || $code =~ $named || $prev =~ $named;
+while (my $text = <>) {
+    (my $code = $text) =~ s{/\*.*?\*/}{(my $c = $&) =~ s/[^\n]/ /g; $c}gse;
+    $code =~ s{//[^\n]*}{' ' x length($&)}ge;
+    while ($code =~ /((?:(?:\@\w+(?:\([^()]*\))?|\b(?:public|private|fileprivate|internal|open|final|dynamic|override|nonisolated|static|class|required|convenience)\b)\s*)*)\bfunc\s+(mouseEntered|mouseExited|mouseMoved|cursorUpdate)\s*\(\s*with\b/g) {
+        my ($prefix, $name) = ($1, $2);
+        next if $prefix =~ /\boverride\b/ || $prefix =~ /\@objc\(\Q$name\E:\)/;
+        my $line = 1 + (substr($code, 0, $-[2]) =~ tr/\n//);
+        print "HIT $ARGV:$line: func $name(with\n";
     }
-    $prev = $code if $code =~ /\S/;
-} continue {
-    if (eof) { close ARGV; $prev = ''; }
+    print "SCANNED $ARGV\n";
 }
 PERL
 SWIFT_SOURCES="$(find Sources -name '*.swift' -type f | wc -l | tr -d ' ')"
 [ "${SWIFT_SOURCES}" -gt 0 ] || fail "found no Swift file under Sources (an empty scan is a false green)"
-UNNAMED="$(find Sources -name '*.swift' -type f -print0 | xargs -0 perl -e "${UNNAMED_CALLBACKS}" || true)"
-[ -z "${UNNAMED}" ] || fail "a tracking area's callback without AppKit's selector: write @objc(mouseEntered:) (or override NSResponder's). On an owner that isn't an NSResponder, Swift names it mouseEnteredWith:, AppKit's mouseEntered: raises on every enter / exit, and one raised under a modal alert inside a Swift task crashed SkyCut (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md):
+if CALLBACK_SCAN="$(find Sources -name '*.swift' -type f -print0 | xargs -0 perl -0777 -e "${UNNAMED_CALLBACKS}")"; then
+  SCANNED="$(grep -c '^SCANNED ' <<<"${CALLBACK_SCAN}" || true)"
+  [ "${SCANNED}" = "${SWIFT_SOURCES}" ] \
+    || fail "the tracking-callback scan read ${SCANNED} of ${SWIFT_SOURCES} Swift files under Sources (a partial scan is a false green)"
+  UNNAMED="$(sed -n 's/^HIT //p' <<<"${CALLBACK_SCAN}")"
+  [ -z "${UNNAMED}" ] || fail "a tracking area's callback without AppKit's selector: write @objc(mouseEntered:) (or override NSResponder's). On an owner that isn't an NSResponder, Swift names it mouseEnteredWith:, AppKit's mouseEntered: raises on every enter / exit, and one raised under a modal alert inside a Swift task crashed SkyCut (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md):
 ${UNNAMED}"
+else
+  fail "the tracking-callback scan itself failed (find or perl exited non-zero): a scan that doesn't run is a false green"
+fi
 
 if [ "${FAILED}" -ne 0 ]; then exit 1; fi
 echo "✓ audio-engine-idle-wiring：引擎交给管空闲的、空了就收、2 分钟、用户回来在后台起图、待钉的锚点、主时钟自己收尾、起不来不空转"
