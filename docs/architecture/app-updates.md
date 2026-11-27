@@ -316,6 +316,11 @@ No check reaches a real notarized pair of builds, Gatekeeper on a real download,
 
 Last run on 2026-11-27, 0.18.69 → 0.18.70 (the release record: [构建与打包](../build/build-and-packaging.md)「公开下载发布」).
 Every step a script could observe passed (files, the test server's log, SkyCut's log, the process list, the window
-server's window list); step 6 was confirmed by the user (About 0.18.70, the Updated pill with the four notes). Not run
-that day, checked at the next real update: steps 7, 9 and 11, the Dock click of step 12, the Update pill and its popover
-(steps 4 and 17) and the menu's Check for Updates… of step 14.
+server's window list); step 6 was confirmed by the user (About 0.18.70, the Updated pill with the four notes).
+
+The first real update, 0.18.70 → 0.18.71 on the user's Mac (2026-11-27, read from SkyCut's log, the Updates folder and
+the Trash; the release record has the times). It covered the check, download, verification, staging and swap from the
+public feed, and most likely Restart and Update's relaunch: `open` started 0.18.71 0.13 s after 0.18.70 exited, with no AI
+helper active. The menu's Check for Updates… crashed 0.18.70 and 0.18.71; 0.18.72 fixes it, and step 19 tests it. Still
+for a person: Restart and Update while an export runs and with an unsaved project (step 7), the Settings switch (step 9),
+a quit with Wi-Fi off (step 11), the Dock click of step 12, and the Update pill and its popovers (steps 4 and 17).
