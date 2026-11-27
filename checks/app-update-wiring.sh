@@ -26,6 +26,8 @@
 #      cancelled download's silence and the record matched to the offer.
 #   9. get_status's app_update (MCP-85) reads, never acts: one line in AIProjectTools.status takes AppUpdater.statusReport,
 #      which only builds AppUpdateStatusReport (pure, Foundation only: no check, download, install, restart or quit).
+#  10. The menu check's answer window runs its modal loop from the run loop (RunLoop.main.perform), never inside a Swift
+#      task or a dispatch block, and nothing else shows it (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md).
 # Usage: checks/app-update-wiring.sh
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -247,6 +249,12 @@ MAKE_LINE="$(line_of 'AppUpdateStatusReport.make(state, decision: decision, auto
 if [ -z "${REPORT_LINE}" ] || [ -z "${MAKE_LINE}" ] || [ $((MAKE_LINE - REPORT_LINE)) -ne 1 ]; then
   fail "${UPDATER}: statusReport only builds AppUpdateStatusReport from the published state"
 fi
+
+# 10. The answer window's modal loop runs from the run loop, outside any Swift task.
+[ "$(count 'RunLoop.main.perform { MainActor.assumeIsolated { AppUpdateAlerts.show(answer) } }' "${UPDATER}")" = 1 ] \
+  || fail "${UPDATER}: the menu check's answer is shown from the run loop (RunLoop.main.perform), not in a Task or DispatchQueue.main.async: an exception under its modal loop unwinds a task and crashes SkyCut at the next isolation check, and one escaping a dispatch block ends the app"
+SHOWN="$(grep -rlF 'AppUpdateAlerts.show(' Sources --include='*.swift' | tr '\n' ' ')"
+[ "${SHOWN}" = "${UPDATER} " ] || fail "only AppUpdater's answer effect shows the answer window (found in: ${SHOWN:-nothing})"
 
 if [ "${FAILED}" -ne 0 ]; then exit 1; fi
 echo "✓ app-update-wiring: one feed address, the atomic swap only, deletes inside Updates only, wired at start / quit / menu / Settings / toolbars, the coordinator pinned, get_status read only, no admin rights, no network in the check"

@@ -5,6 +5,9 @@ import Foundation
 //   1. 从 App 启动起就在看（不是等第一次建音频引擎）：不然打开工程的那一下已经错过，刚起的图当场被当成没人用停掉；
 //   2. `lastInput` 只往后走：时间戳更早的事件（合成事件带 0、晚到的旧事件）不把它写回过去；
 //   3. 指针移出不算「回来了」。
+//   4. (2026-11-27) The tracking areas' owner answers AppKit's `mouseEntered:` / `mouseExited:`: with Swift's own names an
+//      enter or exit raised an exception, and one under the Check for Updates… alert crashed SkyCut
+//      (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md).
 // 不建 NSApplication、不开窗口：通知自己发，事件类型只看那张表。编译方式见 scripts/check-audio-engine.sh。
 
 @MainActor
@@ -61,4 +64,20 @@ func checkUserPresence() {
     check(presence.lastInput == time + 0.5 && returns == 2, "半秒之后又动：记下时间，不算「回来了」")
     presence.note(at: time + 5)
     check(returns == 3, "安静了几秒再动：算回来了")
+
+    // 4. AppKit tells a tracking area's owner by selector: `mouseEntered:` / `mouseExited:`. Delivered as AppKit does.
+    let watcher = presence.trackingOwner
+    let entered = #selector(NSResponder.mouseEntered(with:)), exited = #selector(NSResponder.mouseExited(with:))
+    let answers = watcher.responds(to: entered) && watcher.responds(to: exited)
+    check(answers, "the tracking areas' owner answers AppKit's mouseEntered: / mouseExited: (else every enter / exit raises)")
+    guard answers else { return }   // performing an unknown selector would raise here and end the check
+    guard let enter = NSEvent.enterExitEvent(with: .mouseEntered, location: .zero, modifierFlags: [], timestamp: time + 20,
+                                             windowNumber: 0, context: nil, eventNumber: 0, trackingNumber: 0, userData: nil),
+          let exit = NSEvent.enterExitEvent(with: .mouseExited, location: .zero, modifierFlags: [], timestamp: time + 30,
+                                            windowNumber: 0, context: nil, eventNumber: 0, trackingNumber: 0, userData: nil)
+    else { return check(false, "could not make the enter / exit events the owner is told with") }
+    _ = watcher.perform(entered, with: enter)
+    check(presence.lastInput == time + 20 && returns == 4, "the pointer moving into a window (AppKit's mouseEntered:): noted, a return")
+    _ = watcher.perform(exited, with: exit)
+    check(presence.lastInput == time + 20 && returns == 4, "the pointer leaving a window (mouseExited:) changes nothing")
 }
