@@ -75,8 +75,8 @@ The script came in with the updater (#565, its only commit `f903c9e1`) and has n
     `#!/usr/bin/env python3` file next to it is not handed to bash;
   - a probe with legitimate forms (`"${A:-"it's"}"`, `"${A:-'quoted'}"`, `${1:-'a b'}`, `${IFS_UNSET:-$' \t\n'}`,
     `"${A:-it\'s}"`, an apostrophe in a comment line): green, and it runs.
-- `scripts/check-local.sh app-update shell-syntax` (every scan guard, `scripts/check-app-update.sh`, the new guard): the
-  results are in the PR.
+- `scripts/check-local.sh app-update shell-syntax`: all 62 scan guards and `scripts/check-mcp.sh --scans-only` green,
+  `scripts/check-app-update.sh` 411 checks with 0 failed, the new guard green.
 
 ## Lessons
 

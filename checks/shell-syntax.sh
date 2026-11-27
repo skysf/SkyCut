@@ -45,34 +45,31 @@ PERL
 FILES=()
 while IFS= read -r file; do
   FILES+=("${file}")
-done < <(git ls-files -z --cached --others --exclude-standard | xargs -0 perl -e "${PICK}" | LC_ALL=C sort -u)
+done < <(git ls-files -z --cached --others --exclude-standard | xargs -0 perl -e "${PICK}" -- | LC_ALL=C sort -u)
 if [ "${#FILES[@]}" -eq 0 ]; then
   echo "✗ shell-syntax: found no shell script at all (an empty scan is a false green)" >&2
   exit 1
 fi
 
+# Every failing file gets its own ✗ line: scripts/check-guards.sh shows only the ✗ lines of a red guard.
 FAILED=0
-PARSE=""
 for file in "${FILES[@]}"; do
-  if ! errors="$(/bin/bash -n "${file}" 2>&1)"; then
-    PARSE="${PARSE}${file}:"$'\n'"${errors}"$'\n'
+  if ! errors="$(/bin/bash -n -- "${file}" 2>&1)"; then
+    echo "✗ shell-syntax: ${file} doesn't parse under /bin/bash -n (bash 3.2, the shell CI and check-all.sh use):" >&2
+    printf '%s\n' "${errors}" | sed 's/^/    /' >&2
+    FAILED=1
   fi
 done
-if [ -n "${PARSE}" ]; then
-  echo "✗ shell-syntax: these scripts don't parse under /bin/bash -n (bash 3.2, the shell CI and check-all.sh use):" >&2
-  printf '%s' "${PARSE}" | sed 's/^/    /' >&2
-  FAILED=1
-fi
 
-LONE_HITS="$(perl -ne "${LONE}" "${FILES[@]}")"
+LONE_HITS="$(perl -ne "${LONE}" -- "${FILES[@]}")"
 if [ -n "${LONE_HITS}" ]; then
   echo "✗ shell-syntax: a lone apostrophe in a \${name:-…} / \${name:?…} word opens a single quote, even inside double quotes" >&2
   echo "  (one: the script doesn't parse; two: it parses and runs everything between them as one string). Reword it:" >&2
-  printf '%s\n' "${LONE_HITS}" | sed 's/^/    /' >&2
+  printf '%s\n' "${LONE_HITS}" | sed 's/^/  ✗ /' >&2
   FAILED=1
 fi
 
 if [ "${FAILED}" -ne 0 ]; then
   exit 1
 fi
-echo "✓ shell-syntax: ${#FILES[@]} shell scripts parse under /bin/bash -n; no lone apostrophe in a \${…} word"
+echo "✓ shell-syntax: ${#FILES[@]} shell scripts parse under /bin/bash -n; no lone apostrophe in a \${…:?…}-type word"

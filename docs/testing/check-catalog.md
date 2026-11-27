@@ -736,6 +736,17 @@
   `checks/shell-pipe-grep-q.sh`。
 - `"$(…)"` 里不许再套带 `{…,…}` 的双引号字符串（CI 的 /bin/bash 3.2 会把它花括号展开、拆成几个词；放在 `[ ]` 里就是 too many arguments、
   `if` 走 else，守卫永远不红 —— 先赋给变量再比较）：`checks/shell-brace-in-nested-quotes.sh`。
+- Every shell script parses, and no `${…}` word holds a lone apostrophe: `checks/shell-syntax.sh` (2026-11-27,
+  [coding standards](../architecture/coding-standards.md) section 6). The files: every `.sh` file and every file whose first
+  line is a bash or sh shebang that `git ls-files` lists (tracked, plus new files not yet added, minus ignored ones); none
+  found is red. Each must pass `/bin/bash -n` (bash 3.2, which parses inside `$( … )` only when it runs: a blind spot). No
+  non-comment line may hold a lone apostrophe in the word of `${name:-…}`, `:=`, `:?` or `:+` (with or without the colon):
+  bash opens a single quote there even inside double quotes, and with two of them the script parses and is wrong. One
+  inside a nested `"…"`, escaped or paired in the same expansion passes. Reverse verification (2026-11-27): one apostrophe
+  put back into `scripts/write-update-feed.sh`, and main's original, are red on both rules; two such messages on adjacent
+  lines, which `bash -n` accepts, are red on the apostrophe rule alone; a file without `.sh` whose `#!/usr/bin/env bash`
+  script has an unclosed `if` is red, a python3 one next to it isn't parsed; legitimate forms stay green
+  ([case](../bugfixes/2026-11-27-feed-writer-apostrophe-never-parsed.md)).
 - 每个 sheet / popover 的内容、每个自建的 `NSHostingView` 都必须套 `.appLanguage()`（SwiftUI
   不把应用内语言带进 sheet / popover）：`checks/presented-views-app-language.sh`。
 - 代码里每个 `UTType(exportedAs:)` 都必须在 `packaging/Info.plist` 里声明（没声明的

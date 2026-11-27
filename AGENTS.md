@@ -274,7 +274,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-localization-coverage.sh` — 界面文案在每张字符串表都配齐、占位符一致。
 - `scripts/check-look-jobs.sh` — Slow looks: the router's lines, a look behind an edit as a queued job, cancel, two sessions' parallel looks; `sound` under a look (real App objects).
 - `scripts/check-main-thread-watchdog.sh` — 主线程心跳看门狗、挂起抓栈期间不分配。
-- `scripts/check-mcp.sh` — AI 接口（MCP）：协议、清单和说明的上限、说明书、AI 改时间线的规则、客户端配置、词表对账（`--scans-only` 只跑编译之前的扫描，含 `checks/MCP/*-wiring.sh`）。 Native preset wraps survive canvas changes. Exports the tool vocabulary; published Sky Studio names still exist.
+- `scripts/check-mcp.sh` — AI 接口（MCP）：协议、清单和说明的上限、说明书、AI 改时间线的规则、客户端配置、词表对账（`--scans-only` 只跑编译之前的扫描，含 `checks/MCP/*-wiring.sh`）。
 - `scripts/check-media-import.sh` — 拖文件进轨道的落点。
 - `scripts/check-mix-layers.sh` — 按层量混音：频段 / 帧 / 响度的 oracle、和导出逐位对账; `listen voice=` / `describe=` checks.
 - `scripts/check-motion-placement.sh` — Stored web motion: real rendering, template reuse, approval modes, same-clip parameter edits, undo and cache recovery.
@@ -327,7 +327,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/cloud-task-projects.sh` — 生成任务带工程归属，卡片和 MCP 共用分组。
 - `checks/copy-project-guard.sh` — 冒烟拷工程不整夹拷「下载」这类大文件夹。
 - `checks/dmg-packaging.sh` — DMG 安装引导的接线与模板。
-- `checks/docs-index-drift.sh` — 本文件和 `docs/bugfixes/INDEX.md` 的索引是全的、没有死链、每条一行、只有规定的几种写法，`INDEX.md` 按文件名里日期后面那一段排、一份案例只列一次，本文件总大小不超上限；`--self-test` 跑它自带的负例（check-all 里也跑）。
+- `checks/docs-index-drift.sh` — 本文件和 `docs/bugfixes/INDEX.md` 的索引是全的、没有死链、每条一行、只有规定的几种写法，`INDEX.md` 按文件名里日期后面那一段排、一份案例只列一次，本文件总大小不超上限；`--self-test` 跑它自带的负例。
 - `checks/encode-settings-memory.sh` — 压缩 / 烧录记住的设置在队列创建时读回来；字幕样式都经 `subtitleStyle(appWide:)`。
 - `checks/export-audio-single-pipeline.sh` — 导出图里不许出现声音滤镜。
 - `checks/export-watermark-wiring.sh` — 加不加水印只问 `WatermarkPolicy`、落在烧字幕之后缩小之前。
@@ -361,6 +361,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/sfx-catalog.sh` — 音效目录：id 连号永不改、tag 在词表里。
 - `checks/shell-brace-in-nested-quotes.sh` — `"$(…)"` 里不许再套带 `{…,…}` 的双引号串（bash 3.2 会拆开）。
 - `checks/shell-pipe-grep-q.sh` — 开着 pipefail 时管道末端不许用 `grep -q`。
+- `checks/shell-syntax.sh` — every shell script parses under `/bin/bash -n`; no lone apostrophe in a `${…:?…}`-type word.
 - `checks/shell-var-boundary.sh` — 裸 `$VAR` 不许紧跟中文 / 全角标点。
 - `checks/sky-studio-wiring.sh` — Sky Studio 的地址、机器号、钥匙串、照授权拦、任务、声音库和变声只在该在的地方（分节在 `checks/sky-studio-wiring/`）。
 - `checks/source-file-size.sh` — 单文件超过 600 行就红、老文件只许降（变短了跑 `--update`）。

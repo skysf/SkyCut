@@ -99,6 +99,7 @@
 - [2026-11-02 导出反复解码静止的文字和形状](2026-11-02-export-redecodes-static-overlays.md) — 静止叠层只解码一次、按本段复制已解的帧；默认质量不变。
 - [2026-10-03 导出的线条两头各比预览长半个线宽](2026-10-03-exported-lines-longer-than-preview.md) — 画法只有 `ShapeOutline.drawing` 一份；对账要比外框，不能只比重合度。
 - [2026-10-02 状态行上的小标折成两行](2026-10-02-fal-status-pill-wraps.md) — 一行里谁让步要明说（小件 `fixedSize`、长话去截）。
+- [2026-11-27 The update feed writer never parsed](2026-11-27-feed-writer-apostrophe-never-parsed.md) — An apostrophe in a `${…:?…}` message opens a single quote even inside double quotes; every shell script must parse under `/bin/bash -n`.
 - [2026-11-03 短导出卡在退出等待](2026-11-03-ffmpeg-exit-wait-runloop.md) — 启动前注册退出回调、排空双管道后再汇合。
 - [2026-09-23 磁吸开着时拖文件的落点框画错位置](2026-09-23-file-drop-frame-ignores-magnet.md) — 画框要在副本上把落地原样走一遍（含 `packMain`）。
 - [2026-11-17 fills_frame said a turned or moving picture fills the frame, and look never said where it was bare](2026-11-17-fills-frame-ignores-rotation-and-motion.md) — Answer "does it cover" with the renderer's geometry at every frame on screen, never from pixels; give the fix (fill_scale, fills_except) with the verdict.
