@@ -146,6 +146,8 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["editing_style", "newer_version"])
     // No music where the film's editing style expects it (2026-11-20, AIDeliveryStyleMusic): inspect_video's suspect kind.
     names.insert("audio_music_missing")
+    // get_status's app_update (2026-11-27, MCP-85, AppUpdateStatusReport): the field and the states its updates section names.
+    names.formUnion(["app_update", "up_to_date", "just_updated", "check_failed", "not_checked"])
     return names
 }
 
