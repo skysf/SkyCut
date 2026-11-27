@@ -34,6 +34,7 @@ func runSplitOutGroups(root: URL) {
         ("Voice band: a clip's own 300 Hz-3 kHz lowered", checkVoiceBand),  // 51: VoiceBand.swift
         ("Sound role: what a clip's sound is, saved", checkSoundRole),  // 52: SoundRole.swift
         ("The editing style a film was cut with", checkEditingStyle),  // 53: EditingStyle.swift
+        ("What an empty project is: nothing the person made", checkEmptyProject),  // 54: EmptyProject.swift
     ]
     for group in groups {
         do {

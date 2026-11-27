@@ -156,6 +156,9 @@ identity, gain or a larger source-time interval invalidates a decision. Repeatin
 different clip cannot inherit it. A mark matches at most one finding in a report; exact duplicate findings are coalesced. Matching findings leave `findings` and appear under `intentional`
 with their reason, separately for human review. The stale-export attention note remains visible even
 when its finding has been marked. Unreproduced saved marks remain in the separate intentional list with `reproduced:false`; they suppress nothing and persist until explicitly cleared.
+So review reasons are project content even after their clips are gone: an untitled project left with only review reasons
+asks Save… / Discard / Cancel before it closes ([project file](video-edit-project-file.md) §5 "What an empty project is",
+since 2026-11-27).
 
 `DeliveryChecks` runs synthetic real-tool reports for overload/limiter, silence, thin sound, a mix hole,
 source/picture sentence cuts, no edits, marking/suppression/separate listing, undo/redo, project-file

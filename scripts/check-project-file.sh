@@ -153,6 +153,7 @@ xcrun swiftc \
   checks/ProjectFile/VoiceBand.swift \
   checks/ProjectFile/SoundRole.swift \
   checks/ProjectFile/EditingStyle.swift \
+  checks/ProjectFile/EmptyProject.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
 # ---- 真实媒体素材（探针「文件存在 ≠ 音轨可读」那一组要用）----

@@ -53,6 +53,11 @@
 - 所有写入走 `perform(rebuildsPreview: false)`。改标记会重建一次 AVComposition
   的话，就是拿几百毫秒换画面一帧不变。
 - 但它**仍然是要存盘的用户数据**，见下一节。
+- It is content, too: a project whose only content is markers on the ruler, with or without a note, is not empty
+  (`TimelineState.isEmpty` counts them), so closing it untitled asks Save… / Discard / Cancel and its timeline stays on screen
+  ([project file](video-edit-project-file.md) §5 "What an empty project is";
+  [case](../bugfixes/2026-11-27-untitled-project-with-only-markers-closes-unasked.md)). Markers on blocks come with their
+  block, which counts anyway.
 
 ## 三、格式版本 v8 / v28，按需写入
 
@@ -239,3 +244,5 @@ M / 书签的落点规则只有 `MarkerTargets.atPlayhead` 一份（纯值，`ch
 14. 磁吸开着删掉主轨中间一段：后面的段往前挤，标尺上的小旗留在原来的秒数。
 15. 悬到标尺的小旗上：画面 peek 到那一帧、备注气泡出现在标尺下方压着轨道；单击选中（白边）、
     ⌫ 删掉、⌘Z 回来；双击弹面板换色即时生效。
+16. An untitled project left with only a flag on the ruler and its note (media deleted): ⌘Q and File ▸ New Project ask
+    Save… / Discard / Cancel; Cancel keeps the flag and its note ([project file](video-edit-project-file.md) §7).

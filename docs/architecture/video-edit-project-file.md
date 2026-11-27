@@ -506,6 +506,34 @@ a project file can live on a sleeping, slow, read-only or stuck external drive, 
    project is compared by document generation, never by object identity alone.
 7. Behaviour: `scripts/check-project-saves.sh`.
 
+### What an empty project is (2026-11-27)
+
+`TimelineState.isEmpty` is the one answer to "is this project empty?": would its file hold anything the person made. Closing an
+untitled project asks Save… / Discard / Cancel only when it would (`prepareToClose`, `closesAtOnce`, `prepareToCloseDocument`:
+Quit, Restart and Update, New, Open / Open Recent, a project window's close button, the AI's `close_project`). The same answer
+decides the start screen and the timeline's empty state, Play and Export, whether the AI may take over an untitled main window
+and must save an untitled project it changed, and whether a version is saved. There is no second notion of empty: a new field
+the project file keeps goes on one side of this list in the same change, and `scripts/check-project-file.sh` group 54 pins
+both sides.
+
+- **Content** (each alone makes the project not empty): clips on any track (with their markers, curves and keyframes), the
+  original subtitle track, a translation track (SkyCut keeps it only beside an original, but the file can hold it alone),
+  shapes (covers too), texts, grades (with their markers), **markers on the ruler, with or without a note**, the storyboard
+  (`production`), an explicit ending (`minimumDuration`), **review reasons** (`deliveryIntentions`: `inspect_video` keeps
+  listing them, as not reproduced once their clips are gone, until they are explicitly cleared —
+  [finished-video inspection](finished-video-inspection.md)), and **a pinned Sky Studio style version** (`editingStyle` with
+  `isPinned`: it decides which version of the style the film reads next time, v40 below).
+- **Not content** (alone): the canvas shape and frame rate, the faders, the eyes and the magnet, tracks without clips, the
+  project's subtitle style, place, word highlight and line count, a subtitle companion's languages and generation settings
+  without a translation, a style record that only says where a style came from (a preset's or the user's own: recorded,
+  never pinned), and outside the timeline the row heights (decoration, above) and the media table (made from the clips).
+
+Ruler markers were missing from the list until
+[an untitled project with only ruler markers closed without asking](../bugfixes/2026-11-27-untitled-project-with-only-markers-closes-unasked.md):
+the markers and their notes were thrown away unasked. Review reasons and the pinned version joined the list in that case's
+review round (CXL1): an untitled project left with only a review reason closed on New Project without asking, and the reason
+was gone.
+
 ### 切工程必须是事务性的
 
 **`flushAutosave()` / `saveNow()` 的返回值必须被在意。** 磁盘满、权限变了、外接盘
@@ -519,7 +547,8 @@ a project file can live on a sleeping, slow, read-only or stuck external drive, 
 2. `prepareToCloseDocument()` 返回 false 就**原地不动**，别调 `closeCurrentDocument`
    （它会把保存失败的 notice 一起清掉）。
 3. 从没存过、又有内容的未命名工程要弹 Save…/Discard/Cancel。自动保存的语义只覆盖
-   已经有位置的工程，没位置的直接扔就是数据丢失。
+   已经有位置的工程，没位置的直接扔就是数据丢失。What counts as content: "What an empty project is" above (ruler markers
+   and their notes too).
 4. **打开的就是当前工程时，只 flush，不载入。** 「先读后关」的顺序在这个特例上
    会反噬：读到磁盘旧状态 → flush 写下新状态 → 又拿旧状态盖回内存并标成干净，
    下一次编辑把新状态从磁盘上也抹掉。Open Recent 里永远有当前工程，这条路是
@@ -576,6 +605,7 @@ made before it no longer finds the moved file — until then this only worked be
    `relocateMedia`）、丢失上报、宽容解码、**书签保全**、版本校验、重链接后
    补静帧。**加了新字段要往 `checks/ProjectFile/main.swift` 里补一条**，
    升版本时还要改那批**写死版本号**的断言（写死是故意的，见上）。
+   A new field also goes into group 54 (`EmptyProject.swift`), as content or not (§5 "What an empty project is").
    脚本末尾另有一段**接线守卫**（grep 级）：自检编不动
    `VideoEditProject` / `TranscriptionTask` 这类 @MainActor App 类型，
    「纯函数有没有被调用、参数对不对」只能在源码层面钉住。
@@ -590,6 +620,9 @@ made before it no longer finds the moved file — until then this only worked be
      并出现在预览里（验 `awaitVideoEngine`）
    - 未命名工程里加一段素材 → File ▸ New Project → 应弹 Save…/Discard/Cancel，
      点 Cancel 后剪辑还在；⌘Q 也应弹同一个框，Cancel 能取消退出
+   - An untitled project: add media, mark the ruler and write a note in the marker, delete the media → the timeline stays
+     (the flag on the ruler, not the start screen); ⌘Q, File ▸ New Project and a project window's close button each ask
+     Save…/Discard/Cancel; Cancel keeps the marker and its note (2026-11-27)
    - 两条音频轨各拖成不同高度 → 存盘 → 重开工程 → 两条轨各自的高度都还在；
      新建工程时每条轨回到默认高度（不会带着上一份工程的条目）
    - 播放头停在工程后半段（在播、停着各一次）→ File ▸ New Project / 打开另一个工程 → 播放头在 0:00
@@ -597,7 +630,9 @@ made before it no longer finds the moved file — until then this only worked be
 3. `scripts/check-project-saves.sh` — the project file written off the main thread (§5 "Writing the project file off the main
    thread"): slow, stuck and failing drives, switching away, Save As, Quit; an edit made while New / a close / Quit is
    writing, Quit looking again at a project it let through, a document opened in a project after "Quit Anyway" was chosen
-   for the one before it, a save window answered too late. Real windows and a real drive, before a release:
+   for the one before it, a save window answered too late; an untitled project left with only a ruler marker and its note
+   asked about by every close, and one left with only a review reason or a pinned style version asked about by New Project
+   (§5 "What an empty project is"). Real windows and a real drive, before a release:
    - a project on a USB hard drive that has gone to sleep: edit, wait for the autosave — the timeline stays responsive while
      the drive spins up; ⌘S right after — no beachball, the notice says the drive is not responding if it takes over 15 s;
    - the same project, then ⌘Q while the drive is asleep: SkyCut quits once the drive answers, or after about 3 s shows
