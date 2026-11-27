@@ -243,9 +243,10 @@ struct SubtitleEditPanel: View {
         ScrollViewReader { proxy in
             Table(cues, selection: $selection) {
                 TableColumn(Text("#")) { cue in
+                    // The look before the frame: Forest's chip hugs the number, not the 30-pt column.
                     Text("\(cue.index)")
-                        .frame(width: 30, alignment: .trailing)
                         .modifier(CurrentCueHighlight(isCurrent: cue.id == currentCueID))
+                        .frame(width: 30, alignment: .trailing)
                 }
                 .width(30)
                 TableColumn(Text("Start")) { cue in
@@ -378,14 +379,12 @@ struct SubtitleEditPanel: View {
     }
 }
 
-/// 播放头正落在的那句加个重音。
+/// 播放头正落在的那句加个重音。The look is the shared current line (StateMarks.swift): semibold, and in Forest on the chip.
 struct CurrentCueHighlight: ViewModifier {
     let isCurrent: Bool
     func body(content: Content) -> some View {
         let _ = PerfCounters.body(Self.self)
-        content
-            .fontWeight(isCurrent ? .semibold : .regular)
-            .foregroundStyle(isCurrent ? Color.accentColor : Color.primary)
+        content.currentLine(isCurrent, normal: Color.primary, semibold: true)
     }
 }
 

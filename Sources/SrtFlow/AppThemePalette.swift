@@ -54,6 +54,14 @@ struct AppThemePalette {
     /// Behind an "on" icon toggle, the current subtitle line and the workbench's shown panels. Forest: look A's light green
     /// (the user's pick, 2026-11-27); Classic: the workbench chip it always had (Classic's icon toggles stay AppKit's own).
     var onChip: Color { isForest ? Self.color(0xcfe0c8) : .primary.opacity(0.08) }
+    /// What marks a selected, current or drop-target thing in lists, cards and on the timeline. Classic: the macOS accent
+    /// exactly as SwiftUI draws it. **The one place `Color.accentColor` is named** (checks/app-theme-wiring.sh): the theme
+    /// root's `.accentColor(_:)` doesn't reach it, so in Forest it drew the macOS accent (yellow / blue), not Forest green.
+    var highlight: Color { isForest ? accent : Color.accentColor }
+    /// A selected row of the edit page's subtitle list. Classic fills it with the macOS accent at 18 %; Forest outlines it in
+    /// its accent (a light fill would melt into the current line's chip on a row that is both).
+    var rowSelectionFill: Color { isForest ? .clear : Color.accentColor.opacity(0.18) }
+    var rowSelectionStroke: Color? { isForest ? accent : nil }
 
     func blockLabel(classic: Color) -> Color {
         isForest ? Self.color(0x243c2f) : classic

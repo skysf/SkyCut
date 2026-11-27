@@ -52,9 +52,41 @@ private struct StateToggleModifier: ViewModifier {
     }
 }
 
+private struct CurrentLineModifier: ViewModifier {
+    let isCurrent: Bool
+    /// The colour of a line that isn't current.
+    let normal: Color
+    let semibold: Bool
+
+    func body(content: Content) -> some View {
+        let _ = PerfCounters.body(Self.self)
+        let palette = AppThemePalette.current
+        if palette.isForest {
+            content
+                .fontWeight(semibold && isCurrent ? .semibold : nil)
+                .foregroundStyle(isCurrent ? palette.accent : normal)
+                .padding(.horizontal, 3)
+                .background {
+                    if isCurrent { RoundedRectangle(cornerRadius: 4).fill(palette.onChip) }
+                }
+        } else if semibold {
+            // Classic: exactly what CurrentCueHighlight drew.
+            content.fontWeight(isCurrent ? .semibold : .regular).foregroundStyle(isCurrent ? palette.highlight : normal)
+        } else {
+            // Classic: exactly what the cue row's index drew.
+            content.foregroundStyle(isCurrent ? palette.highlight : normal)
+        }
+    }
+}
+
 extension View {
     /// An icon toggle's on / off look (on a `Toggle`). `classicTint`: the tint the control had in Classic (nil: none).
     func stateToggle(classicTint: Color?) -> some View { modifier(StateToggleModifier(classicTint: classicTint)) }
+
+    /// The current subtitle line's look. `normal`: the colour of a line that isn't current.
+    func currentLine(_ isCurrent: Bool, normal: Color, semibold: Bool) -> some View {
+        modifier(CurrentLineModifier(isCurrent: isCurrent, normal: normal, semibold: semibold))
+    }
 
     /// A workbench panel button's label (Library, Subtitles): the on chip behind it while its panel shows.
     @MainActor

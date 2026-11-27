@@ -138,7 +138,7 @@ private struct ShapeBlockView: View, Equatable {
         .timelineHiddenLook(shape.isHidden)
         .overlay {
             if highlighted {
-                RoundedRectangle(cornerRadius: 4).strokeBorder(.white, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: 4).strokeBorder(AppThemePalette.current.selectionStroke, lineWidth: 1.5)
             }
         }
         // 标记必须排在裁切把手**之前**（同剪辑块：排在后面的话贴着两端的标记会盖住把手）。

@@ -50,7 +50,7 @@ struct VideoEditSubtitleCueRow: View {
                     Text("#\(cue.index)")
                         .font(.caption2)
                         .monospacedDigit()
-                        .foregroundStyle(isCurrent ? Color.accentColor : Color.secondary)
+                        .currentLine(isCurrent, normal: Color.secondary, semibold: false)
                         .frame(width: 24, alignment: .leading)
                     // 两个时间码格子平分剩下的宽度：这一列可以被拖窄，钉死宽度
                     // 会让「结束时间」在窄列里被切掉半截（实测 260pt 就切了）。
@@ -85,8 +85,14 @@ struct VideoEditSubtitleCueRow: View {
         .textFieldStyle(.roundedBorder)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
+                .fill(isSelected ? AppThemePalette.current.rowSelectionFill : Color.clear)
         )
+        // Forest outlines a selected row (Classic: none, its fill above): a row that is also current keeps its chip visible.
+        .overlay {
+            if isSelected, let stroke = AppThemePalette.current.rowSelectionStroke {
+                RoundedRectangle(cornerRadius: 6).strokeBorder(stroke, lineWidth: 1.5).allowsHitTesting(false)
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
         .onChange(of: focusedCueID) { old, new in
