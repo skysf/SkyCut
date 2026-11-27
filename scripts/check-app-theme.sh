@@ -13,5 +13,6 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -wmo \
   Sources/SrtFlow/TimelineMagnetSymbol.swift \
   checks/Shared/ScratchDefaults.swift \
   checks/AppTheme/main.swift \
+  checks/AppTheme/StateRuleChecks.swift \
   -o "${WORK}/check-app-theme"
 "${WORK}/check-app-theme"

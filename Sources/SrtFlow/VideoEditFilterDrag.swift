@@ -157,9 +157,9 @@ struct FilterDropIndicator: View {
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         RoundedRectangle(cornerRadius: 4)
-            .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
+            .strokeBorder(AppThemePalette.current.highlight, style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
             .background(
-                RoundedRectangle(cornerRadius: 4).fill(Color.accentColor.opacity(0.18))
+                RoundedRectangle(cornerRadius: 4).fill(AppThemePalette.current.highlight.opacity(0.18))
             )
             .frame(
                 width: max(FilterBlockMetrics.minimumWidth, plan.duration * pps),

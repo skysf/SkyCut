@@ -49,4 +49,51 @@ if grep -E '\.id\(|scheduleRebuild|VideoEditProject|PlayerClock' Sources/SrtFlow
   echo 'FAIL: changing a theme must not replace the editor or rebuild its media' >&2
   exit 1
 fi
-echo 'PASS: theme roots, hand-built panel appearance, native settings, palette, toolbar and MCP wiring.'
+# On / off, current and selected at a glance (docs/architecture/app-themes.md "On / off at a glance",
+# docs/bugfixes/2026-11-27-on-off-invisible-in-forest.md). Code lines only (comments skipped).
+code_lines() { grep -rn --include='*.swift' "$1" Sources/SrtFlow | grep -vE '^[^:]*:[0-9]+:[[:space:]]*//' || true; }
+# 1. Button-style toggles only through the shared style (StateMarks.swift). Allowlist, one line each with its reason:
+#    the Upscale compare's Loop is a *bordered* button toggle: AppKit's bezel shows on / off in both themes (audit 2026-11-27).
+RAW="$(code_lines 'toggleStyle(.button)' | grep -v '^Sources/SrtFlow/StateMarks.swift:' | grep -v '^Sources/SrtFlow/Upscale/UpscaleCompareView.swift:' || true)"
+if [ -n "${RAW}" ]; then
+  echo "FAIL: app-theme: a button-style toggle outside the shared style; use .stateToggle(classicTint:) (StateMarks.swift):" >&2
+  printf '%s\n' "${RAW}" >&2
+  exit 1
+fi
+[ "$(code_lines 'toggleStyle(.button)' | grep -c '^Sources/SrtFlow/Upscale/UpscaleCompareView.swift:')" = 1 ] \
+  || { echo "FAIL: app-theme: the Upscale compare's allowlisted Loop toggle moved or multiplied (one bordered button toggle)" >&2; exit 1; }
+# 2. No on-state tint of its own: toggleAccent (Classic's teal) only as the shared style's Classic tint.
+TINTS="$(code_lines 'toggleAccent' | grep -v '^Sources/SrtFlow/AppThemePalette.swift:' | grep -v 'stateToggle(classicTint: AppThemePalette.current.toggleAccent)' || true)"
+if [ -n "${TINTS}" ]; then
+  echo "FAIL: app-theme: toggleAccent tints a control outside .stateToggle(classicTint:):" >&2
+  printf '%s\n' "${TINTS}" >&2
+  exit 1
+fi
+# 3. Color.accentColor only in the palette: the theme root's .accentColor(_:) doesn't reach it, so anywhere else it draws the
+#    macOS accent in Forest (yellow, blue…). The root's .accentColor(palette.accent) modifier itself is the one other use.
+ACCENTS="$(grep -rn --include='*.swift' 'accentColor' Sources | grep -vE '^[^:]*:[0-9]+:[[:space:]]*//' \
+  | grep -v '^Sources/SrtFlow/AppThemePalette.swift:' | grep -vF '.accentColor(palette.accent)' || true)"
+if [ -n "${ACCENTS}" ]; then
+  echo "FAIL: app-theme: Color.accentColor outside AppThemePalette (use highlight, rowSelectionFill, overVideo…):" >&2
+  printf '%s\n' "${ACCENTS}" >&2
+  exit 1
+fi
+# 4. The controls the audit found use the shared looks; the shared look uses the palette values check-app-theme measures.
+[ "$(grep -c 'stateToggle(classicTint: AppThemePalette.current.toggleAccent)' Sources/SrtFlow/VideoEditToolbarIcons.swift)" = 1 ] \
+  && [ "$(grep -c 'stateToggle(classicTint: AppThemePalette.current.toggleAccent)' Sources/SrtFlow/VideoEditInspector+Transform.swift)" = 1 ] \
+  && [ "$(grep -c 'stateToggle(classicTint: nil)' Sources/SrtFlow/VideoEditSubtitlePanel.swift)" = 1 ] \
+  && [ "$(grep -c 'stateToggle(classicTint: nil)' Sources/SrtFlow/SubtitleEditPanel.swift)" = 1 ] \
+  || { echo "FAIL: app-theme: the toolbar, flip and both follow-playback toggles use .stateToggle(classicTint:)" >&2; exit 1; }
+require Sources/SrtFlow/SubtitleEditPanel.swift 'content.currentLine(isCurrent, normal: Color.primary, semibold: true)'
+require Sources/SrtFlow/VideoEditSubtitleCueRow.swift '.currentLine(isCurrent, normal: Color.secondary, semibold: false)'
+require Sources/SrtFlow/VideoEditSubtitleCueRow.swift '.fill(isSelected ? AppThemePalette.current.rowSelectionFill : Color.clear)'
+require Sources/SrtFlow/VideoEditSubtitleCueRow.swift 'if isSelected, let stroke = AppThemePalette.current.rowSelectionStroke {'
+require Sources/SrtFlow/VideoEditTimelineShapeRow.swift 'strokeBorder(AppThemePalette.current.selectionStroke, lineWidth: 1.5)'
+[ "$(grep -c '.workbenchChip(isOn: ' Sources/SrtFlow/VideoEditWorkbenchToolbar.swift)" = 2 ] \
+  || { echo "FAIL: app-theme: the workbench's Library and Subtitles buttons both show on with .workbenchChip(isOn:)" >&2; exit 1; }
+require Sources/SrtFlow/StateMarks.swift '.foregroundStyle(configuration.isOn ? palette.accent : palette.secondaryText)'
+require Sources/SrtFlow/StateMarks.swift 'if configuration.isOn { RoundedRectangle(cornerRadius: 5).fill(palette.onChip) }'
+require Sources/SrtFlow/StateMarks.swift '.foregroundStyle(isCurrent ? palette.accent : normal)'
+require Sources/SrtFlow/StateMarks.swift 'if isCurrent { RoundedRectangle(cornerRadius: 4).fill(palette.onChip) }'
+require Sources/SrtFlow/StateMarks.swift '.accessibilityRepresentation {'
+echo 'PASS: theme roots, hand-built panel appearance, native settings, palette, toolbar and MCP wiring; on / off, current and selected through the shared looks, no Color.accentColor outside the palette.'

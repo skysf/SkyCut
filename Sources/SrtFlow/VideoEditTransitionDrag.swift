@@ -147,9 +147,9 @@ struct TransitionDropIndicator: View {
         let _ = PerfCounters.body(Self.self)
         let height = max(14, rowHeight - 10)
         RoundedRectangle(cornerRadius: 4)
-            .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
+            .strokeBorder(AppThemePalette.current.highlight, style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
             .background(
-                RoundedRectangle(cornerRadius: 4).fill(Color.accentColor.opacity(0.18))
+                RoundedRectangle(cornerRadius: 4).fill(AppThemePalette.current.highlight.opacity(0.18))
             )
             .frame(width: preview.width, height: height)
             .offset(x: preview.x, y: (rowHeight - height) / 2)

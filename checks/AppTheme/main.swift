@@ -74,7 +74,9 @@ struct AppThemeChecks {
         for symbol in [TimelineThemeIcons.snapping, TimelineThemeIcons.followPlayhead] {
             check(NSImage(systemSymbolName: symbol, accessibilityDescription: nil) != nil, "native symbol exists: \(symbol)")
         }
+        // On / off, current and selected tell apart at a glance (StateRuleChecks.swift, docs/architecture/app-themes.md).
+        StateRuleChecks.run(check)
         if failures > 0 { exit(1) }
-        print("PASS: theme defaults, persistence, isolation, classic colors, forest palette, light / dark rule (never nil to SwiftUI) and native toolbar symbols.")
+        print("PASS: theme defaults, persistence, isolation, classic colors, forest palette, light / dark rule (never nil to SwiftUI), native toolbar symbols and the on / off rule.")
     }
 }

@@ -152,7 +152,7 @@ private struct TimelineHeaderRow: View {
             // 被拖着换位的那一行垫个底色：它压在别的行上面跟着指针走，一眼认得出是哪条。
             .background(
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(dragging ? Color.accentColor.opacity(0.18) : Color.clear)
+                    .fill(dragging ? AppThemePalette.current.highlight.opacity(0.18) : Color.clear)
             )
             .contentShape(Rectangle())
             // 点一下（非眼睛的地方）= 选中这一行的全部素材。眼睛是 Button，它自己

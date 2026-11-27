@@ -36,8 +36,9 @@ struct MarginGuideOverlay: View {
         let clamped = min(max(0, x), boxSize.width)
         return ZStack(alignment: labelOnRight ? .topLeading : .topTrailing) {
             Rectangle()
-                .fill(Color.accentColor.opacity(0.9))
+                .fill(AppThemePalette.current.overVideo.opacity(0.9))
                 .frame(width: 1, height: boxSize.height)
+                .overVideoGlow()
             GuideLabel(text: label)
                 .padding(.horizontal, 4)
                 .padding(.top, 4)
@@ -50,8 +51,9 @@ struct MarginGuideOverlay: View {
         let clamped = min(max(0, y), boxSize.height)
         return ZStack(alignment: .bottomLeading) {
             Rectangle()
-                .fill(Color.accentColor.opacity(0.9))
+                .fill(AppThemePalette.current.overVideo.opacity(0.9))
                 .frame(width: boxSize.width, height: 1)
+                .overVideoGlow()
             GuideLabel(text: label)
                 .padding(.leading, 6)
                 .padding(.bottom, 3)
@@ -72,6 +74,6 @@ private struct GuideLabel: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 4)
             .padding(.vertical, 1)
-            .background(Color.accentColor.opacity(0.85), in: RoundedRectangle(cornerRadius: 3))
+            .background(AppThemePalette.current.overVideoLabel.opacity(0.85), in: RoundedRectangle(cornerRadius: 3))
     }
 }

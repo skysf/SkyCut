@@ -144,7 +144,7 @@ deny() {   # deny <文件> <正则> <人话>
 # 1) 点遮罩选中的是**转场**，不是出场段。选成出场段的话按 ⌫ 删掉的是整段素材。
 need "$MASK" "project\.selectedTransitionSeamID = outgoing\.id" "点遮罩选中转场的接线"
 deny "$MASK" "project\.select\(outgoing\.id" "老的「点遮罩选中出场段」写法"
-need "$MASK" "isSelected \? Color\.accentColor" "遮罩的选中态描边"
+need "$MASK" "isSelected \? AppThemePalette\.current\.highlight" "遮罩的选中态描边（主题的 highlight：Classic 是 Color.accentColor 本身，2026-11-27）"
 
 # 2) ⌫ 要有转场这一支，而且 prune 挂在 state 的唯一写入点上。
 need "$PROJECT" "if let seamID = selection\.transitionSeamID" "deleteSelected 里的转场分支"

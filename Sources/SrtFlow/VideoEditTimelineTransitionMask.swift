@@ -68,7 +68,7 @@ struct TransitionMaskView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 4)
                             .strokeBorder(
-                                isSelected ? Color.accentColor : .white.opacity(0.75),
+                                isSelected ? AppThemePalette.current.highlight : .white.opacity(0.75),
                                 lineWidth: isSelected ? 2 : 1
                             )
                     )

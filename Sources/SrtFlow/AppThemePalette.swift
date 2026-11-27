@@ -62,6 +62,14 @@ struct AppThemePalette {
     /// its accent (a light fill would melt into the current line's chip on a row that is both).
     var rowSelectionFill: Color { isForest ? .clear : Color.accentColor.opacity(0.18) }
     var rowSelectionStroke: Color? { isForest ? accent : nil }
+    /// Selection drawn over the video (the text frame box, the Burn In margin guides) reads on any picture: Forest uses the clip
+    /// transform box's white with its dark glow (never the dark Forest accent alone); Classic keeps the macOS accent.
+    var overVideo: Color { isForest ? .white : Color.accentColor }
+    var overVideoGlow: Color? { isForest ? dragAccent.opacity(0.8) : nil }
+    /// Inside a hollow handle over the video (Classic: white, as always).
+    var overVideoHollow: Color { isForest ? .black.opacity(0.45) : .white }
+    /// Behind the Burn In margin guides' white numbers.
+    var overVideoLabel: Color { isForest ? .black : Color.accentColor }
 
     func blockLabel(classic: Color) -> Color {
         isForest ? Self.color(0x243c2f) : classic

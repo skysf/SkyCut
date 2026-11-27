@@ -97,4 +97,15 @@ extension View {
             }
             .accessibilityAddTraits(isOn ? .isSelected : [])
     }
+
+    /// Over the video, Forest's white selection marks get the clip transform box's dark glow; Classic draws none.
+    @MainActor
+    @ViewBuilder
+    func overVideoGlow() -> some View {
+        if let glow = AppThemePalette.current.overVideoGlow {
+            shadow(color: glow, radius: 2)
+        } else {
+            self
+        }
+    }
 }
