@@ -17,6 +17,10 @@
 #   8. 停图 / 起图的那句日志不在主线程上写；
 #   9. 后台起图没起来：图还是故意停着的样子（喂样线程歇回去、不留计时器、不每看一眼就重试、只在真停下来时记「停图」）。
 #  10. 一个判断只读一次图的状态（原子的，后台随时改）：「在跑或者正在起」在取出来的值上判。
+#  11. (2026-11-27, any Swift file under Sources) A tracking area's callbacks that aren't an `override` carry AppKit's
+#      selector: `@objc(mouseEntered:)`. Such a method can only sit on an owner that isn't an NSResponder, where Swift's
+#      own name (`mouseEnteredWith:`) makes AppKit's message raise on every enter / exit; one raised under the Check for
+#      Updates… alert crashed SkyCut (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md).
 #
 # 用法：checks/audio-engine-idle-wiring.sh
 set -euo pipefail
@@ -204,6 +208,38 @@ grep -qF 'var graphIsUp: Bool { run.state.isUp }' <<<"${ENGINE_CODE}" \
   || fail "${ENGINE}：graphIsUp 要只读一次状态、在那个值上判（run.state.isUp）—— 读两次的话 starting → running 交接的那一下答成「没在跑」，管空闲的把计时器撤了、图就一直开着"
 TWICE="$(grep -nE 'run\.state.*run\.state|graphState.*graphState' <<<"${ENGINE_CODE}"$'\n'"${HOST_CODE}"$'\n'"${KEEPER_CODE}" || true)"
 [ -z "${TWICE}" ] || fail "同一句里读了两次图的状态（先 let state = … 再判）：${TWICE}"
+
+# 11. A tracking area's callbacks name AppKit's selector unless they override NSResponder's (any Swift file in Sources).
+# Whole files, so a declaration may wrap (its attributes on the lines above, `with event:` on the next line); comments and
+# string literals are blanked out (checks/Shared/swift-code.pl, line numbers kept); only the attributes and modifiers
+# right before `func` count (an @objc(mouseEntered:) on another member doesn't). Review CXC1: the line-by-line scan missed
+# a wrapped declaration and a name borrowed from the line above, and swallowed a failing perl. Review CXC2: "override" in
+# an @available message counted as the modifier.
+read -r -d '' UNNAMED_CALLBACKS <<'PERL' || true
+require "./checks/Shared/swift-code.pl";
+while (my $text = <>) {
+    my $code = swift_code($text);
+    while ($code =~ /((?:(?:\@\w+(?:\([^()]*\))?|\b(?:public|private|fileprivate|internal|open|final|dynamic|override|nonisolated|static|class|required|convenience)\b)\s*)*)\bfunc\s+(mouseEntered|mouseExited|mouseMoved|cursorUpdate)\s*\(\s*with\b/g) {
+        my ($prefix, $name) = ($1, $2);
+        next if $prefix =~ /\boverride\b/ || $prefix =~ /\@objc\(\Q$name\E:\)/;
+        my $line = 1 + (substr($code, 0, $-[2]) =~ tr/\n//);
+        print "HIT $ARGV:$line: func $name(with\n";
+    }
+    print "SCANNED $ARGV\n";
+}
+PERL
+SWIFT_SOURCES="$(find Sources -name '*.swift' -type f | wc -l | tr -d ' ')"
+[ "${SWIFT_SOURCES}" -gt 0 ] || fail "found no Swift file under Sources (an empty scan is a false green)"
+if CALLBACK_SCAN="$(find Sources -name '*.swift' -type f -print0 | xargs -0 perl -0777 -e "${UNNAMED_CALLBACKS}")"; then
+  SCANNED="$(grep -c '^SCANNED ' <<<"${CALLBACK_SCAN}" || true)"
+  [ "${SCANNED}" = "${SWIFT_SOURCES}" ] \
+    || fail "the tracking-callback scan read ${SCANNED} of ${SWIFT_SOURCES} Swift files under Sources (a partial scan is a false green)"
+  UNNAMED="$(sed -n 's/^HIT //p' <<<"${CALLBACK_SCAN}")"
+  [ -z "${UNNAMED}" ] || fail "a tracking area's callback without AppKit's selector: write @objc(mouseEntered:) (or override NSResponder's). On an owner that isn't an NSResponder, Swift names it mouseEnteredWith:, AppKit's mouseEntered: raises on every enter / exit, and one raised under a modal alert inside a Swift task crashed SkyCut (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md):
+${UNNAMED}"
+else
+  fail "the tracking-callback scan itself failed (find or perl exited non-zero): a scan that doesn't run is a false green"
+fi
 
 if [ "${FAILED}" -ne 0 ]; then exit 1; fi
 echo "✓ audio-engine-idle-wiring：引擎交给管空闲的、空了就收、2 分钟、用户回来在后台起图、待钉的锚点、主时钟自己收尾、起不来不空转"

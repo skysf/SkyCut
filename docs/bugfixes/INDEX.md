@@ -49,6 +49,7 @@
 - [2026-11-17 A canvas change narrows preset text boxes and loses their snug width](2026-11-17-canvas-preset-wrap-width.md) — Automatic wraps need the final scaled and clamped style; test the narrow canvas and the next edit as well as the round trip.
 - [2026-11-04 换 Key 后旧模型目录回填](2026-11-04-catalog-cache-key-change.md) — 缓存失效要带 epoch，拦住迟到的写回。
 - [2026-11-19 Checks left thousands of preference files in the developer's home](2026-11-19-check-defaults-leftovers.md) — Removing a defaults domain leaves its plist, and cfprefsd rewrites one deleted within about 10 s: name test suites by a temporary path; delete a staged app's domain only after it settles.
+- [2026-11-27 Check for Updates… crashed SkyCut: a tracking area's owner without AppKit's selectors](2026-11-27-check-for-updates-crash-tracking-owner-selectors.md) — An exception AppKit swallows can unwind a Swift task and leave its executor tracking dangling: name AppKit's selectors on a non-responder owner, run modal loops outside tasks, click every menu path before a release.
 - [2026-10-03 一条扫描被 bash 3.2 花括号展开拆开，从没生效](2026-10-03-check-mcp-undo-scan-split-by-brace-expansion.md) — 守卫里先把命令替换赋给变量再比；反向验证用 `/bin/bash`。
 - [2026-09-18 自检脚本的源文件清单漏掉新依赖](2026-09-18-check-script-source-list-drift.md) — 手抄的清单会漂。
 - [2026-09-29 没下载苹方的 Mac 上中文字幕烧成方框](2026-09-29-chinese-burns-as-boxes-without-pingfang.md) — CoreText 找得到不等于 libass 找得到：回退到私有字体时两边一起换内置字体。
@@ -60,6 +61,7 @@
 - [2026-08-08 CI 首跑与吞错](2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) — SDK 与构建日志不许被吞。
 - [2026-10-27 连接 AI 客户端时留的配置备份谁都能读](2026-10-27-client-config-backup-world-readable.md) — 「另写一份」不等于「拷一份」：备份的权限从原文件来。
 - [2026-08-16 竖图缩略图的隐形命中区盖死标尺](2026-08-16-clipped-thumbnail-hit-area-covers-ruler.md) — `.clipped()` 只裁绘制不裁命中；块内装饰必须不吃事件。
+- [2026-11-27 A Close It strip popped up next to every macOS file window after 5 s](2026-11-27-close-it-strip-popped-up-next-to-every-file-window.md) — A timer can't tell a stuck window from a person thinking: offer the way out when the person asks again, never by itself, and say what it is about.
 - [2026-11-19 Closing a project counted a write of an older snapshot as "saved", and a late save window wrote the wrong project](2026-11-19-close-trusts-a-stale-save.md) — Decide "ready" from the state when you answer: after every wait, check it is the same document with nothing left to write, then act without another await.
 - [2026-10-03 关掉主窗口就退出了 App，工程变回空的](2026-10-03-closing-window-quits-app.md) — 框架的默认生命周期要先确认；替别人兜底时把兜底这件事告诉对方。
 - [2026-10-30 多项生成横幅挤占预览](2026-10-30-cloud-tasks-cover-preview.md) — 工具栏单入口 + 滚动浮层汇总任务；取消不先删状态。

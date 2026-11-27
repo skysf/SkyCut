@@ -181,7 +181,10 @@ the replaced app going to the Trash. Every deletion, the download's own file inc
 - First launch after an update: **Updated**; clicking shows the notes and, only when Connect AI has a client set up, the AI
   line. It goes away once looked at, or at the next launch.
 - App menu: SkyCut › Check for Updates… (after About); once ready, Restart and Update to %@…, which opens the pill's popover
-  in the active window. The answer to a check started there is the **only** window the updater ever opens.
+  in the active window. The answer to a check started there is the **only** window the updater ever opens. It runs its
+  modal loop from the run loop (`RunLoop.main.perform`), never inside a Swift task: an exception under it there crashed
+  0.18.70 ([case](../bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md),
+  [system file windows](system-file-windows.md) rule 10).
 - Settings › General › Software Update: the version, the status line, Check for Updates (answers in the status line), the
   switch «Download and install updates automatically» (default on, `SrtFlow.update.automatic.v1`) and its caption, which
   follows the switch. Turning it off stops a background download; a copy already staged then no longer installs by itself
@@ -247,7 +250,9 @@ than the running one stays; the rest goes.
   for a copy that installs; the schedule's origin, the retry record at launch, the real home folder, the cadence, a
   cancelled download's silence, the record matched to the offer (review FBU2); get_status's one `app_update` line, and the
   report only mapping a state it is given (Foundation only, no check, download, install or restart). Deletion calls (`removeItem`, `unlink`,
-  `rmdir`, `recycle`) only in `AppUpdateFiles.swift`.
+  `rmdir`, `recycle`) only in `AppUpdateFiles.swift`. Since 2026-11-27 (section 10): the menu check's answer window from the run
+  loop, never in a `Task` or `DispatchQueue.main.async`, and nothing else shows it: one executable call, right after
+  `case .answer`, read across lines with comments and string literals not counted.
 - Reverse-verified on 2026-11-27 (#565): replacing the swap with two renames turns the kill loop red (the destination missing
   after kills); removing the cancellation check or the incoming staging folder turns their cases red; each wiring line
   removed turns the guard red. Again for the fixes before the first release (U1b, two rounds): each new case and guard line
@@ -270,8 +275,8 @@ No check reaches a real notarized pair of builds, Gatekeeper on a real download,
    http://127.0.0.1:8123/SkyCut-<B>-arm64.dmg notes.json <that folder>/skycut.json` (checked as the app checks a feed from
    that hook; without `--test-feed` only an immutable https URL on `downloads.skylu.ai` is accepted).
 3. `defaults write com.srtflow.SrtFlow SrtFlow.update.feedURL http://127.0.0.1:8123/skycut.json`, open A.
-4. Within about a minute (or SkyCut › Check for Updates…): no window; the Update pill appears when B is downloaded and
-   verified. The popover shows B's notes in the in-app language.
+4. Within about a minute: no window; the Update pill appears when B is downloaded and verified. The popover shows B's notes
+   in the in-app language. (The menu's Check for Updates… answers with a window: step 19.)
 5. Quit A normally: B replaces it; no password asked; `/Applications/SkyCut.app` never disappears in Finder.
 6. Open SkyCut: About says B; the Updated pill (no popover by itself); its notes; the AI line only with Connect AI set up.
    Screen recording, microphone, Downloads, Finder automation and the keychain are not asked again.
@@ -301,7 +306,13 @@ No check reaches a real notarized pair of builds, Gatekeeper on a real download,
     shows (the feed can't be reached), and quitting installs B.
 18. Quit A right after B finished downloading (while it is being staged): at the next launch B is staged from the kept DMG,
     with no second download in the test server's log.
-19. Clean up: `defaults delete com.srtflow.SrtFlow SrtFlow.update.feedURL`; the replaced build is in the Trash.
+19. SkyCut › Check for Updates… with B offered (added 2026-11-27, after it crashed 0.18.70 and 0.18.71:
+    [case](../bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md)). The answer window says B is
+    downloading. While it is up, move the pointer between it, the main window and a project window several times, then
+    click its button with the mouse. SkyCut keeps running, and the Update pill appears once B is staged. Do the same with
+    auto install off (Download and Install / Later) and with the feed rolled back to A's version (up to date). Then
+    `log show --last 15m --predicate 'process == "SkyCut" AND eventMessage CONTAINS "PointerWatcher"'` prints nothing.
+20. Clean up: `defaults delete com.srtflow.SrtFlow SrtFlow.update.feedURL`; the replaced build is in the Trash.
 
 Last run on 2026-11-27, 0.18.69 → 0.18.70 (the release record: [构建与打包](../build/build-and-packaging.md)「公开下载发布」).
 Every step a script could observe passed (files, the test server's log, SkyCut's log, the process list, the window

@@ -1708,8 +1708,8 @@
 "Quit Anyway" = "Quit Anyway";
 
 /* macOS open / save windows without a modal session, and the helper next to them (SystemFileWindows, 2026-11-19). */
-"If the macOS window stops responding, close it here." = "If the macOS window stops responding, close it here.";
-"Close the macOS window" = "Close the macOS window";
+"If the window for choosing a file is stuck or not responding, click here to close it." = "If the window for choosing a file is stuck or not responding, click here to close it.";
+"Close the window for choosing a file" = "Close the window for choosing a file";
 "Open the macOS window again" = "Open the macOS window again";
 "Save Here" = "Save Here";
 "Last time SkyCut had to be closed while a macOS file window was open. Type the file's full path below, or drag the file here from Finder." = "Last time SkyCut had to be closed while a macOS file window was open. Type the file's full path below, or drag the file here from Finder.";

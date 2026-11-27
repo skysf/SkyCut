@@ -18,7 +18,7 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
 1. **Panels are made only in `SystemFileChooser.swift`** (`SystemFilePanel`, from a `FileWindowRequest`: files to open,
    a folder, a new file to save) **and opened with `begin`, never `runModal`**. `checks/file-io-off-main-wiring.sh` fails on an
    `NSOpenPanel(` / `NSSavePanel(` anywhere else and on `runModal` in the chooser, the shared windows, the helper and the
-   export panel. In-process `NSAlert`s are not panels of that service and may stay modal.
+   export panel. In-process `NSAlert`s are not panels of that service and may stay modal, outside any Swift task (rule 10).
 2. **`SystemFileChooser` watches the window**: not on screen with no answer for 3 s, or an empty answer within 1 s, is a
    failure (AppKit can give up without ever calling back); "Close It" cancels a window that stopped responding. Its completion
    gets the picked URLs, or nil when the person cancelled; a failure is a phase (`.failed`), not a completion.
@@ -27,16 +27,32 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
    inside AppKit: the typed path comes first and "Try Again" asks AppKit anyway. SkyCut cannot cut AppKit's own wait short;
    this is how it avoids walking into it twice.
 4. **Everything except the export panel's folder row goes through `SystemFileWindows.shared`** (the views call `FilePicker`,
-   which wraps it): **one system window at a time** — while one is up, a second request opens nothing and gets no answer, as
-   with the modal panels before. Answers come in a closure (`open`) or awaited (`choose`).
+   which wraps it). Answers come in a closure (`open`) or awaited (`choose`).
+   - **One system window at a time in the whole app**, the export panel's folder row included (it drives a chooser of its
+     own). While one is up, a second request, from either, opens nothing and gets no answer, as with the modal panels
+     before; the strip of rule 5 then offers to close the open one.
+   - `SystemFileChooser.choose` builds no panel while any chooser's window is open (`SystemFileChooser.openWindow`):
+     making a second panel waits on AppKit's main-thread handshake with the panel service, which held SkyCut for 60 s
+     when the service hung (2026-11-18).
+   - Since 2026-11-27 (review CXC2): until then, the export folder button built a second panel beside an open Open
+     Project… window.
 5. **The helper next to the system window** (`FileWindowHelper`, SkyCut's own small window, so it keeps working when the
-   service hangs): once the system window has been on screen for 5 s without an answer, a strip next to it says "If the macOS
-   window stops responding, close it here" with **Close It**; after a failure, a small window offers **the same job without
-   the system window** — type or paste a path (quotes, `~`, `\ `, `file://` accepted), drag the files or a folder from Finder,
-   or **Try Again**. `TypedPath` decides a typed or dropped answer without touching a drive (allowed types by extension; a
-   folder for a folder request, or a dropped file's folder; for a save, a path ending in "/" or a dropped folder gets the
-   suggested name and a name without an extension gets the type's); the caller checks the file as it would after the
-   system window.
+   service hangs).
+   - **Nothing appears next to the system window while the person chooses, however long they take** (since 2026-11-27,
+     [case](../bugfixes/2026-11-27-close-it-strip-popped-up-next-to-every-file-window.md): a strip used to come after 5 s,
+     next to every window a person took longer over, and nobody knew what it meant). Nothing pops up by itself.
+   - **The strip comes only when the person asks for another file window while one is up** (from any entry, the export
+     panel's folder button and its Try Again included), and only while that window is on screen. That is the one sign
+     SkyCut gets that the window may be stuck: macOS says nothing when its panel service hangs, and the window just stops
+     answering. The strip stands next to the open window, whichever chooser's it is, and goes away with it: "If the window for choosing a
+     file is stuck or not responding, click here to close it." (「选文件的窗口卡住或没反应，点这里关闭。」, wording approved by the user
+     on 2026-11-27) with **Close** (关闭), which cancels the file window, never SkyCut, even when its service hangs (rule 2),
+     and offers the fallback below. ⌘Q quits as usual.
+   - After a failure, a small window offers **the same job without the system window**: type or paste a path (quotes, `~`,
+     `\ `, `file://` accepted), drag the files or a folder from Finder, or **Try Again**. `TypedPath` decides a typed or
+     dropped answer without touching a drive (allowed types by extension; a folder for a folder request, or a dropped
+     file's folder; for a save, a path ending in "/" or a dropped folder gets the suggested name and a name without an
+     extension gets the type's); the caller checks the file as it would after the system window.
 6. **The window is not modal, so the rest of SkyCut keeps working while it is open**: a caller whose answer goes into a
    project checks that the project is still the same document (`isCurrentGeneration`) — adding media, attaching subtitles,
    relinking (and only while that file is still missing), Save As. A queue item that went away is skipped (burn-in's
@@ -64,17 +80,30 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
    in the branch the person confirmed and commits every other name with one rename that fails when the name is taken,
    journaled first ([recording lifecycle](screen-recording-lifecycle.md) "文件覆盖与命名"). The AI's saves pick unused names
    and never replace a file (only `save_project` back to the project's own file).
+10. **An alert's modal loop runs from the run loop, never inside a Swift task** (since 2026-11-27,
+    [case](../bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md)). While `runModal` runs, every event
+    goes through AppKit's handlers, and AppKit swallows an Objective-C exception raised there. Raised under a modal loop
+    that runs inside a task, the exception unwinds the task and the Swift runtime's `swift_job_run`, which then never puts
+    the thread's executor tracking back. The next main-actor isolation check outside a task (`MainActor.assumeIsolated`,
+    an event monitor) reads a dead stack frame and crashes. That is how Check for Updates… crashed 0.18.70.
+    - Show a new alert from a run-loop turn: `RunLoop.main.perform { MainActor.assumeIsolated { … } }`, as the update
+      check's answer does ([app updates](app-updates.md) §7). Not `Task { }`. Not `DispatchQueue.main.async` either: an
+      exception escaping a dispatch block terminates the app.
+    - Still inside tasks on 2026-11-27, because they await the answer: the untitled-project save question
+      (`ProjectCloseQuestions`, from `prepareToClose`), the drive question at quit (`ProjectQuit.waitForDrive`) and
+      `FileReplaceQuestion`. Moving one out of its task is a change of its own.
 
 ## Checks
 
 | Check | What it holds |
 | --- | --- |
 | `scripts/check-export-profile.sh` (`FileChooserChecks`) | the chooser with fake windows: answers, a person cancels, empty at once, never appears (main thread free), appears then vanishes, stays stuck + Close It, closed when nobody waits any more, the force-quit record + Try Again |
-| `scripts/check-export-profile.sh` (`FileWindowsChecks`) | the shared windows with a recording helper: an answer reaches the caller, a cancel is not a failure, a window that never comes offers the fallback and a typed answer there reaches the caller, Close It appears next to a window on screen and offers the fallback, Try Again, one window at a time, the record sends the next request to the fallback; `TypedPath` for files, saves and drops |
+| `scripts/check-export-profile.sh` (`FileWindowsChecks`) | the shared windows with a recording helper: an answer reaches the caller, a cancel is not a failure, a window that never comes offers the fallback and a typed answer there reaches the caller; nothing appears next to a window the person takes long over (a pick cancelled after 1.2 s, a window up 1.5 s); a second request while one is up opens nothing and gets Close It next to it only while it is on screen (rule 5), which cancels it and offers the fallback for the first request; Try Again, one window at a time, the record sends the next request to the fallback; `TypedPath` for files, saves and drops |
 | `scripts/check-export-profile.sh` (`SaveAnswerChecks`) | an answer from macOS's own save window may replace a file that is there, never a free name (a file saved there after the answer keeps its bytes), nothing when the drive doesn't answer the look; a typed folder, a dropped folder and a typed path from the helper may not; a confirmation covers only its URL (rule 9) |
 | `scripts/check-screen-recording-feedback.sh` (`RecordingCommitChecks`) | a recording's commit: a file that appears at a free name or at the sidecar's name after the intent was journaled keeps its bytes, the file takes the next name and the journal names it; a confirmed commit replaces (rule 9) |
 | `scripts/check-project-saves.sh` (`ReplaceChecks`) | a file under the answered name keeps its bytes until the person answers Replace: the project's Save As for each helper answer, closing an untitled project, the AI's saves, the subtitle file write (rule 9) |
-| `checks/file-io-off-main-wiring.sh` | panels only in `SystemFileChooser.swift`, `begin`, no `runModal` in the chooser / shared windows / helper / export panel, the record before AppKit, `FilePicker` through `SystemFileWindows`; rule 9's wiring (helper answers unconfirmed, the exclusive install, Save As and Export As asking, the recording's confirmation) |
+| `checks/file-io-off-main-wiring.sh` | panels only in `SystemFileChooser.swift`, `begin`, no `runModal` in the chooser / shared windows / helper / export panel, the record before AppKit, `FilePicker` through `SystemFileWindows`; the Close It strip only from `offerToCloseOpenWindow` (a second request) and no sleep or timer in `SystemFileWindows` (rule 5); rule 9's wiring (helper answers unconfirmed, the exclusive install, Save As and Export As asking, the recording's confirmation) |
+| `checks/app-update-wiring.sh` (section 10) | rule 10 for the update check's answer window: shown with `RunLoop.main.perform`, never in a `Task` or `DispatchQueue.main.async`. The other alerts are not scanned (they run inside their tasks today, rule 10) |
 
 ## Manual regression (real windows, before a release)
 
@@ -85,11 +114,14 @@ The real panel service can't be driven from a check (it needs the window server,
    project with edits), relink a missing file, attach subtitles (editor and burn-in), compress / burn-in "Choose…" (files and
    output folder), batch convert (files and output folder), the subtitle editor's "Export As", the screen recording's save
    location, a new voice's sample file. Cancel changes nothing.
-2. With a window open, the rest of SkyCut responds (timeline, playback); after 5 s the "Close It" strip stands next to it;
-   ⌘Q quits.
+2. With a window open, the rest of SkyCut responds (timeline, playback), and nothing appears next to the window however long
+   it stays open (leave it a minute). Ask for another file window (Add Media… again): the strip "If the window for choosing
+   a file is stuck…" stands next to the open one, and Close closes it (the helper then offers the typed path and Try
+   Again); SkyCut stays open. ⌘Q quits.
 3. Freeze the panel service while a window is open (Activity Monitor: "Open and Save Panel Service (SkyCut)", or the
-   `openAndSavePanelService` process that appeared, then `kill -STOP` it): SkyCut stays usable; Close It closes the window and
-   the helper offers the typed path; typing a path or dropping a file from Finder answers the request. Then ask for another
+   `openAndSavePanelService` process that appeared, then `kill -STOP` it): SkyCut stays usable; ask for the same window
+   again and the strip appears next to the frozen one; Close closes the window and the helper offers the typed path;
+   typing a path or dropping a file from Finder answers the request. Then ask for another
    window with the service still stopped: SkyCut may hang up to about a minute inside AppKit (not fixable), then shows the
    helper; force quit during that wait → reopen SkyCut → the next window request goes straight to the helper. Kill the
    stopped service afterwards.
@@ -104,3 +136,11 @@ The real panel service can't be driven from a check (it needs the window server,
    up, and says the drive is not responding if it takes over 15 s.
 6. Chinese and Spanish UI: the strip, the helper and the replace question are translated (in-process windows with
    `.appLanguage()`; the question is an `NSAlert` with SkyCut's own strings).
+7. Across choosers (review CXC2): leave Open Project…'s window open, then in Export click the folder button. No second
+   window opens, and the strip stands next to Open Project…'s window; Close closes it, and the export row's button works
+   again. The other way round: with the export folder window open, Add Media… opens nothing and the strip stands next to
+   the export window; Close closes it, and the export row offers typing a path.
+8. Still open (review CXC2, backlog): quit with an untitled project that has edits, choose "Save…", then freeze the panel
+   service while the save window is up. During Quit, AppKit runs its terminate-later modal loop; ⌘Q again or closing the
+   window again asks for no second file window. Does ⌘O there still bring the strip and rescue the stuck save window?
+   Check this on a real Mac; the checks can't reach AppKit's terminate-later loop.

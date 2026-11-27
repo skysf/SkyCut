@@ -6,10 +6,13 @@ import UniformTypeIdentifiers
 // Every macOS open / save window outside the export panel (SystemFileWindows, 2026-11-19,
 // docs/bugfixes/2026-11-19-modal-file-windows-can-wedge-app.md), with fake windows and a helper that records what it
 // would show: an answer reaches the caller; a cancel answers nothing; a window that never comes is given up with the main
-// thread free and the fallback offered, and a typed answer there reaches the caller; a window that stays up gets "Close
-// It" next to it, which closes it and offers the fallback; "Try Again" asks AppKit again; a second request while one window
-// is up opens nothing; a record left by a force quit sends the next request to the fallback first. What a save's answer
-// may replace: SaveAnswerChecks. Then the typed and dropped answers (TypedPath), which never touch a drive.
+// thread free and the fallback offered, and a typed answer there reaches the caller; nothing appears next to a window the
+// person takes long over (since 2026-11-27: the strip came after 5 s, next to every window); a second request while one
+// window is up opens nothing, and gets "Close It" next to the open window only while it is on screen, which closes it and
+// offers the fallback; one window in the whole app, across the shared windows and the export panel's own chooser (review
+// CXC2: the export folder button built a second panel); "Try Again" asks AppKit again; a record left by a force quit sends
+// the next request to the fallback first. What a save's answer may replace: SaveAnswerChecks. Then the typed and dropped answers (TypedPath), which never
+// touch a drive.
 @MainActor enum FileWindowsChecks {
     static func run(require: (Bool, String) -> Void) async {
         let scratch = ScratchDefaults("exportprofilecheck-filewindows")
@@ -28,8 +31,8 @@ import UniformTypeIdentifiers
         // Cancelled by the person: nothing, and the awaited form says nil.
         let cancelling = Rig(record: record) { FakeFolderPanel(.answers(nil, after: 1.2)) }
         let none = await cancelling.windows.choose(files)
-        require(none == nil && !cancelling.helper.shown.contains { $0.hasPrefix("fallback") } && cancelling.helper.hidden > 0,
-                "a cancelled window answers nothing and is not a failure (no fallback; its helper goes away)")
+        require(none == nil && cancelling.helper.shown.isEmpty && cancelling.helper.hidden > 0,
+                "a window the person takes 1.2 s over and cancels: nothing answered, nothing shown next to it, no fallback: \(cancelling.helper.shown)")
 
         // Never appears: given up after the deadline with the main thread free, the fallback offered for this request.
         let never = Rig(record: record) { FakeFolderPanel(.neverShows) }
@@ -45,27 +48,36 @@ import UniformTypeIdentifiers
         never.helper.answer?([b])
         require(typedAnswer == [b] && never.helper.hidden > 0, "an answer typed or dropped in the fallback reaches the caller")
 
-        // Up and never answering: "Close It" next to it after the delay; it closes the window and offers the fallback;
-        // "Try Again" asks AppKit again (force: the record's detour skipped) and its answer reaches the caller.
+        // Up and never answering (the panel service hung, or a person thinking): nothing next to it, however long. The
+        // person asking for another file window is the sign: "Close It" next to the open one, the new request opens nothing
+        // and answers nothing; Close It closes the stuck window and offers the fallback for the first request; "Try Again"
+        // asks AppKit again (force: the record's detour skipped) and its answer reaches the first caller.
         let stuck = Rig(record: record, panels: [FakeFolderPanel(.staysStuck), FakeFolderPanel(.answers(a, after: 0.1))])
         var retried: [URL]?
         stuck.windows.open(files) { retried = $0 }
-        await settle(0.6)
-        require(stuck.helper.shown == ["strip"] && stuck.helper.stripFrame == stuck.made.first?.frame,
-                "a window up for a while gets Close It next to it: \(stuck.helper.shown)")
+        await settle(1.5)
+        require(stuck.helper.shown.isEmpty, "nothing appears next to a window the person takes long over: \(stuck.helper.shown)")
+        let again = await stuck.windows.choose(FileWindowRequest(kind: .folder))
+        require(again == nil && stuck.made.count == 1 && stuck.helper.shown == ["strip"]
+                && stuck.helper.stripFrame == stuck.made.first?.frame,
+                "asking for another file window while one is up: Close It next to it, nothing new opens: \(stuck.helper.shown)")
         stuck.helper.close?()
-        require(stuck.made.first?.cancels == 1 && stuck.helper.shown.last == "fallback closedByUser",
-                "Close It cancels the stuck window and offers the fallback")
+        require(stuck.made.first?.cancels == 1 && stuck.helper.shown.last == "fallback closedByUser"
+                && stuck.helper.fallbackRequest == files,
+                "Close It cancels the stuck window and offers the fallback for the first request")
         stuck.helper.tryAgain?()
         await settle(0.4)
         require(stuck.made.count == 2 && retried == [a], "Try Again opens the macOS window again and its answer reaches the caller")
 
-        // A second request while a window is up opens nothing and answers nothing.
-        let busy = Rig(record: record) { FakeFolderPanel(.staysStuck) }
+        // A second request while the window isn't on screen (macOS hasn't shown it yet): nothing new opens, no answer, and
+        // no strip (the chooser's watcher gives up a window that never comes).
+        let busy = Rig(record: record) { FakeFolderPanel(.neverShows) }
         busy.windows.open(files) { _ in }
         let second = await busy.windows.choose(FileWindowRequest(kind: .folder))
-        require(second == nil && busy.made.count == 1, "one system window at a time: a second request opens nothing")
+        require(second == nil && busy.made.count == 1 && busy.helper.shown.isEmpty,
+                "one system window at a time: a second request opens nothing; no strip next to a window not on screen")
         busy.windows.chooser.cancelIfChoosing()
+        await acrossChoosers(record: record, files: files, require: require)
 
         // A force quit left the record: the fallback comes first and AppKit is not asked.
         var previous = record
@@ -79,6 +91,41 @@ import UniformTypeIdentifiers
 
         await SaveAnswerChecks.run(record: record, require: require)
         typedAndDropped(require: require)
+    }
+
+    /// One system window in the whole app, across choosers (review CXC2): the shared windows and the export panel's folder
+    /// row each drive a chooser of their own. With one window up, the other builds no second panel (AppKit's handshake can
+    /// hold the main thread up to a minute when the service hangs); the strip offers to close the open one, whichever it is.
+    private static func acrossChoosers(
+        record: SystemFileWindowRecord, files: FileWindowRequest, require: (Bool, String) -> Void
+    ) async {
+        // Open Project…'s window up and stuck, then the export panel's folder button (what ExportFolderRow does).
+        let shared = Rig(record: record) { FakeFolderPanel(.staysStuck) }
+        shared.windows.open(files) { _ in }
+        var exportPanels: [FakeFolderPanel] = []
+        let exportChooser = SystemFileChooser(
+            makePanel: { _ in let panel = FakeFolderPanel(.staysStuck); exportPanels.append(panel); return panel },
+            record: record, note: { _ in }, appearDeadline: 0.6, quickReturn: 0.05
+        )
+        let opened = exportChooser.choose(FileWindowRequest(kind: .folder)) { _ in }
+        if !opened { shared.windows.offerToCloseOpenWindow() }
+        require(!opened && exportPanels.isEmpty && exportChooser.phase == .idle && shared.helper.shown == ["strip"],
+                "with a file window up, the export folder button builds no second panel and the strip offers to close the open one: panels \(exportPanels.count), shown \(shared.helper.shown)")
+        shared.windows.chooser.cancelIfChoosing()
+
+        // The other way round: the export panel's window up, then a shared request (Add Media…): no second panel; the strip
+        // stands next to the export window, its button closes that window (the row then offers typing a path), and the
+        // strip goes away with it.
+        exportChooser.choose(FileWindowRequest(kind: .folder)) { _ in }
+        let other = Rig(record: record) { FakeFolderPanel(.answers(nil, after: 0.1)) }
+        let none = await other.windows.choose(files)
+        require(none == nil && other.made.isEmpty && other.helper.shown == ["strip"],
+                "with the export folder window up, a shared request opens nothing and gets the strip: made \(other.made.count), shown \(other.helper.shown)")
+        let hidden = other.helper.hidden
+        other.helper.close?()
+        require(exportPanels.first?.cancels == 1 && exportChooser.phase == .failed(.closedByUser) && other.helper.hidden > hidden,
+                "the strip's button closes the export folder window (its row offers typing a path) and the strip goes away")
+        exportChooser.dismissFailure()
     }
 
     /// Typed paths and dropped files decide the answer without a drive.
@@ -143,7 +190,7 @@ import UniformTypeIdentifiers
             )
             self.store = store
             self.helper = helper
-            windows = SystemFileWindows(chooser: chooser, helper: helper, stripDelay: 0.4, probe: probe)
+            windows = SystemFileWindows(chooser: chooser, helper: helper, probe: probe)
         }
     }
 

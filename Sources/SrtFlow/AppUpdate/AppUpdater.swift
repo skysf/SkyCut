@@ -253,8 +253,12 @@ final class AppUpdater: ObservableObject {
         case .saveRetry(let record):
             AppUpdateWork.queue.addOperation { files.writeRetry(record) }
         case .answer(let answer):
-            // After this turn: the answer window must not run its modal loop inside a transition.
-            Task { @MainActor in AppUpdateAlerts.show(answer) }
+            // After this turn: the answer window must not run its modal loop inside a transition. And from the run loop,
+            // never inside a Swift task: an Objective-C exception raised by any event during the modal loop would unwind the
+            // task and leave the runtime's executor tracking dangling; the next isolation check crashed SkyCut. Not
+            // DispatchQueue.main.async either: an exception escaping a dispatch block ends the app
+            // (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md, system-file-windows.md rule 10).
+            RunLoop.main.perform { MainActor.assumeIsolated { AppUpdateAlerts.show(answer) } }
         }
     }
 

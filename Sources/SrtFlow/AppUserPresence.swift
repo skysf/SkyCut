@@ -37,15 +37,21 @@ final class AppUserPresence {
     private var listeners: [(owner: () -> AnyObject?, action: () -> Void)] = []
 
     /// 指针移进窗口时收消息的那一位（跟踪区的 owner）。
+    /// AppKit messages a tracking area's owner as `mouseEntered:` / `mouseExited:`. This is a plain NSObject, not an
+    /// NSResponder, so the names are written out: Swift's own would be `mouseEnteredWith:` / `mouseExitedWith:`, and then
+    /// every enter / exit raised an exception, which under an alert's modal loop inside a Swift task crashed SkyCut
+    /// (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md; checks/audio-engine-idle-wiring.sh).
     private final class PointerWatcher: NSObject {
-        @objc func mouseEntered(with event: NSEvent) {
+        @objc(mouseEntered:) func mouseEntered(with event: NSEvent) {
             let time = event.timestamp
             MainActor.assumeIsolated { AppUserPresence.shared.note(at: time) }
         }
 
-        @objc func mouseExited(with event: NSEvent) {}
+        @objc(mouseExited:) func mouseExited(with event: NSEvent) {}
     }
     private let pointerWatcher = PointerWatcher()
+    /// The tracking areas' owner, for the checks: it must answer AppKit's selectors (checks/AudioEngine/Presence.swift).
+    var trackingOwner: NSObject { pointerWatcher }
     private let watchedWindows = NSHashTable<NSWindow>.weakObjects()
 
     private init() {}

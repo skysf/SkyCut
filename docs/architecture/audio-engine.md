@@ -107,6 +107,13 @@ The same offline per-layer render feeds `listen voice=…` (each narration line'
          也报）+ 一个本地事件监视器（发给 SkyCut 的鼠标 / 键盘事件都算；**指针移出不算**））→ `wake()` 在后台那条队列上起。
          按播放时图已经在跑，和一直开着一样。**App 一启动就开始看**（等第一次建引擎才看的话，打开工程的那一下已经错过，
          刚起的图当场被当成没人用停掉）；「上一次有动作」只往后走（时间戳更早的事件不算数）。
+         **The tracking areas' owner names AppKit's selectors** (since 2026-11-27). `PointerWatcher` is a plain NSObject,
+         not an NSResponder, so its callbacks are `@objc(mouseEntered:)` / `@objc(mouseExited:)`. With Swift's own names
+         (`mouseEnteredWith:`), AppKit's message raised an exception on every enter / exit. One raised under an alert's modal
+         loop inside a Swift task crashed SkyCut, and the watcher had never noted a pointer coming in
+         ([case](../bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md)). The same holds for any
+         owner AppKit messages by selector that isn't an NSResponder; `checks/audio-engine-idle-wiring.sh` section 11 scans
+         every Swift file for it.
       2. 时钟要出声时图还停着（回来的第一下就是播放）→ `recoverIfNeeded()` **当场起、等声卡起来、再从原处开播**。
          后台正在起就等它起完。Since 2026-11-20 `PlayerClock` then holds sound and picture until the output renders
          (`isRendering`) and starts both back to back: started at once, the picture ran up to 170 ms ahead
@@ -293,7 +300,8 @@ and sound from its first sample (reverse check: without the paused sync, 4,096 f
 管空闲的看一眼的中途第 1–6 次读状态时交接都不撤计时器；另有真并发的旁证（另一条线程交接 30 万次，主线程不停地问 /
 看，红不红不靠它）。`Presence.swift`
 （`AppUserPresence`，不建 NSApplication、不开窗口）：开始看之后窗口变成键窗口就记下、「上一次有动作」只往后走、指针移出
-不算。开发机另跑（真声卡、全程静音；`--realtime-idle --silent-only` 只跑送数字静音的那几段）：
+不算。Since 2026-11-27 also: the tracking areas' owner answers AppKit's `mouseEntered:` / `mouseExited:`, and told them as
+AppKit does, it notes the user on entry and changes nothing on exit. 开发机另跑（真声卡、全程静音；`--realtime-idle --silent-only` 只跑送数字静音的那几段）：
 `scripts/check-audio-engine.sh --realtime-idle`（`IdleRealtime.swift`，30 条：冷着开播第一拍就是起点的声音、播放头不往回走；
 先动一下再按不用等；没有声音的时间线播着图不开、播放头按 host 时间走；停过再起总表的 tap 还在、轨道表量得到；图停着读
 电平表不崩）、`--realtime-recovery`（加了「停 1.5 秒再恢复，播放头从停的地方接着走」）、
@@ -304,7 +312,10 @@ and sound from its first sample (reverse check: without the paused sync, 4,096 f
 the user's Play at the end replays from 0 (peek ended, timeline told to scroll left) and the replay stops on the total length again.
 接线：`checks/audio-engine-idle-wiring.sh`（十节，含一个判断只读一次图的状态：引擎交给管空闲的、空了就收、2 分钟、后台起 / 当场起、待钉的锚点和
 「报过时间没有」的内存序、主时钟自己收尾且不听「播到头」通知、「回来了」的信号齐全且启动就看、日志不在主线程上写、
-起不来不空转）。
+起不来不空转）。Section 11 (since 2026-11-27, every Swift file under `Sources`): a tracking area's callback that isn't an
+`override` carries AppKit's selector (`@objc(mouseEntered:)`) among the attributes right before it. It reads whole
+declarations (they may wrap; comments and string literals don't count, through `checks/Shared/swift-code.pl`), and a scan
+that fails or skips a file is red (reviews CXC1 and CXC2).
 
 反向验证（2026-11-11，各自弄坏一处、确认变红、再恢复）：
 
@@ -328,6 +339,7 @@ the user's Play at the end replays from 0 (peek ended, timeline told to scroll l
 | 图没在跑也留着计时器 | 第 15 组 1 条（0.15 秒里又问了 7 次） |
 | 「上一次有动作」能被旧时间戳写回过去 | 第 15 组 5 条 |
 | 指针移出又算回来了 | 第 15 组 1 条 |
+| `PointerWatcher`'s callbacks back to Swift's own names (2026-11-27) | group 15, 1 check (332 checks); `audio-engine-idle-wiring.sh` section 11 (both lines named; a throwaway `NSObject` owner in another file red too) |
 | 没有声音的时间线不按 host 时间走 | 真声卡 `--realtime-idle` 3 条 |
 | 冷着开播让播放头先走（第一版的做法） | 真声卡 `--realtime-idle` 2 条（第一拍在 5.12，起点是 5.0：开头少了 0.12 秒） |
 | 接线守卫的 40 处（不交给管空闲的、只卸片不收引擎、2 分钟改回 30 秒、wake 在调用方线程上起、要出声时改成 wake、写死下一拍、「报过时间没有」用 relaxed 发布 / 读、先发布再写数、主时钟走到总长不收尾、在尽头照样开播、又去听「播到头」通知、`graphIsUp` 读两次状态、同一句里读两次状态、窗口变成键 / 主窗口不算、鼠标移进窗口不算、指针移出又算、启动时不看、没起来记成 stopped、没起来每看一眼都重试……） | `checks/audio-engine-idle-wiring.sh` 每一处都红 |

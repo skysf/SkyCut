@@ -1708,8 +1708,8 @@
 "Quit Anyway" = "Salir de todos modos";
 
 /* macOS open / save windows without a modal session, and the helper next to them (SystemFileWindows, 2026-11-19). */
-"If the macOS window stops responding, close it here." = "Si la ventana de macOS deja de responder, ciérrala aquí.";
-"Close the macOS window" = "Cerrar la ventana de macOS";
+"If the window for choosing a file is stuck or not responding, click here to close it." = "Si la ventana para elegir un archivo se ha quedado colgada o no responde, haz clic aquí para cerrarla.";
+"Close the window for choosing a file" = "Cerrar la ventana para elegir un archivo";
 "Open the macOS window again" = "Abrir de nuevo la ventana de macOS";
 "Save Here" = "Guardar aquí";
 "Last time SkyCut had to be closed while a macOS file window was open. Type the file's full path below, or drag the file here from Finder." = "La última vez hubo que cerrar SkyCut mientras había una ventana de archivos de macOS abierta. Escribe abajo la ruta completa del archivo o arrástralo aquí desde el Finder.";

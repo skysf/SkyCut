@@ -1708,8 +1708,8 @@
 "Quit Anyway" = "仍然退出";
 
 /* macOS open / save windows without a modal session, and the helper next to them (SystemFileWindows, 2026-11-19). */
-"If the macOS window stops responding, close it here." = "如果 macOS 的窗口没有反应了，在这里关掉它。";
-"Close the macOS window" = "关掉 macOS 的窗口";
+"If the window for choosing a file is stuck or not responding, click here to close it." = "选文件的窗口卡住或没反应，点这里关闭。";
+"Close the window for choosing a file" = "关闭选文件的窗口";
 "Open the macOS window again" = "再打开一次 macOS 的窗口";
 "Save Here" = "存到这里";
 "Last time SkyCut had to be closed while a macOS file window was open. Type the file's full path below, or drag the file here from Finder." = "上次 macOS 的文件窗口开着的时候，SkyCut 不得不被强制关闭。请在下面输入文件的完整路径，或者从访达把文件拖到这里。";

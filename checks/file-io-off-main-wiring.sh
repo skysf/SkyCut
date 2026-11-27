@@ -68,6 +68,30 @@ require "the chooser leaves its in-flight record before asking AppKit for the wi
   Sources/SrtFlow/SystemFileChooser.swift 'record\.markStarted\(\)'
 require "the views' FilePicker goes through the shared non-modal windows" \
   Sources/SrtFlow/SystemFileWindows.swift 'SystemFileWindows\.shared\.open\(request'
+# Nothing appears next to a system file window while the person chooses, however long they take (2026-11-27,
+# docs/bugfixes/2026-11-27-close-it-strip-popped-up-next-to-every-file-window.md): the strip is offered only when the
+# person asks for a file window while one is up (offerToCloseOpenWindow), never on a timer. And one system file window in
+# the whole app (review CXC2): a chooser opens nothing while any chooser's window is open, and both the shared windows
+# (start) and the export panel's folder row (its two buttons) offer the strip then.
+WINDOWS_SWIFT=Sources/SrtFlow/SystemFileWindows.swift
+STRIP_CALLS="$(grep -cE '^[^/]*\.showStrip\(' "${WINDOWS_SWIFT}" || true)"
+OFFER_BODY="$(awk '/    func offerToCloseOpenWindow\(\) \{/,/^    \}/' "${WINDOWS_SWIFT}")"
+START_BODY="$(awk '/    private func start\(_ request: FileWindowRequest/,/^    \}/' "${WINDOWS_SWIFT}")"
+if [ "${STRIP_CALLS}" != 1 ] || ! grep -qF 'helper.showStrip(' <<<"${OFFER_BODY}" \
+  || ! grep -qF 'guard SystemFileChooser.openWindow == nil else {' <<<"${START_BODY}" \
+  || ! grep -qF 'offerToCloseOpenWindow()' <<<"${START_BODY}"; then
+  echo "✗ 接线守卫：the strip is offered only from offerToCloseOpenWindow, and start asks for it whenever any file window is open (SystemFileChooser.openWindow); found ${STRIP_CALLS} showStrip lines" >&2
+  WIRING_FAIL=1
+fi
+require "a chooser opens nothing while any chooser's window is open (one system file window in the whole app)" \
+  Sources/SrtFlow/SystemFileChooser.swift 'guard phase != \.choosing, Self\.openWindow == nil else \{ return false \}'
+ROW_OFFERS="$(grep -cF 'if !opened { SystemFileWindows.shared.offerToCloseOpenWindow() }' Sources/SrtFlow/ExportFolderRow.swift || true)"
+if [ "${ROW_OFFERS}" != 2 ]; then
+  echo "✗ 接线守卫：the export folder row's folder button and Try Again offer the strip when their chooser opens nothing (found ${ROW_OFFERS})" >&2
+  WIRING_FAIL=1
+fi
+forbid "nothing next to a system file window comes on a timer (no sleep or timer in SystemFileWindows)" \
+  "${WINDOWS_SWIFT}" '^[^/]*(Task\.sleep|asyncAfter|Timer\.|scheduledTimer)'
 require "the folder window never starts on a drive the last check found not answering (windowStart)" \
   Sources/SrtFlow/ExportFolderRow.swift 'chooser\.choose\(\.exportFolder\(startingAt: destination\.windowStart\)\)'
 for f in Sources/SrtFlow/VideoEditExportSheet.swift Sources/SrtFlow/ExportFolderRow.swift Sources/SrtFlow/ExportDestinationState.swift; do

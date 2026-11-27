@@ -26,6 +26,9 @@
 #      cancelled download's silence and the record matched to the offer.
 #   9. get_status's app_update (MCP-85) reads, never acts: one line in AIProjectTools.status takes AppUpdater.statusReport,
 #      which only builds AppUpdateStatusReport (pure, Foundation only: no check, download, install, restart or quit).
+#  10. The menu check's answer window runs its modal loop from the run loop (RunLoop.main.perform), never inside a Swift
+#      task or a dispatch block, and nothing else shows it: exactly one executable call, comments not counted
+#      (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md).
 # Usage: checks/app-update-wiring.sh
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -246,6 +249,38 @@ REPORT_LINE="$(line_of 'var statusReport: AppUpdateStatusReport {' "${UPDATER}")
 MAKE_LINE="$(line_of 'AppUpdateStatusReport.make(state, decision: decision, automatic: automatic, lastUpToDate: lastUpToDate,' "${UPDATER}")"
 if [ -z "${REPORT_LINE}" ] || [ -z "${MAKE_LINE}" ] || [ $((MAKE_LINE - REPORT_LINE)) -ne 1 ]; then
   fail "${UPDATER}: statusReport only builds AppUpdateStatusReport from the published state"
+fi
+
+# 10. The answer window's modal loop runs from the run loop, outside any Swift task. Executable code only: whole files
+#     with comments and string literals blanked out (checks/Shared/swift-code.pl), so a call may wrap and a comment never
+#     counts (review CXC1: a count of raw text let the right call sit in a comment while the old Task ran, and a list of
+#     file names let a second call through; review CXC2: a second call split over two lines got through, and a call in a
+#     block comment counted). Exactly one reference to AppUpdateAlerts.show in Sources, and it is the run-loop statement
+#     right after `case .answer(let answer):`.
+read -r -d '' ANSWER_SCAN <<'PERL' || true
+require "./checks/Shared/swift-code.pl";
+while (my $text = <>) {
+    my $code = swift_code($text);
+    while ($code =~ /\bAppUpdateAlerts\s*\.\s*show\b/g) {
+        my $line = 1 + (substr($code, 0, $-[0]) =~ tr/\n//);
+        print "CALL $ARGV:$line\n";
+    }
+    print "ANSWER $ARGV\n"
+        if $code =~ /\bcase\s+\.answer\s*\(\s*let\s+answer\s*\)\s*:\s*RunLoop\.main\.perform \{ MainActor\.assumeIsolated \{ AppUpdateAlerts\.show\(answer\) \} \}/;
+    print "SCANNED $ARGV\n";
+}
+PERL
+SWIFT_FILES="$(find Sources -name '*.swift' -type f | wc -l | tr -d ' ')"
+if ANSWER_OUT="$(find Sources -name '*.swift' -type f -print0 | xargs -0 perl -0777 -e "${ANSWER_SCAN}")"; then
+  SHOW_CALLS="$(sed -n 's/^CALL //p' <<<"${ANSWER_OUT}")"
+  [ "$(grep -c '^SCANNED ' <<<"${ANSWER_OUT}" || true)" = "${SWIFT_FILES}" ] \
+    || fail "the answer-window scan read fewer than the ${SWIFT_FILES} Swift files under Sources (a partial scan is a false green)"
+  if [ "$(grep -c . <<<"${SHOW_CALLS}" || true)" != 1 ] || [ "${SHOW_CALLS%%:*}" != "${UPDATER}" ] \
+    || [ "$(sed -n 's/^ANSWER //p' <<<"${ANSWER_OUT}")" != "${UPDATER}" ]; then
+    fail "${UPDATER}: the menu check's answer is shown by exactly one call, RunLoop.main.perform { MainActor.assumeIsolated { AppUpdateAlerts.show(answer) } }, right after case .answer (code only: comments and strings don't count), never in a Task or DispatchQueue.main.async: an exception under its modal loop unwinds a task and crashes SkyCut at the next isolation check, and one escaping a dispatch block ends the app (found: ${SHOW_CALLS:-no call})"
+  fi
+else
+  fail "the answer-window scan itself failed (find or perl exited non-zero): a scan that doesn't run is a false green"
 fi
 
 if [ "${FAILED}" -ne 0 ]; then exit 1; fi
