@@ -384,7 +384,9 @@ CDN 缓存属于外部状态，每次发布都要执行这条真实网络检查�
    the version, build and minimum macOS from the DMG's app, wants Gatekeeper's «Notarized Developer ID» for both, and
    writes only a feed SkyCut's own parser reads back field for field. Never the `/download/skycut` redirect.
 3. The personal-site PR that moves the two `/download/skycut` redirects also adds `skycut.json` at `/updates/skycut.json`,
-   with a no-cache `_headers` rule for `/updates/*`: the feed and the download entry go live together.
+   with a no-cache `_headers` rule for `/updates/*`: the feed and the download entry go live together. The site's deploy
+   workflow publishes `updates/` and its `scripts/check-site.mjs` checks that the feed names the redirect's DMG (since
+   skystudio PR #25), so a later release only changes the two redirects and `updates/skycut.json`.
 4. Once Cloudflare Pages has deployed it: `python3 scripts/check-release-download.py <verified.dmg> --feed` (the live feed,
    read as SkyCut reads it, names this DMG, which downloads whole with its size and SHA-256).
 
@@ -871,6 +873,76 @@ Permissions after upgrading:
   Studio Key asks again: click the banner's 「允许…」, enter the login password and choose 「始终允许」. Builds after this
   one are expected to keep every grant, since the signature names the team
   ([签名与系统权限](../architecture/code-signing-and-permissions.md)).
+
+No git tag and no GitHub release, as before.
+
+2026-11-27, publish **0.18.70**, the first SkyCut that updates itself ([App updates](../architecture/app-updates.md)).
+The user's OK for the in-app updater (MCP-85), covering the test installs and this release: 「装测试包、发版 ，你直接操作，授权」;
+the Chinese release notes approved that morning: 「4 条中文更新说明 没有问题」. 0.18.69 was only the two-build test's A: built,
+installed for the test, never published. Release and verification facts by Claude.
+
+Build:
+- Source: main `17440ca4e3c0e7378ebc33584f2e91a21a114dec` (#566); its main run 45915740544 was green (`check-all`). Client
+  changes since 0.18.68: the in-app updater (#565) and its fixes before the first release (#566); #563 (merge slot
+  batches) and #564 (docs) don't touch the app.
+- In the main checkout, A then B from the same commit: `VERSION=0.18.69 arch -arm64 /bin/bash scripts/build-app.sh` (Release
+  compile 298 s), then `VERSION=0.18.70 …` (0.6 s). B's DMG was built once: the file tested is the file published.
+
+Product:
+- `SkyCut-0.18.70-arm64.dmg`, 42,684,517 bytes; SHA-256
+  `b4ec4c2b8828a421bfe48feebac44e2e3ef2fbcf4f12901fc09b0ffafe056f57`; the App's CDHash `61741fe3…`.
+- Notarization: the App, submission `18a65ef0-dd53-4487-a3da-8c8d273a58ee`; the DMG, submission
+  `588f1894-952c-4f86-89d5-4748aede8f9f`; both Accepted and stapled. (A: `263c77cd-e713-4912-b4cf-d45e1aca82ba`,
+  `45e91a2d-9676-432b-bac0-4967a67cfb6f`.)
+
+Checks, on A and B alike:
+- Package: `hdiutil verify` passes; Info.plist version `0.18.70` (build 1), minimum macOS 15.0; the main binary, ffmpeg,
+  `skycut-mcp` and `skycut-web-motion` are arm64; the App in the mounted DMG is byte for byte `dist/SkyCut.app`.
+- Signing: the App and its three helpers chain to `Developer ID Application: TIANYU LU (26TVX3S9FR)`, Developer ID
+  Certification Authority and Apple Root CA, with `TeamIdentifier=26TVX3S9FR`, the runtime flag and a secure timestamp;
+  the designated requirement names the team; deep, strict verify passes locally and mounted; `spctl` gives
+  `source=Notarized Developer ID` for the App, the DMG and the mounted App; `stapler validate` passes on both; no ad-hoc
+  warning in the build log.
+- Running: the mounted `skycut-mcp` initializes as `skycut` / `0.18.70`, 64 tools, `skycut_guide` first; ffmpeg 8.1 runs;
+  `skycut-web-motion` fed `{}` exits 2; the main binary has `SrtFlow.update.feedURL`,
+  `https://skylu.ai/updates/skycut.json` and `SrtFlow.update.automatic.v1`. `scripts/check-dmg.sh <dmg>` passes.
+
+The two-build test ([App updates](../architecture/app-updates.md) §10, 09:29–09:51 on the user's Mac, a loopback feed):
+- Passed where a script could observe it: download, verification and staging, four atomic swaps at quit with
+  `/Applications/SkyCut.app` never missing (sampled every ~2 ms), an AI helper reaching B, the kept DMG, the retry hold, the
+  rolled-back and the unreachable feed, no permission prompt while staging; step 6 confirmed by the user.
+- Not run, checked at the next real update: steps 7, 9, 11, the Dock click, the Update pill's popover, the menu's check.
+  Found: `scripts/write-update-feed.sh` could not run (two apostrophes in `${…:?…}`), fixed in #568 before the real feed.
+
+Publish:
+- Public object: `skycut/SkyCut-0.18.70-b4ec4c2b8828-arm64.dmg`, immutable cache. Uploaded first (15.2 s), then read back
+  in full from the public direct link with `--url`: the same size and SHA-256.
+- The feed: `scripts/write-update-feed.sh` at main `b57854fb` (#568) from the verified DMG and the approved notes (four
+  lines each in zh-Hans, en and es); version 0.18.70, build 1, macOS 15.0, the immutable object.
+- Personal site [skystudio PR #25](https://github.com/skysf/skystudio/pull/25) (merge commit `bba8f9a`): both entries to the
+  new object, `updates/skycut.json`, `/updates/*` no-cache, `updates/` in the deploy bundle (the workflow only copies the
+  folders it lists) and a `check-site.mjs` check that the feed names the redirect's DMG. Cloudflare Pages deployed it.
+- Live: `check-release-download.py` through both entries (a full download, the same size and SHA-256) and with `--feed`
+  (the live feed byte for byte the written one); `https://skylu.ai/updates/skycut.json` answers 200, `application/json`,
+  `cache-control: no-cache`.
+- The SkyCut website went out the same day with #567 (the privacy page and the docs say SkyCut updates itself): Vercel
+  deployment `dpl_3uSTsguRJGTgS58p7DFPodWbks5V` ([SkyCut 官网](../architecture/skycut-website.md) 「运行与部署」).
+
+Tool vocabulary for Sky Studio:
+- `VERSION=0.18.70 scripts/export-tool-vocabulary.sh skycut-0.18.70.json` from `17440ca4`: 64 tools, 69 guide topics, 792
+  known names, sources not dirty; in the content root's `vocab/` folder beside `skycut-0.18.68.json`.
+
+Install:
+- The user's `/Applications/SkyCut.app` is this build, put there by the updater's own swap at the end of the test (A had
+  replaced the user's `0.18.67-local.20261126.d3a6c971`). The three replaced copies of A were unregistered and removed
+  from the Trash afterwards. The Beta was not asked for.
+
+Updating and permissions:
+- From this build on, a release reaches users through the feed. 0.18.68 and older have no updater: their users download
+  0.18.70 once by hand from the website. Sky Studio's `min_version` is unchanged (no forced update).
+- The same team signs 0.18.68 and 0.18.70, so the grants carry over. Seen on the user's Mac: the screen-recording record
+  still pins the self-signed certificate of 0.18.67 and older (`certificate leaf = H"76d2756…"`), so screen recording shows
+  as not granted until it is granted again; that comes from the switch to the Developer ID, not from the update.
 
 No git tag and no GitHub release, as before.
 
