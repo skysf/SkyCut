@@ -19,6 +19,8 @@ import Foundation
             try await MotionGUI.native(project("native-motion", in: root))
             note("Starting web motion")
             try await MotionGUI.web(project("web-motion", in: root), page: page)
+            note("Starting timeline teardown")
+            try await TimelineTeardownGUI.check(window: project("teardown-window", in: root), root: project("teardown-root", in: root))
         } catch {
             FileHandle.standardError.write(Data("SkyCut GUI E2E failed: \(error)\n".utf8))
             exit(1)
