@@ -3,11 +3,12 @@ import Combine
 import SwiftUI
 @testable import SrtFlow
 
-// Take the timeline down twice with no AppKit event loop running, so each closed window and its hosting view are released
-// right after the close: a project window (the full editor, closed the way set_view background closes it) and a window whose
-// root is the timeline (the off-screen renderers' shape). Taking the timeline down must publish nothing. Until 2026-11-27 its
-// scroll accessor wrote the @Published offset from dismantleNSView, inside SwiftUI's graph invalidation: the second window
-// aborted with "Fatal access conflict", the first published too and survived only by SwiftUI's teardown order
+// Take the timeline down three times with no AppKit event loop running, so each closed window and its hosting view are
+// released right after the close: a project window (the full editor) closed the way set_view background closes it, the same
+// project's window closed with its close button, and a window whose root is the timeline (the off-screen renderers' shape).
+// Taking the timeline down must publish nothing. Until 2026-11-27 the scroll accessor wrote the @Published offset from
+// dismantleNSView, inside SwiftUI's graph invalidation: the timeline-only window aborted with "Fatal access conflict", and
+// the project windows published too and survived only by SwiftUI's teardown order
 // (docs/bugfixes/2026-11-27-timeline-teardown-publishes-scroll-offset.md). Counting the publishes keeps the check meaningful
 // on a macOS whose teardown order would not abort.
 @MainActor enum TimelineTeardownGUI {
@@ -15,12 +16,21 @@ import SwiftUI
         for target in [project, other] {
             target.perform { $0.textOverlays = [TextOverlay(text: "Title", timelineStart: 0, duration: 3, row: 0)] }
         }
-        try await projectWindow(project)
+        try await projectWindow(project, "the project window sent to the background") {
+            OpenProjects.shared.moveToBackground(project)
+        }
         try await timelineAsRoot(other)
-        print("GUI timeline teardown: a project window and a timeline-only window closed and released, nothing published")
+        // The close button last: it saves (the project has a file, so nothing asks), then closes the window and the project.
+        // In this process a framework may stop the main run loop around such a close, which ends the suite with status 0;
+        // the completion line in Main.swift (required by scripts/check-e2e-gui.sh) turns that into a failure.
+        try await projectWindow(project, "the project window closed with its close button") {
+            OpenProjects.shared.window(of: project)?.performClose(nil)
+        }
+        print("GUI timeline teardown: a project window (background, close button) and a timeline-only window closed and "
+              + "released, nothing published")
     }
 
-    private static func projectWindow(_ project: VideoEditProject) async throws {
+    private static func projectWindow(_ project: VideoEditProject, _ place: String, close: () -> Void) async throws {
         weak var host: NSView?
         do {
             OpenProjects.shared.showWindow(for: project, inFront: false)
@@ -28,9 +38,7 @@ import SwiftUI
             window.ignoresMouseEvents = true
             host = window.contentView
         }
-        try await takeDown(project, in: "the project window", released: { host == nil }) {
-            OpenProjects.shared.moveToBackground(project)
-        }
+        try await takeDown(project, in: place, released: { host == nil }, close: close)
     }
 
     private static func timelineAsRoot(_ project: VideoEditProject) async throws {

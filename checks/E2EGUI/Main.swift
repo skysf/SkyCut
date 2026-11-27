@@ -25,8 +25,13 @@ import Foundation
             FileHandle.standardError.write(Data("SkyCut GUI E2E failed: \(error)\n".utf8))
             exit(1)
         }
+        // The only success: the Swift runtime also exits 0 when something stops the main run loop mid-suite.
+        print(completionLine)
         exit(0)
     }
+
+    /// scripts/check-e2e-gui.sh requires this exact line.
+    static let completionLine = "GUI E2E: every case ran"
 
     @MainActor private static func project(_ name: String, in root: URL) async throws -> VideoEditProject {
         guard let project = await OpenProjects.shared.createProject(
