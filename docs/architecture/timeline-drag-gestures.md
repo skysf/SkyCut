@@ -426,6 +426,15 @@ SwiftUI 里子视图的手势优先，所以块本体的移动、标尺的 scrub
 - **只有这两块订阅 `TimelineScrollGeometry`**（`@ObservedObject`）。时间线主体用
   `@State` 持有它、**不订阅** —— 订阅了的话滚动的每一帧都会把整棵时间线视图树
   （所有块连同缩略图与波形）重建一遍，就是第 0 节那条老约束在另一个轴上重演。
+- **Taking the timeline down publishes nothing** (2026-11-27). `TimelineScrollViewAccessor.dismantleNSView`, and the probe
+  leaving the tree (`attach(nil)`), let go through `TimelineScrollGeometry.detach(owner:)`: the bounds observer, the scroll
+  view and the `live` entry go, `offset` is not written. `dismantleNSView` runs inside the hosting view's graph invalidation
+  (`NSHostingView.deinit` → `GraphHost.invalidate()`); a publish there reaches the two subscribers above while SwiftUI holds
+  exclusive access, and Swift aborts ("Fatal access conflict"). Whether it aborts is only SwiftUI's teardown order: a window
+  whose root is the timeline aborted, the project windows survived on macOS 26.5.2. **The same holds for every
+  `NSViewRepresentable`: nothing in `dismantleNSView`, or anything it calls, writes `@Published` or `@Observable` state that
+  views read, or sends `objectWillChange`.** Guards: `checks/timeline-drag-wiring/teardown.sh` and the timeline teardown case
+  of `scripts/check-e2e-gui.sh` ([case](../bugfixes/2026-11-27-timeline-teardown-publishes-scroll-offset.md)).
 - **轨道头列不许决定时间线的高度。** 它的固有高度是所有行加起来（十来条轨 500pt
   往上），裸摆在 `HStack` 里就会让整条时间线按这个高度要地方，`VSplitView` 给不了，
   **工具栏和标尺当场被挤出窗口**。所以它画在 `Color.clear` 的 overlay 上（弹性
