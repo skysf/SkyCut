@@ -227,3 +227,20 @@ bash 5 不展开，本机跑是对的；和陷阱 5 不同，3.2 这回**不报�
 **改法**：总闸只放在最后；新加一节加在总闸前面。要算行号的 `$(grep … | head | cut)` 加 `|| true`，找不到时照常走到 `fail` 说原因（不然 `set -e` 半路掐断、不说为什么）。
 
 **防回归**：`checks/sky-studio-wiring.sh` 总闸前读自己这个文件，最后一条 `fail "…"` 要在总闸之前，不然就红并说出两个行号。
+
+## Trap 8 (2026-11-27): an apostrophe in a `${…:?…}` message opens a single quote, even inside double quotes
+
+`scripts/write-update-feed.sh`, which writes each release's update feed, reached main unable to parse. Line 16 was
+`TEST_FEED="${2:?--test-feed needs the test feed's own URL}"`. Bash 3.2 and 5 both read an apostrophe in the word of
+`${name:-…}`, `${name:=…}`, `${name:?…}` or `${name:+…}` (with or without the colon) as the start of a single-quoted
+string, although elsewhere inside double quotes it is a plain character. The quote ran to the next such apostrophe four
+lines down and took a `fi` with it, so the script didn't parse. Without that `fi` it would have parsed and silently
+skipped the lines in between. No check runs that script, so nobody saw it until the release
+([case](2026-11-27-feed-writer-apostrophe-never-parsed.md)).
+
+**Fix**: reword the message without an apostrophe ("the URL of the test feed"). An apostrophe inside a nested `"…"` in
+the word, escaped, or paired in the same expansion is fine.
+
+**Guard**: `checks/shell-syntax.sh` (in `scripts/check-all.sh`). Every shell script that `git ls-files` lists (`.sh`, or a
+bash / sh shebang) must parse under `/bin/bash -n`, and no line may hold a lone apostrophe in such a word. The rule is in
+[coding standards](../architecture/coding-standards.md) section 6.

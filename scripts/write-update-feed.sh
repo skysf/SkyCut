@@ -13,11 +13,11 @@
 set -euo pipefail
 TEST_FEED=""
 if [ "${1:-}" = "--test-feed" ]; then
-  TEST_FEED="${2:?--test-feed needs the test feed's own URL}"
+  TEST_FEED="${2:?--test-feed needs the URL of the test feed itself}"
   shift 2
 fi
 DMG="${1:?usage: scripts/write-update-feed.sh [--test-feed <url>] <verified.dmg> <immutable DMG URL> <notes.json> <out.json>}"
-URL="${2:?the DMG's immutable URL on downloads.skylu.ai}"
+URL="${2:?the immutable URL of the DMG on downloads.skylu.ai}"
 NOTES="${3:?the notes file (zh-Hans, en, es)}"
 OUT="${4:?where to write the feed}"
 cd "$(dirname "$0")/.."
