@@ -89,7 +89,8 @@ Each guard was reverse-verified: red with its part of the fix undone, green with
   in 332 checks.
 - **`checks/audio-engine-idle-wiring.sh` section 11** (every Swift file under `Sources`). A non-`override`
   `func mouseEntered` / `mouseExited` / `mouseMoved` / `cursorUpdate` `(with` without `@objc(<name>:)` among the
-  attributes right before it is red. The scan reads whole files, so the declaration may wrap; comments don't count.
+  attributes right before it is red. The scan reads whole files, so the declaration may wrap; comments and string literals
+  don't count (`checks/Shared/swift-code.pl`, shared with the next guard).
   - Selectors undone: red, both lines named.
   - A throwaway `NSObject` subclass in another file: red.
   - The name on the line above, or an `override` in an `NSView`: green.
@@ -97,10 +98,15 @@ Each guard was reverse-verified: red with its part of the fix undone, green with
     - a declaration with `with event:` on the next line: now red (it was green);
     - an `@objc(mouseEntered:)` that belongs to another member on the line above: now red (it was green);
     - a perl program that fails, or a scan that reads fewer files than exist: red (both were swallowed).
-- **`checks/app-update-wiring.sh` section 10.** Executable code only (comments don't count): exactly one display call in
-  `Sources`, the run-loop line, as the first code line under `case .answer`.
+  - Review round 2 (CXC2): "override" inside an `@available(…, message: "…")` string counted as the modifier. Now red;
+    so is a name that is only inside a string. A declaration inside a comment or a string stays green.
+- **`checks/app-update-wiring.sh` section 10.** Executable code only: whole files with comments and string literals blanked,
+  so a call may wrap. Exactly one reference to `AppUpdateAlerts.show` in `Sources`, the run-loop statement right after
+  `case .answer`.
   - Red: back to the `Task`; as `DispatchQueue.main.async`; the right call left in a comment while the old `Task` runs, and
     a second call in the same file. The last two were green before review round 1.
+  - Review round 2 (CXC2): a second call split over two lines inside a `Task`, and a bare reference, are red (the split
+    call was green). A call inside a block comment or a string no longer counts (it was a false red).
 - **Local checks:** `scripts/check-local.sh audio-engine app-update app-update-wiring` green.
 - **Manual, before the next release:** a real modal window crossed by a real pointer can't be driven from a check.
   [App updates](../architecture/app-updates.md) §10 step 19 clicks the menu's Check for Updates… with a newer version

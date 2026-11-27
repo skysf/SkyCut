@@ -9,8 +9,9 @@ import UniformTypeIdentifiers
 // thread free and the fallback offered, and a typed answer there reaches the caller; nothing appears next to a window the
 // person takes long over (since 2026-11-27: the strip came after 5 s, next to every window); a second request while one
 // window is up opens nothing, and gets "Close It" next to the open window only while it is on screen, which closes it and
-// offers the fallback; "Try Again" asks AppKit again; a record left by a force quit sends the next request to the fallback
-// first. What a save's answer may replace: SaveAnswerChecks. Then the typed and dropped answers (TypedPath), which never
+// offers the fallback; one window in the whole app, across the shared windows and the export panel's own chooser (review
+// CXC2: the export folder button built a second panel); "Try Again" asks AppKit again; a record left by a force quit sends
+// the next request to the fallback first. What a save's answer may replace: SaveAnswerChecks. Then the typed and dropped answers (TypedPath), which never
 // touch a drive.
 @MainActor enum FileWindowsChecks {
     static func run(require: (Bool, String) -> Void) async {
@@ -76,6 +77,7 @@ import UniformTypeIdentifiers
         require(second == nil && busy.made.count == 1 && busy.helper.shown.isEmpty,
                 "one system window at a time: a second request opens nothing; no strip next to a window not on screen")
         busy.windows.chooser.cancelIfChoosing()
+        await acrossChoosers(record: record, files: files, require: require)
 
         // A force quit left the record: the fallback comes first and AppKit is not asked.
         var previous = record
@@ -89,6 +91,41 @@ import UniformTypeIdentifiers
 
         await SaveAnswerChecks.run(record: record, require: require)
         typedAndDropped(require: require)
+    }
+
+    /// One system window in the whole app, across choosers (review CXC2): the shared windows and the export panel's folder
+    /// row each drive a chooser of their own. With one window up, the other builds no second panel (AppKit's handshake can
+    /// hold the main thread up to a minute when the service hangs); the strip offers to close the open one, whichever it is.
+    private static func acrossChoosers(
+        record: SystemFileWindowRecord, files: FileWindowRequest, require: (Bool, String) -> Void
+    ) async {
+        // Open Project…'s window up and stuck, then the export panel's folder button (what ExportFolderRow does).
+        let shared = Rig(record: record) { FakeFolderPanel(.staysStuck) }
+        shared.windows.open(files) { _ in }
+        var exportPanels: [FakeFolderPanel] = []
+        let exportChooser = SystemFileChooser(
+            makePanel: { _ in let panel = FakeFolderPanel(.staysStuck); exportPanels.append(panel); return panel },
+            record: record, note: { _ in }, appearDeadline: 0.6, quickReturn: 0.05
+        )
+        let opened = exportChooser.choose(FileWindowRequest(kind: .folder)) { _ in }
+        if !opened { shared.windows.offerToCloseOpenWindow() }
+        require(!opened && exportPanels.isEmpty && exportChooser.phase == .idle && shared.helper.shown == ["strip"],
+                "with a file window up, the export folder button builds no second panel and the strip offers to close the open one: panels \(exportPanels.count), shown \(shared.helper.shown)")
+        shared.windows.chooser.cancelIfChoosing()
+
+        // The other way round: the export panel's window up, then a shared request (Add Media…): no second panel; the strip
+        // stands next to the export window, its button closes that window (the row then offers typing a path), and the
+        // strip goes away with it.
+        exportChooser.choose(FileWindowRequest(kind: .folder)) { _ in }
+        let other = Rig(record: record) { FakeFolderPanel(.answers(nil, after: 0.1)) }
+        let none = await other.windows.choose(files)
+        require(none == nil && other.made.isEmpty && other.helper.shown == ["strip"],
+                "with the export folder window up, a shared request opens nothing and gets the strip: made \(other.made.count), shown \(other.helper.shown)")
+        let hidden = other.helper.hidden
+        other.helper.close?()
+        require(exportPanels.first?.cancels == 1 && exportChooser.phase == .failed(.closedByUser) && other.helper.hidden > hidden,
+                "the strip's button closes the export folder window (its row offers typing a path) and the strip goes away")
+        exportChooser.dismissFailure()
     }
 
     /// Typed paths and dropped files decide the answer without a drive.

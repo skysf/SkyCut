@@ -251,8 +251,8 @@ than the running one stays; the rest goes.
   cancelled download's silence, the record matched to the offer (review FBU2); get_status's one `app_update` line, and the
   report only mapping a state it is given (Foundation only, no check, download, install or restart). Deletion calls (`removeItem`, `unlink`,
   `rmdir`, `recycle`) only in `AppUpdateFiles.swift`. Since 2026-11-27 (section 10): the menu check's answer window from the run
-  loop, never in a `Task` or `DispatchQueue.main.async`, and nothing else shows it: one executable call, as the first code line
-  under `case .answer`, comments not counted.
+  loop, never in a `Task` or `DispatchQueue.main.async`, and nothing else shows it: one executable call, right after
+  `case .answer`, read across lines with comments and string literals not counted.
 - Reverse-verified on 2026-11-27 (#565): replacing the swap with two renames turns the kill loop red (the destination missing
   after kills); removing the cancellation check or the incoming staging folder turns their cases red; each wiring line
   removed turns the guard red. Again for the fixes before the first release (U1b, two rounds): each new case and guard line

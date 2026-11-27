@@ -48,6 +48,8 @@ final class SystemFileWindows {
     /// The caller still waiting for an answer; the flag says it came from macOS's own window (not the helper).
     private var answer: (([URL]?, Bool) -> Void)?
     private var phaseWatch: AnyCancellable?
+    /// While the strip stands next to another chooser's window (the export panel's): takes it away when that window closes.
+    private var stripWatch: AnyCancellable?
 
     /// nil: the real window and helper (the checks pass fakes).
     init(chooser: SystemFileChooser? = nil, helper: FileWindowHelping? = nil, probe: ExportDestinationProbe = .shared) {
@@ -101,7 +103,8 @@ final class SystemFileWindows {
     }
 
     private func start(_ request: FileWindowRequest, answer: @escaping ([URL]?, Bool) -> Void) {
-        guard chooser.phase != .choosing else {
+        // One system file window in the whole app: this chooser's, or the export panel's folder window (its own chooser).
+        guard SystemFileChooser.openWindow == nil else {
             offerToCloseOpenWindow()
             return answer(nil, false)
         }
@@ -112,12 +115,17 @@ final class SystemFileWindows {
         chooser.choose(request) { [weak self] urls in self?.finish(urls, inSystemWindow: true) }
     }
 
-    /// "Try Again" in the fallback: the system window once more, the record's detour skipped.
+    /// "Try Again" in the fallback: the system window once more, the record's detour skipped. If another file window opened
+    /// meanwhile (the export panel's), this request gives way and the strip offers to close that one.
     private func tryAgain() {
         guard let request = chooser.request else { return finish(nil, inSystemWindow: false) }
         helper.hide()
         chooser.dismissFailure()
-        chooser.choose(request, force: true) { [weak self] urls in self?.finish(urls, inSystemWindow: true) }
+        let opened = chooser.choose(request, force: true) { [weak self] urls in self?.finish(urls, inSystemWindow: true) }
+        if !opened {
+            finish(nil, inSystemWindow: false)
+            offerToCloseOpenWindow()
+        }
     }
 
     /// Answered from the fallback (a typed path, dropped files) or given up there. Nobody asked "Replace?".
@@ -126,16 +134,29 @@ final class SystemFileWindows {
         finish(urls, inSystemWindow: false)
     }
 
-    /// The person asked for another file window while one is up: the one sign SkyCut gets that it may be stuck (macOS says
-    /// nothing when its panel service hangs; the window just stops answering). "Close It" next to the open window, only
-    /// while it is on screen (one that never comes is given up by the chooser's watcher). Never on a timer: choosing a file
-    /// takes as long as the person likes, and nothing pops up by itself.
-    private func offerToCloseOpenWindow() {
-        guard chooser.windowIsVisible else { return }
-        helper.showStrip(near: chooser.windowFrame) { [weak self] in self?.chooser.closeStuckWindow() }
+    /// The person asked for another file window while one is up (here, or with the export panel's folder button, which
+    /// calls this when its chooser opens nothing): the one sign SkyCut gets that it may be stuck (macOS says nothing when
+    /// its panel service hangs; the window just stops answering). The strip stands next to the open window, whichever
+    /// chooser's it is, only while it is on screen (one that never comes is given up by its chooser's watcher); its button
+    /// closes that window. Never on a timer: choosing a file takes as long as the person likes, and nothing pops up by itself.
+    func offerToCloseOpenWindow() {
+        guard let open = SystemFileChooser.openWindow, open.windowIsVisible else { return }
+        stripWatch = nil
+        if open !== chooser {
+            // Nothing here hears the export panel's window close (its row shows its own fallback): watch it.
+            stripWatch = open.$phase.dropFirst().sink { [weak self] phase in
+                MainActor.assumeIsolated {
+                    guard phase != .choosing, let self else { return }
+                    self.stripWatch = nil
+                    self.helper.hide()
+                }
+            }
+        }
+        helper.showStrip(near: open.windowFrame) { [weak open] in open?.closeStuckWindow() }
     }
 
     private func finish(_ urls: [URL]?, inSystemWindow: Bool) {
+        stripWatch = nil
         helper.hide()
         let pending = answer
         answer = nil

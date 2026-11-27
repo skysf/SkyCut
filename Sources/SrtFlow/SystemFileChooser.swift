@@ -156,19 +156,30 @@ final class SystemFileChooser: ObservableObject {
     /// The system window is on screen now.
     var windowIsVisible: Bool { panel?.isVisible ?? false }
 
+    /// The chooser whose system window is open now, if any: one system file window in the whole app, the shared windows'
+    /// and the export panel's folder row alike. A second panel waits on AppKit's main-thread handshake with the panel
+    /// service, which held SkyCut for 60 s when the service hung (2026-11-18), so while one is open nothing builds another
+    /// (review CXC2, docs/bugfixes/2026-11-27-close-it-strip-popped-up-next-to-every-file-window.md).
+    static var openWindow: SystemFileChooser? { current?.phase == .choosing ? current : nil }
+    private static weak var current: SystemFileChooser?
+
     /// Opens the system window for `request`. `force` skips the detour after a run that ended with a window open (the
     /// "Try Again" button). `onChosen` gets the picked URLs, or nil when the person cancelled; it is not called when the
-    /// window failed (the phase says how) or `cancelIfChoosing` closed it.
-    func choose(_ request: FileWindowRequest, force: Bool = false, onChosen: @escaping ([URL]?) -> Void) {
-        guard phase != .choosing else { return }
+    /// window failed (the phase says how) or `cancelIfChoosing` closed it. Returns false, and opens nothing, while a system
+    /// file window is open (this chooser's or another's): the caller offers to close that one
+    /// (`SystemFileWindows.offerToCloseOpenWindow`).
+    @discardableResult
+    func choose(_ request: FileWindowRequest, force: Bool = false, onChosen: @escaping ([URL]?) -> Void) -> Bool {
+        guard phase != .choosing, Self.openWindow == nil else { return false }
         self.request = request
         if !force, record.previousRunDidNotFinish() {
             record.clear()
             note("file window: the last run ended while one was open; offering a typed path first")
             phase = .failed(.lastRunDidNotFinish)
-            return
+            return true
         }
         phase = .choosing
+        Self.current = self
         record.markStarted()
         clearRecordOnQuit()
         note("file window: opening")
@@ -183,6 +194,7 @@ final class SystemFileChooser: ObservableObject {
             self.answered(urls, after: ProcessInfo.processInfo.systemUptime - began, onChosen: onChosen)
         }
         watch(panel, since: began)
+        return true
     }
 
     /// "Close It": the window is on screen but stopped responding. `cancel()` closes it even when its service hangs.
@@ -244,6 +256,8 @@ final class SystemFileChooser: ObservableObject {
         record.clear()
         if let quitObserver { NotificationCenter.default.removeObserver(quitObserver) }
         quitObserver = nil
+        // Before the phase: @Published tells its watchers in willSet, while `phase` still reads .choosing.
+        if Self.current === self { Self.current = nil }
         phase = next
     }
 

@@ -27,17 +27,24 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
    inside AppKit: the typed path comes first and "Try Again" asks AppKit anyway. SkyCut cannot cut AppKit's own wait short;
    this is how it avoids walking into it twice.
 4. **Everything except the export panel's folder row goes through `SystemFileWindows.shared`** (the views call `FilePicker`,
-   which wraps it): **one system window at a time** — while one is up, a second request opens nothing and gets no answer, as
-   with the modal panels before (the strip of rule 5 then offers to close the open one). Answers come in a closure (`open`)
-   or awaited (`choose`).
+   which wraps it). Answers come in a closure (`open`) or awaited (`choose`).
+   - **One system window at a time in the whole app**, the export panel's folder row included (it drives a chooser of its
+     own). While one is up, a second request, from either, opens nothing and gets no answer, as with the modal panels
+     before; the strip of rule 5 then offers to close the open one.
+   - `SystemFileChooser.choose` builds no panel while any chooser's window is open (`SystemFileChooser.openWindow`):
+     making a second panel waits on AppKit's main-thread handshake with the panel service, which held SkyCut for 60 s
+     when the service hung (2026-11-18).
+   - Since 2026-11-27 (review CXC2): until then, the export folder button built a second panel beside an open Open
+     Project… window.
 5. **The helper next to the system window** (`FileWindowHelper`, SkyCut's own small window, so it keeps working when the
    service hangs).
    - **Nothing appears next to the system window while the person chooses, however long they take** (since 2026-11-27,
      [case](../bugfixes/2026-11-27-close-it-strip-popped-up-next-to-every-file-window.md): a strip used to come after 5 s,
      next to every window a person took longer over, and nobody knew what it meant). Nothing pops up by itself.
-   - **The strip comes only when the person asks for another file window while one is up**, and only while that window is
-     on screen. That is the one sign SkyCut gets that the window may be stuck: macOS says nothing when its panel service
-     hangs, and the window just stops answering. The strip stands next to the open window: "If the window for choosing a
+   - **The strip comes only when the person asks for another file window while one is up** (from any entry, the export
+     panel's folder button and its Try Again included), and only while that window is on screen. That is the one sign
+     SkyCut gets that the window may be stuck: macOS says nothing when its panel service hangs, and the window just stops
+     answering. The strip stands next to the open window, whichever chooser's it is, and goes away with it: "If the window for choosing a
      file is stuck or not responding, click here to close it." (「选文件的窗口卡住或没反应，点这里关闭。」, wording approved by the user
      on 2026-11-27) with **Close** (关闭), which cancels the file window, never SkyCut, even when its service hangs (rule 2),
      and offers the fallback below. ⌘Q quits as usual.
@@ -129,3 +136,11 @@ The real panel service can't be driven from a check (it needs the window server,
    up, and says the drive is not responding if it takes over 15 s.
 6. Chinese and Spanish UI: the strip, the helper and the replace question are translated (in-process windows with
    `.appLanguage()`; the question is an `NSAlert` with SkyCut's own strings).
+7. Across choosers (review CXC2): leave Open Project…'s window open, then in Export click the folder button. No second
+   window opens, and the strip stands next to Open Project…'s window; Close closes it, and the export row's button works
+   again. The other way round: with the export folder window open, Add Media… opens nothing and the strip stands next to
+   the export window; Close closes it, and the export row offers typing a path.
+8. Still open (review CXC2, backlog): quit with an untitled project that has edits, choose "Save…", then freeze the panel
+   service while the save window is up. During Quit, AppKit runs its terminate-later modal loop; ⌘Q again or closing the
+   window again asks for no second file window. Does ⌘O there still bring the strip and rescue the stuck save window?
+   Check this on a real Mac; the checks can't reach AppKit's terminate-later loop.

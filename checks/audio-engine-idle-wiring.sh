@@ -210,14 +210,15 @@ TWICE="$(grep -nE 'run\.state.*run\.state|graphState.*graphState' <<<"${ENGINE_C
 [ -z "${TWICE}" ] || fail "同一句里读了两次图的状态（先 let state = … 再判）：${TWICE}"
 
 # 11. A tracking area's callbacks name AppKit's selector unless they override NSResponder's (any Swift file in Sources).
-# Whole files, so a declaration may wrap (its attributes on the lines above, `with event:` on the next line); comments are
-# blanked out with spaces so line numbers stay right; only the attributes and modifiers right before `func` count (an
-# @objc(mouseEntered:) on another member doesn't). Review CXC1: the line-by-line scan missed a wrapped declaration and a
-# name borrowed from the line above, and swallowed a failing perl.
+# Whole files, so a declaration may wrap (its attributes on the lines above, `with event:` on the next line); comments and
+# string literals are blanked out (checks/Shared/swift-code.pl, line numbers kept); only the attributes and modifiers
+# right before `func` count (an @objc(mouseEntered:) on another member doesn't). Review CXC1: the line-by-line scan missed
+# a wrapped declaration and a name borrowed from the line above, and swallowed a failing perl. Review CXC2: "override" in
+# an @available message counted as the modifier.
 read -r -d '' UNNAMED_CALLBACKS <<'PERL' || true
+require "./checks/Shared/swift-code.pl";
 while (my $text = <>) {
-    (my $code = $text) =~ s{/\*.*?\*/}{(my $c = $&) =~ s/[^\n]/ /g; $c}gse;
-    $code =~ s{//[^\n]*}{' ' x length($&)}ge;
+    my $code = swift_code($text);
     while ($code =~ /((?:(?:\@\w+(?:\([^()]*\))?|\b(?:public|private|fileprivate|internal|open|final|dynamic|override|nonisolated|static|class|required|convenience)\b)\s*)*)\bfunc\s+(mouseEntered|mouseExited|mouseMoved|cursorUpdate)\s*\(\s*with\b/g) {
         my ($prefix, $name) = ($1, $2);
         next if $prefix =~ /\boverride\b/ || $prefix =~ /\@objc\(\Q$name\E:\)/;

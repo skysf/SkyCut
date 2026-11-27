@@ -37,7 +37,10 @@ struct ExportFolderRow: View {
                     ProgressView().controlSize(.small)
                 }
                 Button {
-                    chooser.choose(.exportFolder(startingAt: destination.windowStart)) { if let url = $0?.first { take(url) } }
+                    // One system file window in the whole app: with another one open (Open Project…'s, say) this one isn't
+                    // built (a second panel can hold the main thread up to a minute); the strip offers to close that one.
+                    let opened = chooser.choose(.exportFolder(startingAt: destination.windowStart)) { if let url = $0?.first { take(url) } }
+                    if !opened { SystemFileWindows.shared.offerToCloseOpenWindow() }
                 } label: {
                     Image(systemName: "folder")
                 }
@@ -110,7 +113,8 @@ struct ExportFolderRow: View {
                 }
                 HStack(spacing: 8) {
                     Button("Try Again") {
-                        chooser.choose(.exportFolder(startingAt: destination.windowStart), force: true) { if let url = $0?.first { take(url) } }
+                        let opened = chooser.choose(.exportFolder(startingAt: destination.windowStart), force: true) { if let url = $0?.first { take(url) } }
+                        if !opened { SystemFileWindows.shared.offerToCloseOpenWindow() }
                     }
                         .instantHelp("Open the macOS folder window again")
                     Button("Keep This Folder") { chooser.dismissFailure() }

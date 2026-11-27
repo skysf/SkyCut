@@ -236,6 +236,11 @@ never returns.
    which cancels a window that stopped responding. It starts in the destination folder, except when the last check found
    that drive gone or not answering (then the home folder): pointing the system window at a stuck drive is how its service
    gets stuck.
+   - Since 2026-11-27 (review CXC2), the folder button and Try Again open nothing while another file window is open
+     (Open Project…'s, say): one system window in the whole app. The strip next to that window offers to close it
+     ([system file windows](system-file-windows.md) rules 4–5).
+   - The inline line stays. The folder button is off while this panel's own window is open, so the line's "Close It" is
+     that window's way out, and the strip covers only a request made while it is open.
 2. **There is always a way that does not need the system panel**: dropping a folder (or a file: its folder) from Finder
    onto the "Export to" row, and after a failure typing or pasting a path. The Export button is off while a folder is being
    picked (Return in the path field must not start an export).

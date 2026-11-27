@@ -48,11 +48,20 @@ it here." / "Close It").
     non-modal since 2026-11-19, so clicking the timeline meanwhile is normal use and would pop it up;
   - a menu item: permanent UI for a rare failure, and a stuck person rarely looks through menus;
   - a much later timer: it still pops up by itself for someone who leaves the window open.
+- **One system window in the whole app, across choosers** (review CXC2). The export panel's folder row drives a chooser of
+  its own. Its button built a second panel beside an open Open Project… window, and the strip appeared 0 times. Making a
+  panel waits on AppKit's main-thread handshake, which held SkyCut for 60 s when the service hung (2026-11-18).
+  - `SystemFileChooser.choose` now builds nothing while any chooser's window is open (`SystemFileChooser.openWindow`),
+    and returns false.
+  - The shared windows (`start`, Try Again) and the export row (its folder button, Try Again) then ask for the strip
+    (`offerToCloseOpenWindow`). The strip stands next to whichever window is open, and goes away when that window closes.
 - **Unchanged:**
   - A window that never appears, vanishes, or comes back empty at once still gets the fallback within about 3 s. That
     fallback is the answer to the person's own request.
   - The export panel's folder row keeps its inline line "Choose a folder in the macOS window. If that window stops
-    responding, close it here." with Close It. It is a line inside the export panel, not a window of its own.
+    responding, close it here." with Close It. It is a line inside the export panel, not a window of its own. The gate
+    doesn't make it redundant: the folder button is off while the row's own window is open, so that line is the window's
+    way out.
 
 What the person sees now:
 - **Normal:** the macOS window, and nothing else, however long they take. If they ask for another file window while it is
@@ -74,18 +83,31 @@ Each guard was reverse-verified: red with its part of the fix undone, green with
     (at its frame);
   - the strip's button cancels it and offers the fallback for the first request, and Try Again's answer reaches the first
     caller;
-  - a second request while the window isn't on screen yet shows nothing.
-- **`checks/file-io-off-main-wiring.sh`:** `.showStrip(` appears once, inside `offerToCloseOpenWindow`, which is called only
-  from `start`; no sleep or timer in `SystemFileWindows.swift`.
+  - a second request while the window isn't on screen yet shows nothing;
+  - across choosers (review CXC2), with two fake panels:
+    - with a shared window up and stuck, the export chooser builds no panel and the strip appears once;
+    - with the export window up, a shared request builds no panel and gets the strip, whose button closes the export
+      window; the strip goes away.
+- **`checks/file-io-off-main-wiring.sh`:**
+  - `.showStrip(` appears once, inside `offerToCloseOpenWindow`;
+  - `start` asks for the strip whenever any window is open;
+  - `choose` builds nothing while one is open;
+  - the export row's two buttons ask for the strip;
+  - no sleep or timer in `SystemFileWindows.swift`.
 - **Reversals:**
   - the timer back (0.4 s, the delay the check used to pass): the guard (two lines) and 3 assertions red;
   - no strip on a second request: the guard and 3 assertions red;
-  - a strip even when the window isn't on screen: 1 assertion red.
+  - a strip even when the window isn't on screen: 1 assertion red;
+  - the gate taken out (each chooser only checks itself, as before CXC2): the across-choosers assertions red (the export
+    chooser built a second panel, and the strip appeared 0 times).
 - **Localization coverage** green: the new text is in all three tables, and the button reuses "Close".
 - **Pictures:** the strip rendered off-screen in en / zh-Hans / es with the approved wording, to settle with the user before
   the push (not in the repository).
-- **Not verified:** a real panel service frozen under SkyCut. That stays manual:
-  [system file windows](../architecture/system-file-windows.md), manual regression items 2 and 3.
+- **Not verified:**
+  - A real panel service frozen under SkyCut, and the two choosers with real windows. These stay manual:
+    [system file windows](../architecture/system-file-windows.md), manual regression items 2, 3 and 7.
+  - Whether ⌘O can still rescue a stuck save window during Quit's terminate-later modal loop (CXC2, backlog): manual item
+    8.
 
 ## Lessons
 

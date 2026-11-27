@@ -314,7 +314,8 @@ the user's Play at the end replays from 0 (peek ended, timeline told to scroll l
 「报过时间没有」的内存序、主时钟自己收尾且不听「播到头」通知、「回来了」的信号齐全且启动就看、日志不在主线程上写、
 起不来不空转）。Section 11 (since 2026-11-27, every Swift file under `Sources`): a tracking area's callback that isn't an
 `override` carries AppKit's selector (`@objc(mouseEntered:)`) among the attributes right before it. It reads whole
-declarations (they may wrap; comments don't count), and a scan that fails or skips a file is red (review CXC1).
+declarations (they may wrap; comments and string literals don't count, through `checks/Shared/swift-code.pl`), and a scan
+that fails or skips a file is red (reviews CXC1 and CXC2).
 
 反向验证（2026-11-11，各自弄坏一处、确认变红、再恢复）：
 

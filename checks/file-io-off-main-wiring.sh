@@ -69,16 +69,25 @@ require "the chooser leaves its in-flight record before asking AppKit for the wi
 require "the views' FilePicker goes through the shared non-modal windows" \
   Sources/SrtFlow/SystemFileWindows.swift 'SystemFileWindows\.shared\.open\(request'
 # Nothing appears next to a system file window while the person chooses, however long they take (2026-11-27,
-# docs/bugfixes/2026-11-27-close-it-strip-popped-up-next-to-every-file-window.md): "Close It" is offered only when the
-# person asks for another file window while one is up (offerToCloseOpenWindow, from start), never on a timer.
+# docs/bugfixes/2026-11-27-close-it-strip-popped-up-next-to-every-file-window.md): the strip is offered only when the
+# person asks for a file window while one is up (offerToCloseOpenWindow), never on a timer. And one system file window in
+# the whole app (review CXC2): a chooser opens nothing while any chooser's window is open, and both the shared windows
+# (start) and the export panel's folder row (its two buttons) offer the strip then.
 WINDOWS_SWIFT=Sources/SrtFlow/SystemFileWindows.swift
 STRIP_CALLS="$(grep -cE '^[^/]*\.showStrip\(' "${WINDOWS_SWIFT}" || true)"
-OFFER_CALLS="$(grep -cE '^[^/]*offerToCloseOpenWindow\(\)' "${WINDOWS_SWIFT}" || true)"
-OFFER_BODY="$(awk '/    private func offerToCloseOpenWindow\(\) \{/,/^    \}/' "${WINDOWS_SWIFT}")"
+OFFER_BODY="$(awk '/    func offerToCloseOpenWindow\(\) \{/,/^    \}/' "${WINDOWS_SWIFT}")"
 START_BODY="$(awk '/    private func start\(_ request: FileWindowRequest/,/^    \}/' "${WINDOWS_SWIFT}")"
-if [ "${STRIP_CALLS}" != 1 ] || [ "${OFFER_CALLS}" != 2 ] || ! grep -qF 'helper.showStrip(' <<<"${OFFER_BODY}" \
+if [ "${STRIP_CALLS}" != 1 ] || ! grep -qF 'helper.showStrip(' <<<"${OFFER_BODY}" \
+  || ! grep -qF 'guard SystemFileChooser.openWindow == nil else {' <<<"${START_BODY}" \
   || ! grep -qF 'offerToCloseOpenWindow()' <<<"${START_BODY}"; then
-  echo "✗ 接线守卫：the Close It strip is offered only from offerToCloseOpenWindow, called when the person asks for another file window while one is up (start); found ${STRIP_CALLS} showStrip and ${OFFER_CALLS} offerToCloseOpenWindow lines" >&2
+  echo "✗ 接线守卫：the strip is offered only from offerToCloseOpenWindow, and start asks for it whenever any file window is open (SystemFileChooser.openWindow); found ${STRIP_CALLS} showStrip lines" >&2
+  WIRING_FAIL=1
+fi
+require "a chooser opens nothing while any chooser's window is open (one system file window in the whole app)" \
+  Sources/SrtFlow/SystemFileChooser.swift 'guard phase != \.choosing, Self\.openWindow == nil else \{ return false \}'
+ROW_OFFERS="$(grep -cF 'if !opened { SystemFileWindows.shared.offerToCloseOpenWindow() }' Sources/SrtFlow/ExportFolderRow.swift || true)"
+if [ "${ROW_OFFERS}" != 2 ]; then
+  echo "✗ 接线守卫：the export folder row's folder button and Try Again offer the strip when their chooser opens nothing (found ${ROW_OFFERS})" >&2
   WIRING_FAIL=1
 fi
 forbid "nothing next to a system file window comes on a timer (no sleep or timer in SystemFileWindows)" \
