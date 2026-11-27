@@ -274,6 +274,21 @@
   **要图形会话，故意不在 `check-all.sh` 里**（无图形会话会假红），改
   `InstantTooltip.swift` 时按 [GUI 冒烟流程](../testing/gui-smoke-testing.md) 跑。
 - 切主题、系统切深浅色之后，开着的主窗口（SwiftUI 场景）、工程窗口、录屏控制条、sheet、popover、提示面板的窗框、SwiftUI 读到的浅 / 深、画出来的底色都和新主题一致（森林色永远浅，经典色跟系统）：`scripts/check-theme-switch.sh`。**要图形会话，故意不在 `check-all.sh` 里**，改主题的浅 / 深、呈现根、自建窗口的外观时按 [GUI 冒烟流程](../testing/gui-smoke-testing.md) 跑；写法（不交 nil、只有一处 `.preferredColorScheme`、不设 `NSApp.appearance`）由 `checks/app-theme-wiring.sh` 在 check-all 里钉着。
+- On / off, current and selected at a glance (2026-11-27, [界面主题](../architecture/app-themes.md) "On / off at a glance"):
+  `scripts/check-app-theme.sh` → `checks/AppTheme/StateRuleChecks.swift` measures the palette's own values (CIEDE2000 ≥ 20 for
+  a mark, ≥ 10 for an area, text contrast ≥ 3): Forest's toggles, the on chip on the window colour (the workbench), the
+  current line and its index, a selected row and a row that is both; Classic's teal toggles against the label colour and half
+  of it, the current line, its index and the selected row's fill in system light and dark (default blue accent); the old
+  Forest toggles (#123F32 / #19221D, no chip) and the old current line must fail; every Classic state colour equals what it
+  was. Review FBG1: a toggle's chip itself is required; over the video on #FFFFFF and #000000 (casing and line, contrast ≥ 3);
+  the selected cap's chip and a dark shape's inner line on dark content. `checks/AppTheme/StateViewChecks.swift`: #9 … #9999,
+  current or not, both themes (one line, fits, every row's column equally wide; short lists keep 24 / 30 pt), and the
+  VoiceOver tree of two Forest toggles (named toggle buttons with values, no image or switch, the chip's frame).
+  `checks/app-theme-wiring.sh`: no `.toggleStyle(.button)` or `ButtonToggleStyle()` outside `StateMarks.swift` (one
+  allowlisted bordered Loop), `toggleAccent` only as `.stateToggle`'s Classic tint, the macOS accent in any spelling only in
+  `AppThemePalette` (every target; allowlist: `ScreenRecordingRegionPanel`), no hand-made accent / text toggle, the audited
+  controls on the shared looks, the shared looks on the measured palette names, the VoiceOver names, the casings, the
+  cap's chip, the shape's inner line, and no accessibility representation or counted body in `StateMarks.swift`.
 - 时间线缩放的锚点（横向钉指针那一刻、工具栏钉播放头 / 视口正中、纵向按行认的那一处），以及播放跟随
   （开关关着到哪都不推、开着只在边上推、推到 15%）和剪辑页记住的开关（五个默认值、没记过 / 记坏了读默认值、脚本驱动时永远默认值）：
   `scripts/check-timeline-zoom.sh`；接线（不许 hitTest 找滚动视图、唯一缩放入口、⌥ / ⌘↓⌘↑ 纵向）在
@@ -961,6 +976,17 @@
     the feed naming it confirms it (Update, nothing downloads; the menu's check at once), a check that can't reach the feed
     too (offline Macs still update), "up to date" removes it and the kept download, another release replaces it unseen;
     auto off: New Version once confirmed, asked for: ready; a copy that only tells holds none.
+  - **get_status's `app_update`** (MCP-85, `AppUpdateStatusReport`): every state against JSON written out by hand (not known
+    yet, each never-updates reason, a copy that only tells reports no switch, not checked, checking and failed ahead of the
+    last result, up to date with its UTC time, downloading at 42 %, unknown, over 100 %, negative and NaN, ready with notes
+    in en / zh-Hans / es and French falling back to English, a restart waiting, available with auto install off, an asked
+    download that failed, each only-tells reason with its hint, just_updated for the whole launch, a newer release winning
+    over it); notes only for ready / available / just_updated and only the documented keys in every case; the two
+    vocabularies pinned; then through `AppUpdateState.apply` (an earlier run's staged copy unseen until confirmed, as on
+    the pill; review FBG1 E1: an automatic download that failed stays `available` / `download_failed` with SkyCut's retry,
+    also after a failed check, until a check finds nothing newer; a DMG the retry record holds back is `available` /
+    `held_back`, after one failure and after three, while nothing downloads; E2: the hints quote the App's button names,
+    zh-Hans sample). The guard's section 9: get_status's one line, and the report never reading the updater or acting.
   - **The retry record** (U1, `AppUpdateRetryRecord`): a DMG that came down whole and failed its check or staging is
     counted and kept on disk, silently; automatic checks leave it alone for 24 hours (1 h and 23 h later: nothing; 25 h:
     fetched), never after three failures; Settings' and the menu's checks fetch it and their failures count; a download

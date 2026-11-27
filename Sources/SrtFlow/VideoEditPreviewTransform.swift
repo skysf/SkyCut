@@ -238,8 +238,10 @@ struct ResizableFrameBox: View {
         ZStack(alignment: .topLeading) {
             // 描边；能移动的框整个内部都接拖动，不能移动的（形状）只当视觉框，
             // 事件全部放行给下面形状自己的手势。
+            // Forest: the white line in a dark casing too, so it reads on a white picture (review FBG1 U2); Classic: none.
             let stroke = Rectangle()
                 .strokeBorder(.white, lineWidth: 1.5)
+                .overVideoOutlineCasing(Rectangle(), lineWidth: 1.5)
                 .shadow(color: AppThemePalette.current.dragAccent.opacity(0.8), radius: 2)
                 .frame(width: max(rect.width, 2), height: max(rect.height, 2))
             if movable {
@@ -289,6 +291,7 @@ struct ResizableFrameBox: View {
         RoundedRectangle(cornerRadius: 2)
             .fill(.white)
             .frame(width: handleSize, height: handleSize)
+            .overVideoCasing(RoundedRectangle(cornerRadius: 3))
             .shadow(color: .black.opacity(0.6), radius: 1)
             .contentShape(Rectangle().inset(by: -5))
             .pointerStyle(handle.pointerStyle)

@@ -17,7 +17,7 @@ struct CloudTaskProjectCard: View {
             if isCurrent {
                 VStack(alignment: .leading, spacing: 7) {
                     Label("Current project", systemImage: "viewfinder")
-                        .font(.caption).foregroundStyle(Color.accentColor)
+                        .font(.caption).foregroundStyle(AppThemePalette.current.highlight)
                     heading
                 }
                 .padding(16)
@@ -44,7 +44,7 @@ struct CloudTaskProjectCard: View {
         .overlay(alignment: .top) {
             if isCurrent {
                 UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10)
-                    .fill(Color.accentColor).frame(height: 3).padding(.horizontal, 1).allowsHitTesting(false)
+                    .fill(AppThemePalette.current.highlight).frame(height: 3).padding(.horizontal, 1).allowsHitTesting(false)
             }
         }
     }

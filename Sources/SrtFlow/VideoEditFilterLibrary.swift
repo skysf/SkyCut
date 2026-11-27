@@ -221,7 +221,7 @@ private struct FilterCard: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
                             .strokeBorder(
-                                isSelected ? Color.accentColor : Color.primary.opacity(0.15),
+                                isSelected ? AppThemePalette.current.highlight : Color.primary.opacity(0.15),
                                 lineWidth: isSelected ? 2 : 1
                             )
                     )
@@ -234,7 +234,7 @@ private struct FilterCard: View {
             Text(LocalizedStringKey(preset.title))
                 .font(.caption2)
                 .lineLimit(1)
-                .foregroundStyle(isSelected ? Color.accentColor : .primary)
+                .chipText(isSelected, normal: Color.primary, semibold: false)
         }
         // 整张卡片可点：点 = 应用（选中着某段就换种类）。`+` 在它上面，
         // 自己把点击吃掉，所以两个动作不会互相触发。
@@ -252,7 +252,7 @@ private struct FilterCard: View {
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 18, height: 18)
-                .background(Circle().fill(Color.accentColor))
+                .background(Circle().fill(AppThemePalette.current.highlight))
         }
         .buttonStyle(.plain)
         .instantHelp("Add this filter at the playhead")

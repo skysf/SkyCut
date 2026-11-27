@@ -49,6 +49,68 @@
 SF Symbol），自动吸附用 `arrow.right.and.line.vertical.and.arrow.left`，播放跟随
 用 `play.square`。图标表达动作，颜色表达开关状态；开关记忆与行为不改。
 
+## On / off at a glance (since 2026-11-27)
+
+The user, 2026-11-27, on the toolbar toggles: 「这几个button，到底是选中了，还是没有，UI没有反应，都是一个样子」 ([case](../bugfixes/2026-11-27-on-off-invisible-in-forest.md)).
+They picked look A, the light chip, for Forest; Classic does not change (one approved exception below).
+
+- **One shared look** (`Sources/SrtFlow/StateMarks.swift`). An icon toggle goes through `.stateToggle(classicTint:)`: in
+  Forest the icon is the accent #123F32 on the light green chip `onChip` #CFE0C8 when on, the secondary grey #676D62 with
+  no chip when off (padding either way, so nothing moves; the label is at least 18 × 16 pt, so the chip and the click
+  target are at least 24 × 20 pt); in Classic it is exactly what the control drew before (AppKit's button toggle, its teal
+  `toggleAccent` or the root's tint). VoiceOver gets one "toggle button" per control with its on / off value and the chip's
+  frame (no accessibility representation: that made an image plus an unnamed switch); every toggle has a name
+  (`.accessibilityLabel`). The text of a current or selected thing (`.chipText(_:normal:semibold:)`: the current subtitle
+  line and its number, a selected filter / transition card's title) is the accent on the same chip in Forest, drawn
+  around the text so it takes no width from it; the macOS accent in Classic. Users: the timeline toolbar's magnet /
+  snapping / linkage / follow playhead, the inspector's Flip, both subtitle lists' follow playback, `CurrentCueHighlight`,
+  the edit page's cue number, the library cards' titles.
+- **Count-neutral** ([预览性能 ratchet](preview-perf-ratchet.md)): `stateToggle`, `chipText` and the other marks are plain
+  functions, no ViewModifier type, and `ForestStateToggleStyle.makeBody` counts nothing (it re-runs on every evaluation of
+  the view holding the toggle). The bench's paths count what they counted before (review FBG1, measured with its probe).
+  The Burn In page's follow toggle is its own small view (`BurnInFollowToggle`): the panel's body runs on every clock tick,
+  the toggle doesn't.
+- **Numbers never wrap or truncate** (`SubtitleIndexColumn`): the edit page's number column is sized by a hidden template of
+  the list's largest number (formatted as the numbers are, "#9,999"), never narrower than its old 24 pt; the Burn In
+  table's "#" column is 30 pt as before and wider when the largest number (semibold, with Forest's chip) wouldn't fit.
+- **One "on" chip**: `onChip`. The workbench's Library and Subtitles buttons show their panel with it (`.workbenchChip(isOn:)`)
+  in both themes — the Subtitles button's chip is the only Classic change the user approved; Classic's chip is the one the
+  Library button always had. `selectionFill` stays for selected rows (Settings, the voice picker).
+- **Selected**: a selected row of the edit page's subtitle list is outlined in the accent in Forest (`rowSelectionStroke`;
+  a light fill would melt into the current line's chip on a row that is both) and keeps the macOS accent at 18 % in
+  Classic (`rowSelectionFill`). Every timeline block outlines a selection with `selectionStroke` (Classic white).
+- **No `Color.accentColor` outside `AppThemePalette`.** The theme root's `.accentColor(_:)` doesn't reach it, so in Forest
+  it is the macOS accent (yellow / blue…). Selected, current and drop-target marks use `highlight` (Forest: the accent;
+  Classic: `Color.accentColor` itself, so Classic stays as it was). Marks over the video (the text frame box, the Burn In
+  margin guides) must read on any picture: `overVideo` is white in Forest in a dark casing 1 pt beyond each side
+  (`overVideoCasing`, `.overVideoCasing` / `.overVideoOutlineCasing`; the clip transform box gets the same casing in Forest),
+  dark inside hollow handles and behind the white numbers; Classic keeps the macOS accent and no casing.
+- **Selected marks on dark content**: a selected transition cap in Forest is the on chip with the accent's ring and icon
+  (`selectedCapFill`, `selectedCapIcon`), a selected card's title is on the chip, a selected shape block has a light inner
+  line inside its dark outline (`selectionInnerStroke`), so a selection shows on black footage, a black thumbnail or a black
+  shape. Classic: as before.
+- **The rule** (`scripts/check-app-theme.sh`, `checks/AppTheme/StateRuleChecks.swift`, measured on the palette's own values):
+  two states tell apart when their mark (icon or text colour) differs by CIEDE2000 ≥ 20, or their area (chip, row fill,
+  outline, against what is behind it) by ≥ 10; a current line's text keeps WCAG contrast ≥ 3 on its own background. The
+  old Forest toggles (#123F32 on / #19221D off, no chip: mark 13.4, area 0) and the old current line (accent against the
+  primary text, no chip: mark 18) fail it; look A passes (mark 21.7, chip 12.3); Classic passes with its teal (24 dark,
+  50 light) and the default blue accent. `selectionFill` alone (ΔE 6.8 on the panel) is why a selected cue row is outlined.
+  A toggle must show its chip (area ≥ 10), not only the icon colour. Over the video, on #FFFFFF and on #000000: the casing
+  and the white line each keep contrast ≥ 3 against what is behind them (a white line alone on white is 1 : 1). On dark
+  content: the selected cap's chip and a dark shape's inner line keep ΔE ≥ 10 (a dark ring alone melts into black).
+  `checks/AppTheme/StateViewChecks.swift` lays out #9 … #9999, current or not, in both themes (one line, the column fits,
+  every row's column equally wide) and reads the VoiceOver tree of two Forest toggles (two named toggle buttons with their
+  values, no image or switch, the chip's frame).
+  `checks/app-theme-wiring.sh` keeps raw `.toggleStyle(.button)` (allowlist: the Upscale compare's bordered Loop, whose
+  bezel shows the state; also `ButtonToggleStyle()`), `toggleAccent` tints, the macOS accent in any spelling
+  (`Color.accentColor`, `controlAccentColor`; allowlist: `ScreenRecordingRegionPanel`, which draws over the user's whole
+  screen outside SkyCut's themed windows as macOS's own screenshot selection does) and a hand-made toggle in the accent
+  against the text colour out of the views; pins the shared looks' colours, the VoiceOver names, the casings, the cap's chip
+  and the shape's inner line; and keeps StateMarks.swift free of accessibility representations and counted bodies.
+- **Offscreen renders can't show AppKit's toggle state**: a window of an app that isn't active draws AppKit controls as
+  inactive, so Classic's teal "on" never appears in them (both themes looked "off" there before the fix). Forest's look is
+  drawn by SwiftUI and renders exactly. Judge AppKit's states in a real window (manual items below).
+
 ## MCP
 
 `get_settings section=general` 返回 `theme`、`default_theme`、`available_themes`。
@@ -84,3 +146,12 @@ id 冒充当前会话的工程（保护租约会正确拒绝）。
   标签、选中框、标尺、波形在两套颜色里清楚。
 - [ ] 素材、黑场、用户的文字 / 形状颜色、导出参数不变；重启保留主题选择。
 - [ ] MCP 与原生选择器双向同步，坏参数不会造成半次主题更新。
+- [ ] On / off at a glance, in real windows, Forest and Classic (system light and dark): the timeline toolbar's magnet,
+  snapping, linkage and follow playhead, the inspector's Flip, both subtitle lists' follow playback and the workbench's
+  Library and Subtitles buttons each look different on and off without hovering; the current subtitle line and a selected
+  row tell apart, and a row that is both shows both.
+- [ ] Classic: the toggles' teal "on" tint shows in a real, active window (offscreen renders can't show it).
+- [ ] VoiceOver (both themes): each toolbar, Flip and follow-playback toggle reads its name and on / off, once.
+- [ ] Forest with a non-default system accent (e.g. yellow): no Forest control turns that colour (cards, the transition cap,
+  drop targets, the cloud tasks' current project); over a bright and a dark picture the text frame box and the Burn In
+  margin guides stay readable.

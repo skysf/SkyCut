@@ -25,6 +25,7 @@ struct AppUpdateChecks {
         FeedChecks.run(check: check)
         EligibilityChecks.run(check: check)
         StateChecks.run(check: check)
+        StatusReportChecks.run(check: check)
         do {
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
             try await FlowChecks.run(server: server, root: root.appendingPathComponent("flow"), check: check)

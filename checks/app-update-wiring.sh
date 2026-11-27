@@ -24,6 +24,8 @@
 #      for a copy that installs; a copy inside the Updates folder never updates; Settings shows the test hook while one is
 #      set. And (review FBU2, F10) the schedule's origin, the retry record at launch, the real home folder, the cadence, a
 #      cancelled download's silence and the record matched to the offer.
+#   9. get_status's app_update (MCP-85) reads, never acts: one line in AIProjectTools.status takes AppUpdater.statusReport,
+#      which only builds AppUpdateStatusReport (pure, Foundation only: no check, download, install, restart or quit).
 # Usage: checks/app-update-wiring.sh
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -229,5 +231,22 @@ SETTINGS="${DIR}/AppUpdateSettingsSection.swift"
 [ "$(count 'if let feed = updater.testFeedURL {' "${SETTINGS}")" = 1 ] && [ "$(count 'L10n("Test update feed: %@")' "${SETTINGS}")" = 1 ] \
   || fail "${SETTINGS}: the test hook's address shows while it is set"
 
+# 9. get_status's app_update: read only.
+STATUS_TOOL="Sources/SrtFlow/AIProjectTools.swift"
+[ "$(count 'result["app_update"] = try? JSONValue.decode(AppUpdater.shared.statusReport.encoded())' "${STATUS_TOOL}")" = 1 ] \
+  || fail "${STATUS_TOOL}: get_status reports app_update from AppUpdater.statusReport, once"
+REPORT="${DIR}/AppUpdateStatusReport.swift"
+[ "$(grep -c '^import ' "${REPORT}")" = 1 ] && [ "$(count 'import Foundation' "${REPORT}")" = 1 ] \
+  || fail "${REPORT} is pure: it imports Foundation only"
+if grep -nE 'AppUpdater|[.]check[(]|downloadAndInstall|requestRestart|quitToRestart|installAtQuit|send[(]|NSApp' "${REPORT}" \
+  | grep -vE '^[0-9]+:[[:space:]]*//'; then
+  fail "${REPORT} only maps a state it is given: no updater, no check, download, install, restart or quit"
+fi
+REPORT_LINE="$(line_of 'var statusReport: AppUpdateStatusReport {' "${UPDATER}")"
+MAKE_LINE="$(line_of 'AppUpdateStatusReport.make(state, decision: decision, automatic: automatic, lastUpToDate: lastUpToDate,' "${UPDATER}")"
+if [ -z "${REPORT_LINE}" ] || [ -z "${MAKE_LINE}" ] || [ $((MAKE_LINE - REPORT_LINE)) -ne 1 ]; then
+  fail "${UPDATER}: statusReport only builds AppUpdateStatusReport from the published state"
+fi
+
 if [ "${FAILED}" -ne 0 ]; then exit 1; fi
-echo "✓ app-update-wiring: one feed address, the atomic swap only, deletes inside Updates only, wired at start / quit / menu / Settings / toolbars, the coordinator pinned, no admin rights, no network in the check"
+echo "✓ app-update-wiring: one feed address, the atomic swap only, deletes inside Updates only, wired at start / quit / menu / Settings / toolbars, the coordinator pinned, get_status read only, no admin rights, no network in the check"

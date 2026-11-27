@@ -24,7 +24,17 @@ enum MCPGuideProjectTopics {
             which AI session edits it and whether it has a window; the folders you opened; jobs and whether the user pressed \
             Stop; the screen recording state, its permission and any leftover recording; and cloud_tasks grouped by project, \
             background and closed projects included. mcp_catalog gives the App's tool count and fingerprint; it does not prove \
-            that your client reloaded the tools. skycut_plan says what the user's plan includes.
+            that your client reloaded the tools. skycut_plan says what the user's plan includes. app_update is SkyCut's own \
+            update state (section updates).
+            """),
+            // app_update (MCP-85, AppUpdateStatusReport; ai-control-mcp.md section 4 item 69): the user's quiet rule, no nagging.
+            MCPGuideSection(name: "updates", about: "app_update: SkyCut's own update state, and when to mention it", text: """
+            Updates. app_update says whether a newer SkyCut is downloading, ready (it installs when SkyCut quits), available \
+            (reason says why it doesn't download by itself) or just_updated (from names the version before); otherwise \
+            up_to_date, checking, check_failed, not_checked, or off for a copy that never updates. It carries version, notes in \
+            the user's language and a hint with the user's own steps. Mention it only when the user asks about versions or \
+            updates, or when a newer version may fix what they hit; say it once, never nag. Never install, restart or quit \
+            SkyCut yourself: pass on the hint.
             """),
             MCPGuideSection(name: "extras", about: "models=true, screen=true and film_contract=true", text: """
             Extras. models=true reads Sky Studio's model catalog with prices, defaults and reference limits, free and \

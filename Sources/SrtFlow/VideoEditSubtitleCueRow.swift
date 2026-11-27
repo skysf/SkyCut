@@ -31,6 +31,8 @@ struct VideoEditSubtitleCueRow: View {
     /// 播放头此刻正落在这句上。
     let isCurrent: Bool
     let isSelected: Bool
+    /// The hidden template that sizes the number column for the list's largest number (SubtitleIndexColumn.editTemplate).
+    let indexTemplate: Int
     /// 这条轨看得见吗：隐藏 = 不可编辑（与时间线字幕行同一条合同）。
     let canEdit: Bool
     let onSelect: () -> Void
@@ -47,11 +49,8 @@ struct VideoEditSubtitleCueRow: View {
                 .instantHelp(trackName)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text("#\(cue.index)")
-                        .font(.caption2)
-                        .monospacedDigit()
-                        .foregroundStyle(isCurrent ? Color.accentColor : Color.secondary)
-                        .frame(width: 24, alignment: .leading)
+                    // One line, as wide as the list's largest number (SubtitleIndexColumn): #10 to #9999 never wrap.
+                    SubtitleIndexColumn.editLabel(index: cue.index, template: indexTemplate, isCurrent: isCurrent)
                     // 两个时间码格子平分剩下的宽度：这一列可以被拖窄，钉死宽度
                     // 会让「结束时间」在窄列里被切掉半截（实测 260pt 就切了）。
                     TimecodeField(value: startBinding)
@@ -85,8 +84,14 @@ struct VideoEditSubtitleCueRow: View {
         .textFieldStyle(.roundedBorder)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
+                .fill(isSelected ? AppThemePalette.current.rowSelectionFill : Color.clear)
         )
+        // Forest outlines a selected row (Classic: none, its fill above): a row that is also current keeps its chip visible.
+        .overlay {
+            if isSelected, let stroke = AppThemePalette.current.rowSelectionStroke {
+                RoundedRectangle(cornerRadius: 6).strokeBorder(stroke, lineWidth: 1.5).allowsHitTesting(false)
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
         .onChange(of: focusedCueID) { old, new in

@@ -30,14 +30,7 @@ struct VideoEditWorkbenchToolbar: ToolbarContent {
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .navigation) {
             Button { showsLibrary.toggle() } label: {
-                Image(systemName: "sidebar.left")
-                    .padding(5)
-                    .background {
-                        if showsLibrary {
-                            RoundedRectangle(cornerRadius: 5)
-                                .fill(AppThemePalette.current.selectionFill)
-                        }
-                    }
+                Image(systemName: "sidebar.left").workbenchChip(isOn: showsLibrary)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.primary)
@@ -49,7 +42,7 @@ struct VideoEditWorkbenchToolbar: ToolbarContent {
                 .labelStyle(.iconOnly)
                 .foregroundStyle(.primary)
             Button { project.showsSubtitleList.toggle() } label: {
-                Label("Subtitles", systemImage: "captions.bubble")
+                Label("Subtitles", systemImage: "captions.bubble").workbenchChip(isOn: project.showsSubtitleList)
             }
             .labelStyle(.iconOnly)
             .buttonStyle(.plain)
