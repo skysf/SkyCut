@@ -79,6 +79,8 @@ The requests are plain GETs from an ephemeral session: no cookies, cache or cred
 account, key, machine id or any other identifier. Redirects are refused (the feed and the DMG are served directly). The
 check records every request on its loopback server and fails on any header beyond Host, User-Agent (`SkyCut`), Accept
 (`*/*`), Accept-Language, Accept-Encoding, Connection, Cache-Control (`no-cache`) and Priority, and on any query string.
+The website's privacy page states this check in its Mac app section (`privacySections` in `website/content/*.js`), so a
+change here changes that page too.
 
 ## 4. Downloading and verifying
 
@@ -273,12 +275,19 @@ No check reaches a real notarized pair of builds, Gatekeeper on a real download,
 14. A wrong SHA-256 in the test feed: B downloads once, nothing is shown, no Update pill; an automatic check doesn't
     download it again for a day (quit and reopen A: no second download), SkyCut › Check for Updates… does (U1's limit:
     `Updates/retry.json` counts it).
-15. With B staged, quit A and open it again, then quit within 30 s (before its first check): A stays, B is still staged
-    (`staged.noindex/`), and the next quit after a check installs it.
-16. With B staged, roll the test feed back to A's version, then quit and reopen A: once its first check ran (about a
-    minute), B is gone from `staged.noindex/` and nothing is shown; a quit then leaves A.
-17. With B staged, stop the test server, then quit and reopen A: after about a minute the Update pill shows (the feed
-    can't be reached), and quitting installs B.
+15. B stays staged across a launch only when A ends without its normal quit (a force quit or a crash; the test sends
+    SIGKILL to A once B is staged): a normal quit with B staged installs it. Then open A and quit within 30 s (before its
+    first check): A stays, B is still staged (`staged.noindex/`), and the next quit after a check installs it.
+16. With B staged by an earlier run (as in 15), roll the test feed back to A's version, then open A: once its first check
+    ran (about a minute), B is gone from `staged.noindex/` and nothing is shown; a quit then leaves A.
+17. With B staged by an earlier run (as in 15), stop the test server, then open A: after about a minute the Update pill
+    shows (the feed can't be reached), and quitting installs B.
 18. Quit A right after B finished downloading (while it is being staged): at the next launch B is staged from the kept DMG,
     with no second download in the test server's log.
 19. Clean up: `defaults delete com.srtflow.SrtFlow SrtFlow.update.feedURL`; the replaced build is in the Trash.
+
+Last run on 2026-11-27, 0.18.69 → 0.18.70 (the release record: [构建与打包](../build/build-and-packaging.md)「公开下载发布」).
+Every step a script could observe passed (files, the test server's log, SkyCut's log, the process list, the window
+server's window list); step 6 was confirmed by the user (About 0.18.70, the Updated pill with the four notes). Not run
+that day, checked at the next real update: steps 7, 9 and 11, the Dock click of step 12, the Update pill and its popover
+(steps 4 and 17) and the menu's Check for Updates… of step 14.

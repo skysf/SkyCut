@@ -701,6 +701,13 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
   on both hosts lands on the same languages as on 11-20; `favicon.ico`, `favicon-32.png`, `favicon-64.png` and
   `apple-touch-icon.png` byte-identical to `public/`; no hard-coded version or DMG name anywhere in `website/` (the
   buttons use the stable entry); `npm run indexnow` accepted 64 addresses (200).
+- The privacy page's update-check sentence and the docs page's self-update note (PR #567) went live on 2026-11-27 with
+  the 0.18.70 release: main commit `b57854fb27d053c528c4188a193723fb542f225e`, the same `POST /v13/deployments` path,
+  Vercel deployment `dpl_3uSTsguRJGTgS58p7DFPodWbks5V` READY. No new article since the last deploy (only `lastmod`), so no
+  redate. Checked live: all 64 sitemap addresses 200 with self canonicals, the live sitemap byte-identical to main's;
+  `/ja`, `/zh-hant` 307 to their guides; robots, `llms.txt` and the 404 page as before; every asset of the home page and
+  an article page 200; `/docs` on both hosts lands on the same languages as on 11-20; the new sentences are on
+  `/en/privacy/` and `/en/docs/`; `npm run indexnow` accepted 64 addresses (200).
 - `.vercel/`、`node_modules/` 和生成的语言 HTML 不入库。源是 `content/*.js` 和
   `scripts/*.mjs`，不能直接改生成页。
 - 下载沿用 `https://skylu.ai/download/skycut`。2026-11-05 用户单独授权更新 App，
