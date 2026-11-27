@@ -18,7 +18,7 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
 1. **Panels are made only in `SystemFileChooser.swift`** (`SystemFilePanel`, from a `FileWindowRequest`: files to open,
    a folder, a new file to save) **and opened with `begin`, never `runModal`**. `checks/file-io-off-main-wiring.sh` fails on an
    `NSOpenPanel(` / `NSSavePanel(` anywhere else and on `runModal` in the chooser, the shared windows, the helper and the
-   export panel. In-process `NSAlert`s are not panels of that service and may stay modal.
+   export panel. In-process `NSAlert`s are not panels of that service and may stay modal, outside any Swift task (rule 10).
 2. **`SystemFileChooser` watches the window**: not on screen with no answer for 3 s, or an empty answer within 1 s, is a
    failure (AppKit can give up without ever calling back); "Close It" cancels a window that stopped responding. Its completion
    gets the picked URLs, or nil when the person cancelled; a failure is a phase (`.failed`), not a completion.
@@ -64,6 +64,18 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
    in the branch the person confirmed and commits every other name with one rename that fails when the name is taken,
    journaled first ([recording lifecycle](screen-recording-lifecycle.md) "文件覆盖与命名"). The AI's saves pick unused names
    and never replace a file (only `save_project` back to the project's own file).
+10. **An alert's modal loop runs from the run loop, never inside a Swift task** (since 2026-11-27,
+    [case](../bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md)). While `runModal` runs, every event
+    goes through AppKit's handlers, and AppKit swallows an Objective-C exception raised there. Raised under a modal loop
+    that runs inside a task, the exception unwinds the task and the Swift runtime's `swift_job_run`, which then never puts
+    the thread's executor tracking back. The next main-actor isolation check outside a task (`MainActor.assumeIsolated`,
+    an event monitor) reads a dead stack frame and crashes. That is how Check for Updates… crashed 0.18.70.
+    - Show a new alert from a run-loop turn: `RunLoop.main.perform { MainActor.assumeIsolated { … } }`, as the update
+      check's answer does ([app updates](app-updates.md) §7). Not `Task { }`. Not `DispatchQueue.main.async` either: an
+      exception escaping a dispatch block terminates the app.
+    - Still inside tasks on 2026-11-27, because they await the answer: the untitled-project save question
+      (`ProjectCloseQuestions`, from `prepareToClose`), the drive question at quit (`ProjectQuit.waitForDrive`) and
+      `FileReplaceQuestion`. Moving one out of its task is a change of its own.
 
 ## Checks
 
@@ -75,6 +87,7 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
 | `scripts/check-screen-recording-feedback.sh` (`RecordingCommitChecks`) | a recording's commit: a file that appears at a free name or at the sidecar's name after the intent was journaled keeps its bytes, the file takes the next name and the journal names it; a confirmed commit replaces (rule 9) |
 | `scripts/check-project-saves.sh` (`ReplaceChecks`) | a file under the answered name keeps its bytes until the person answers Replace: the project's Save As for each helper answer, closing an untitled project, the AI's saves, the subtitle file write (rule 9) |
 | `checks/file-io-off-main-wiring.sh` | panels only in `SystemFileChooser.swift`, `begin`, no `runModal` in the chooser / shared windows / helper / export panel, the record before AppKit, `FilePicker` through `SystemFileWindows`; rule 9's wiring (helper answers unconfirmed, the exclusive install, Save As and Export As asking, the recording's confirmation) |
+| `checks/app-update-wiring.sh` (section 10) | rule 10 for the update check's answer window: shown with `RunLoop.main.perform`, never in a `Task` or `DispatchQueue.main.async`. The other alerts are not scanned (they run inside their tasks today, rule 10) |
 
 ## Manual regression (real windows, before a release)
 
