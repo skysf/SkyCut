@@ -331,10 +331,14 @@ struct TimelineState: Hashable, Sendable {
     /// The editing style this film was cut with (v40, SS5 plan 5.5): a Sky Studio style keeps its version here. Nil until AI follows one.
     var editingStyle: EditingStyleRecord?
 
+    /// Nothing the person made is in it: the one answer to "is this project empty?" (closing an untitled one asks only when
+    /// it isn't; the start screen, Play and Export follow it too). Ruler markers and their notes and a translation track
+    /// count; settings, switches, review marks and the style record alone don't — the list and why:
+    /// docs/architecture/video-edit-project-file.md §5 "What an empty project is".
     var isEmpty: Bool {
-        mainClips.isEmpty && overlayTracks.allSatisfy(\.clips.isEmpty)
-            && audioTracks.allSatisfy(\.clips.isEmpty) && subtitle == nil && shapes.isEmpty
-            && textOverlays.isEmpty && filters.isEmpty && production == nil && minimumDuration == 0
+        mainClips.isEmpty && overlayTracks.allSatisfy(\.clips.isEmpty) && audioTracks.allSatisfy(\.clips.isEmpty)
+            && subtitle == nil && subtitleCompanion?.translation == nil && shapes.isEmpty && textOverlays.isEmpty
+            && filters.isEmpty && rulerMarkers.isEmpty && production == nil && minimumDuration == 0
     }
 
     /// Content end, extended by the explicit ending when one is set.

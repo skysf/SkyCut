@@ -14,6 +14,7 @@ import SrtFlowCore
 //   document opened since in the same project; a stale save window.
 // - ReplaceChecks.swift: a file already at a chosen place is replaced only when the person confirmed it for that URL.
 // - OffMainWriteChecks.swift: the subtitle editor's writes and a saved version's media never wait on the main thread.
+// - UntitledMarkersChecks.swift: an untitled project with only a ruler marker and its note is asked about before it closes.
 
 @MainActor
 final class Checks {
@@ -50,6 +51,7 @@ final class Checks {
         await EditWhileClosingChecks.run(checks, root: root)
         await ReplaceChecks.run(checks, root: root)
         await OffMainWriteChecks.run(checks, root: root)
+        await UntitledMarkersChecks.run(checks, root: root)
         print("Project saves: \(checks.count) assertions, \(checks.failures) failures")
         exit(checks.failures == 0 ? 0 : 1)
     }
