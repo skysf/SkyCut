@@ -5,7 +5,9 @@ import SwiftUI
 // What it does: SkyCut's version, a status line (checked today / yesterday / on a date and up to date, checking,
 // downloading, ready, a new version), Check for Updates (the answer shows in the status line: no window), and the switch
 // "Download and install updates automatically" (default on, AppUpdater.automatic) with a caption that follows it. A copy
-// that can't update itself shows the switch disabled and says so. Not shown for a copy that never updates.
+// that can't update itself shows the switch disabled and says so. While the test hook is set (`SrtFlow.update.feedURL`,
+// to an address SkyCut uses), one line shows its address: a hook left behind after a test never turns updates off
+// silently. Not shown for a copy that never updates.
 // What it doesn't: the rules or the checking (AppUpdater, AppUpdateStatusLine).
 // Rules: docs/architecture/app-updates.md "What the person sees", docs/architecture/workbench-and-settings.md.
 
@@ -24,9 +26,16 @@ struct AppUpdateSettingsSection: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                        if let feed = updater.testFeedURL {
+                            Text(verbatim: String(format: L10n("Test update feed: %@"), feed.absoluteString))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("settings-test-update-feed")
+                        }
                     }
                     Spacer(minLength: 8)
-                    Button("Check for Updates") { updater.check(byPerson: false) }
+                    Button("Check for Updates") { updater.check(from: .settings) }
                         .disabled(updater.state.checking || updater.state.phase == .downloading)
                         .accessibilityIdentifier("settings-check-for-updates")
                 }
@@ -37,6 +46,7 @@ struct AppUpdateSettingsSection: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            .onAppear { updater.refreshTestFeed() }
         }
     }
 

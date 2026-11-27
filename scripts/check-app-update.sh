@@ -1,10 +1,12 @@
 #!/bin/bash
 # SkyCut's updater (docs/architecture/app-updates.md): the feed's strict parsing, version order, who updates, the state
-# machine and what a restart waits for (pure), then the real flow against scratch folders: a loopback HTTP server (python3's
-# http.server on 127.0.0.1, never the network) serving a feed and a DMG, real read-only images (hdiutil, -nobrowse at
-# scratch mount points), staging with ad-hoc signed fixture bundles, the install at quit, and a loop of atomic swaps killed
-# at random instants (the app is never missing or half-written). Launches no App; never touches the real /Applications,
-# the Trash, Application Support or a running SkyCut. Needs codesign, hdiutil and python3 (CI's macOS runners have them).
+# machine, the retry record and what a restart waits for (pure), then the real flow against scratch folders: a loopback HTTP
+# server (python3's http.server on 127.0.0.1, never the network) serving a feed and a DMG, real read-only images (hdiutil,
+# -nobrowse at scratch mount points), the pipeline with kept downloads, staging with ad-hoc signed fixture bundles, the
+# install at quit, a loop of atomic swaps killed at random instants (the app is never missing or half-written), what a
+# launch reads and cleans, and the relaunch shell (with a recorder for /usr/bin/open). Every request's headers are recorded:
+# nothing beyond the allow-list below (no identifier). Launches no App; never touches the real /Applications, the Trash,
+# Application Support or a running SkyCut. Needs codesign, hdiutil and python3 (CI's macOS runners have them).
 set -euo pipefail
 . "$(dirname "$0")/native-arch.sh"
 cd "$(dirname "$0")/.."
@@ -33,14 +35,18 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -wmo \
   Sources/SrtFlow/AppUpdate/AppUpdateVersion.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateFeed.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateRecords.swift \
+  Sources/SrtFlow/AppUpdate/AppUpdateRetry.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateEligibility.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateState.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateBusy.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateFiles.swift \
+  Sources/SrtFlow/AppUpdate/AppUpdateLaunchFiles.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateHTTP.swift \
+  Sources/SrtFlow/AppUpdate/AppUpdatePipeline.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateVerifier.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateStager.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateInstaller.swift \
+  Sources/SrtFlow/AppUpdate/AppUpdateRelaunch.swift \
   Sources/SrtFlow/MoveToApplicationsOffer.swift \
   Sources/SrtFlow/AppBundleSignature.swift \
   Sources/SrtFlow/Quarantine.swift \
@@ -51,23 +57,38 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -wmo \
   checks/AppUpdate/EligibilityChecks.swift \
   checks/AppUpdate/StateChecks.swift \
   checks/AppUpdate/FlowChecks.swift \
+  checks/AppUpdate/PipelineChecks.swift \
   checks/AppUpdate/InstallChecks.swift \
+  checks/AppUpdate/LaunchChecks.swift \
+  checks/AppUpdate/FilesChecks.swift \
   -o "${WORK}/check-app-update"
 
 echo "==> loopback server"
 mkdir -p "${WORK}/www"
-python3 -u - "${WORK}/www" > "${WORK}/server.port" 2> "${WORK}/server.log" <<'PYTHON' &
+# Every request's headers go to requests.log (one JSON line each): after the run, nothing beyond the allow-list below.
+python3 -u - "${WORK}/www" "${WORK}/requests.log" > "${WORK}/server.port" 2> "${WORK}/server.log" <<'PYTHON' &
 import http.server
+import json
 import os
 import socketserver
 import sys
+import threading
 
 os.chdir(sys.argv[1])
+LOG = open(sys.argv[2], "a", buffering=1)
+LOCK = threading.Lock()
 
 
-class Quiet(http.server.SimpleHTTPRequestHandler):
+class Recording(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
+
+    def parse_request(self):
+        parsed = super().parse_request()
+        if parsed:
+            with LOCK:
+                LOG.write(json.dumps({"path": self.path, "headers": list(self.headers.items())}) + "\n")
+        return parsed
 
 
 class Server(socketserver.ThreadingTCPServer):
@@ -75,7 +96,7 @@ class Server(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
 
 
-with Server(("127.0.0.1", 0), Quiet) as server:
+with Server(("127.0.0.1", 0), Recording) as server:
     print(server.server_address[1], flush=True)
     server.serve_forever()
 PYTHON
@@ -94,6 +115,37 @@ fi
 
 FAILED=0
 "${WORK}/check-app-update" "${WORK}/scratch" "http://127.0.0.1:${PORT}/" "${WORK}/www" || FAILED=1
+
+# What every request carried (the server's record): standard headers only, `User-Agent: SkyCut`, `Accept: */*`, no cookie,
+# no key, no machine id or other identifier, and no query string (docs/architecture/app-updates.md "Checking"). `Priority`
+# is URLSession's own on newer systems. An empty record is a failure too: then nothing was checked.
+echo "==> request headers"
+python3 - "${WORK}/requests.log" <<'PYTHON' || FAILED=1
+import json
+import sys
+
+ALLOWED = {"host", "user-agent", "accept", "accept-language", "accept-encoding", "connection", "cache-control", "priority"}
+FIXED = {"user-agent": "SkyCut", "cache-control": "no-cache", "accept": "*/*"}
+problems, requests = [], 0
+for line in open(sys.argv[1], encoding="utf-8"):
+    request = json.loads(line)
+    requests += 1
+    if "?" in request["path"]:
+        problems.append(f"{request['path']}: a query string in the request")
+    for name, value in request["headers"]:
+        key = name.lower()
+        if key not in ALLOWED:
+            problems.append(f"{request['path']}: a header beyond the allow-list: {name}")
+        elif key in FIXED and value != FIXED[key]:
+            problems.append(f"{request['path']}: {name}: {value!r}, not {FIXED[key]!r}")
+if requests < 10:
+    problems.append(f"only {requests} requests recorded: the header check saw too little")
+for problem in problems:
+    print(f"FAIL: {problem}")
+if problems:
+    sys.exit(1)
+print(f"request headers: {requests} requests, nothing beyond the allow-list")
+PYTHON
 
 # The release's feed writer (scripts/write-update-feed.sh) on fixture values: it writes only what SkyCut's parser reads back.
 echo "==> the feed writer"

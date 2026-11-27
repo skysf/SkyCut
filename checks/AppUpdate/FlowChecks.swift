@@ -1,10 +1,11 @@
 import Foundation
 
 // scripts/check-app-update.sh: the real transfers against the loopback server the script started (never the network):
-// the feed (200, 404, a redirect, too big), the DMG (exact, a wrong SHA-256, a wrong size either way, a redirect, cancelled),
-// then staging from real read-only images (the copy verified, the quarantine cleared, the image detached, only the newest
-// staged copy kept; a wrong bundle id, a wrong version, two apps or a failed verification leave nothing), images a killed run
-// left attached, and the cleanup after an update (the replaced app to the Trash, the rest removed, the newest kept).
+// the feed (200, 404, a redirect, too big), the DMG (exact, a wrong SHA-256, a wrong size either way, a redirect, cancelled;
+// which of them came down but aren't the feed's DMG, the retry record's count), then staging from real read-only images
+// (the copy verified, the quarantine cleared, the image detached, only the newest staged copy kept, under staged.noindex;
+// a wrong bundle id, a wrong version, two apps or a failed verification leave nothing), and images a killed run left
+// attached. The pipeline, the verifier's steps and the launch cleanup: PipelineChecks, LaunchChecks.
 
 enum FlowChecks {
     static func run(server: LoopbackServer, root: URL, check: @escaping (Bool, String) -> Void) async throws {
@@ -22,7 +23,7 @@ enum FlowChecks {
         print("==> staging from real images")
         try staging(root: root, old: old, new: new, dmg: dmg, running: running, check: check)
         try leftovers(root: root, dmg: dmg, check: check)
-        try cleanup(root: root, check: check)
+        try await PipelineChecks.run(server: server, root: root.appendingPathComponent("pipeline"), dmg: dmg, old: old, check: check)
     }
 
     private static func feed(_ server: LoopbackServer, _ path: String, size: Int64, sha: String, version: String = "1.1.0") -> Data {
@@ -51,37 +52,49 @@ enum FlowChecks {
 
     private static func downloads(_ server: LoopbackServer, root: URL, size: Int64, sha: String, check: (Bool, String) -> Void) async throws {
         let source = server.source("feed.json")
-        let target = root.appendingPathComponent("downloaded.dmg")
+        let files = AppUpdateFiles(root: root.appendingPathComponent("http/Updates"))
+        try files.makeFolders()
         func parsed(size: Int64, sha: String, path: String = "SkyCut-1.1.0.dmg") -> AppUpdateFeed {
             AppUpdateFeed.parse(UpdateFixture.feedJSON(version: "1.1.0", build: "2", url: server.url(path).absoluteString, size: size, sha: sha),
                                 from: source)!
         }
         let progress = ProgressBox()
+        let good = parsed(size: size, sha: sha)
         do {
-            try await AppUpdateHTTP.download(parsed(size: size, sha: sha), to: target) { progress.add($0) }
-            check(UpdateFixture.sha256(target) == sha, "the DMG downloads whole")
+            try await AppUpdateHTTP.download(good, into: files) { progress.add($0) }
+            check(UpdateFixture.sha256(files.dmg(for: good)) == sha, "the DMG downloads whole, to its place in downloads/")
             check(progress.last == 1, "progress reaches 100% (last \(progress.last))")
         } catch {
             check(false, "the DMG downloads whole: \(error)")
         }
+        files.removeDownloads()
         let wrongSHA = String(repeating: "0", count: 64)
-        await refuses("a wrong SHA-256", parsed(size: size, sha: wrongSHA), target, check)
-        await refuses("a feed that says bigger", parsed(size: size + 1, sha: sha), target, check)
-        await refuses("a feed that says smaller", parsed(size: size - 1, sha: sha), target, check)
-        await refuses("a missing DMG (404)", parsed(size: size, sha: sha, path: "nothing.dmg"), target, check)
+        // Came down but isn't the feed's DMG (counted by the retry record), or didn't come down at all (not counted).
+        await refuses("a wrong SHA-256", parsed(size: size, sha: wrongSHA), files, mismatch: true, check)
+        await refuses("a feed that says bigger", parsed(size: size + 1, sha: sha), files, mismatch: true, check)
+        await refuses("a feed that says smaller (more bytes than it says)", parsed(size: size - 1, sha: sha), files, mismatch: true, check)
+        await refuses("a missing DMG (404)", parsed(size: size, sha: sha, path: "nothing.dmg"), files, mismatch: false, check)
         try FileManager.default.createDirectory(at: server.folder.appendingPathComponent("folder.dmg"), withIntermediateDirectories: true)
-        await refuses("a redirect", parsed(size: size, sha: sha, path: "folder.dmg"), target, check)
-        let cancelled = Task { try await AppUpdateHTTP.download(parsed(size: size, sha: sha), to: target) { _ in } }
+        await refuses("a redirect", parsed(size: size, sha: sha, path: "folder.dmg"), files, mismatch: false, check)
+        let cancelled = Task { try await AppUpdateHTTP.download(good, into: files) { _ in } }
         cancelled.cancel()
-        check((try? await cancelled.value) == nil && !FileManager.default.fileExists(atPath: target.path), "a cancelled download leaves no file")
+        let outcome = await cancelled.result
+        if case .failure(let error) = outcome {
+            check(!(error is AppUpdateDMGMismatch) && UpdateFixture.contents(of: files.downloads).isEmpty,
+                  "a cancelled download leaves no file and isn't a mismatch")
+        } else {
+            check(false, "a cancelled download is refused")
+        }
     }
 
-    private static func refuses(_ label: String, _ feed: AppUpdateFeed, _ target: URL, _ check: (Bool, String) -> Void) async {
+    private static func refuses(_ label: String, _ feed: AppUpdateFeed, _ files: AppUpdateFiles, mismatch: Bool, _ check: (Bool, String) -> Void) async {
         do {
-            try await AppUpdateHTTP.download(feed, to: target) { _ in }
+            try await AppUpdateHTTP.download(feed, into: files) { _ in }
             check(false, "\(label): refused")
         } catch {
-            check(!FileManager.default.fileExists(atPath: target.path), "\(label): refused, no file left (\(error.localizedDescription))")
+            check(UpdateFixture.contents(of: files.downloads).isEmpty, "\(label): refused, no file left (\(error.localizedDescription))")
+            check((error is AppUpdateDMGMismatch) == mismatch,
+                  "\(label): \(mismatch ? "the DMG isn't the feed's (counted)" : "it didn't come down (not counted)") (got \(type(of: error)))")
         }
     }
 
@@ -103,6 +116,8 @@ enum FlowChecks {
         let record = try stager(files, running: running).stage(dmg, feed: feed, appName: "SkyCut.app", asked: false)
         let staged = URL(fileURLWithPath: record.appPath)
         check(UpdateFixture.marker(of: staged) == "new" && UpdateFixture.codesignVerifies(staged), "the staged copy is the new app, intact")
+        check(record.appPath == files.root.appendingPathComponent("staged.noindex/1.1.0/SkyCut.app").path && files.stagedCopy(of: record) != nil,
+              "the staged copy lies under a .noindex folder (Spotlight never lists it) where the installer takes it (\(record.appPath))")
         check(Quarantine.isFlagged(atPath: staged.path) == false, "no quarantine on the staged copy")
         check(files.readStaged() == record, "the staged record is written")
         check(UpdateFixture.contents(of: files.staging) == ["1.1.0"], "only the newest staged copy is kept (got \(UpdateFixture.contents(of: files.staging)))")
@@ -154,35 +169,19 @@ enum FlowChecks {
         try FileManager.default.createDirectory(at: mount, withIntermediateDirectories: false)
         let attached = Tools.run("/usr/bin/hdiutil", ["attach", "-readonly", "-nobrowse", "-noautoopen", "-noverify", "-mountpoint", mount.path, dmg.path])
         check(attached.status == 0 && Tools.isMounted(mount), "a killed run's image is attached under Updates/")
-        AppUpdateStager(files: files, bundleIdentifier: UpdateFixture.identifier) { _, _ in }.detachLeftovers()
+        AppUpdateStager.detachLeftovers(in: files)
         check(!Tools.isMounted(mount) && !FileManager.default.fileExists(atPath: mount.path), "the next launch detaches it and removes its mount point")
-    }
-
-    private static func cleanup(root: URL, check: (Bool, String) -> Void) throws {
-        let files = AppUpdateFiles(root: root.appendingPathComponent("cleanup/Updates"))
-        let trash = root.appendingPathComponent("cleanup/Trash")
-        try files.makeFolders()
-        try FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
-        let running = AppUpdateVersion("1.1.0")!
-        // The app the swap replaced (left in staged/<running version>), an older staged copy, a newer one the record names, a
-        // newer one no record names, a download, and the record.
-        try UpdateFixture.app(in: files.stagingFolder(for: running), version: "1.0.0", marker: "replaced")
-        try UpdateFixture.app(in: files.stagingFolder(for: AppUpdateVersion("1.0.5")!), version: "1.0.5", marker: "older")
-        let kept = try UpdateFixture.app(in: files.stagingFolder(for: AppUpdateVersion("1.2.0")!), version: "1.2.0", marker: "kept")
-        try UpdateFixture.app(in: files.stagingFolder(for: AppUpdateVersion("1.3.0")!), version: "1.3.0", marker: "orphan")
-        try Data("partial".utf8).write(to: files.downloads.appendingPathComponent("SkyCut-1.2.0-abc.dmg"))
-        let feed = FeedChecks.feed(FeedChecks.valid(version: "1.2.0"))!
-        try files.writeStaged(AppUpdateStagedRecord(feed: feed, appPath: kept.path, asked: false))
-        files.cleanAtLaunch(running: running) { item in
-            try FileManager.default.moveItem(at: item, to: trash.appendingPathComponent(item.lastPathComponent))
-        }
-        check(UpdateFixture.marker(of: trash.appendingPathComponent("SkyCut.app")) == "replaced", "the replaced app goes to the Trash, whole")
-        check(UpdateFixture.contents(of: files.staging) == ["1.2.0"], "only the staged copy the record names stays (got \(UpdateFixture.contents(of: files.staging)))")
-        check(files.readStaged()?.feed.version.description == "1.2.0", "its record stays")
-        check(UpdateFixture.contents(of: files.downloads).isEmpty, "downloads are removed at launch")
-        try FileManager.default.removeItem(at: kept)
-        files.cleanAtLaunch(running: running) { _ in }
-        check(files.readStaged() == nil && UpdateFixture.contents(of: files.staging).isEmpty, "a record whose copy is gone is removed")
+        // A `mount-…` link to a volume mounted elsewhere: never followed, what it points to never detached; the link goes.
+        let elsewhere = root.appendingPathComponent("leftover/elsewhere-mount")
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+        let mountedElsewhere = Tools.run("/usr/bin/hdiutil", ["attach", "-readonly", "-nobrowse", "-noautoopen", "-noverify", "-mountpoint",
+                                                              elsewhere.path, dmg.path])
+        defer { Tools.run("/usr/bin/hdiutil", ["detach", "-quiet", "-force", elsewhere.path]) }
+        let link = files.root.appendingPathComponent("mount-link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: elsewhere)
+        check(mountedElsewhere.status == 0 && Tools.isMounted(elsewhere), "a volume is mounted outside Updates/, a mount-… link to it inside")
+        AppUpdateStager.detachLeftovers(in: files)
+        check(Tools.isMounted(elsewhere) && !AppUpdateFiles.isLink(link), "a mount-… link: the volume it points to stays mounted, the link itself goes")
     }
 }
 

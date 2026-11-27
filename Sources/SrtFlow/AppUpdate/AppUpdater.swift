@@ -9,11 +9,12 @@ import os
 // main thread, checks about a minute later and then every 24 hours while SkyCut runs (the app menu and the Settings button
 // check at once), downloads, verifies and stages a newer release in the background (auto install on, or after Download and
 // Install), and installs the staged copy at every quit (applicationWillTerminate, after the quit flow). It publishes the
-// state the toolbar pill, its popovers, the app menu and Settings show. Nothing pops up by itself: the only window is the
-// answer to a check the person started from the menu. Offline or any failure: nothing is said; the next check tries again.
+// state the toolbar pill, its popovers, the app menu and Settings show, and the test hook's address while one is set.
+// Nothing pops up by itself: the only window is the answer to a check the person started from the menu. Offline or any
+// failure: nothing is said; the next check tries again (a DMG that keeps failing is held back: AppUpdateRetryRecord).
 // The transitions are AppUpdateState's (pure, checked); this file runs their effects.
-// What it doesn't: the rules (AppUpdateEligibility, AppUpdateState), transfers (AppUpdateHTTP, AppUpdateStager), the swap
-// (AppUpdateInstaller), the restart's waiting and relaunch (AppUpdateRestart), the views.
+// What it doesn't: the rules (AppUpdateEligibility, AppUpdateState), transfers (AppUpdatePipeline, AppUpdateHTTP,
+// AppUpdateStager), the swap (AppUpdateInstaller), the restart's waiting and relaunch (AppUpdateRestart), the views.
 // Rules: docs/architecture/app-updates.md.
 
 @MainActor
@@ -32,6 +33,8 @@ final class AppUpdater: ObservableObject {
     /// How this copy takes updates; nil until the launch's reading is in, and for a copy that never updates (SkyCut Beta,
     /// dev, check and smoke builds): no menu item, no Settings section, no pill.
     @Published private(set) var decision: AppUpdateEligibility.Decision?
+    /// The test hook's address while it is set to one SkyCut uses (Settings shows it: a leftover hook is never silent).
+    @Published private(set) var testFeedURL: URL?
     @Published var automatic: Bool {
         didSet {
             guard automatic != oldValue else { return }
@@ -85,21 +88,23 @@ final class AppUpdater: ObservableObject {
         running = reading.running
         decision = reading.decision
         guard let mode, let running = reading.running else { return }
-        state = AppUpdateState.atLaunch(staged: reading.staged, updated: reading.installed, mode: mode, running: running)
+        state = AppUpdateState.atLaunch(staged: reading.files.staged, updated: reading.files.installed, retry: reading.files.retry,
+                                        mode: mode, running: running)
         scheduleTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: Self.firstCheckDelay)
             while !Task.isCancelled {
-                self?.check(byPerson: false)
+                self?.check(from: .schedule)
                 try? await Task.sleep(for: Self.checkInterval)
             }
         }
     }
 
-    /// Checks now. `byPerson` (the app menu) gets an answer window; the Settings button and the schedule don't.
-    func check(byPerson: Bool) {
+    /// Checks now. The menu's check gets an answer window; Settings' and the schedule's don't. The person's (menu, Settings)
+    /// also fetches a DMG an automatic check holds back.
+    func check(from origin: AppUpdateCheckOrigin) {
         guard mode != nil, let running else { return }
         let alreadyChecking = state.checking
-        send(.checkStarted(byPerson: byPerson))
+        send(.checkStarted(origin))
         guard !alreadyChecking else { return }   // the check in flight answers
         let source = currentSource()
         Task { @MainActor in
@@ -109,14 +114,22 @@ final class AppUpdater: ObservableObject {
                 lastUpToDate = now
                 defaults.set(now, forKey: Self.lastUpToDateKey)
             }
-            send(.checkFinished(result))
+            send(.checkFinished(result, at: Date()))
         }
     }
 
-    /// The feed's address now: the test hook when set to one SkyCut accepts (read at every check).
+    /// The feed's address now: the test hook when set to one SkyCut accepts (read at every check, and shown in Settings).
     private func currentSource() -> AppUpdateFeed.Source {
-        AppUpdateFeed.Source.resolve(override: defaults.string(forKey: AppUpdateFeed.Source.overrideKey))
+        let source = AppUpdateFeed.Source.resolve(override: defaults.string(forKey: AppUpdateFeed.Source.overrideKey))
+        if !renderOnly {
+            let hook = source.isTestHook ? source.feedURL : nil
+            if testFeedURL != hook { testFeedURL = hook }
+        }
+        return source
     }
+
+    /// Settings appearing: the test hook read again (`defaults write` / `delete` while SkyCut runs).
+    func refreshTestFeed() { _ = currentSource() }
 
     // MARK: The person's buttons
 
@@ -162,15 +175,16 @@ final class AppUpdater: ObservableObject {
     }
 
     /// The off-screen renders only (scripts/render-app-updates.sh): show `state` as a copy in `decision` would. From then on
-    /// nothing runs: no transition, no download, no file (the switch set here would otherwise start one).
+    /// nothing runs: no transition, no download, no file, no defaults read (the switch set here would otherwise start one).
     func showForRender(_ state: AppUpdateState, decision: AppUpdateEligibility.Decision, automatic: Bool, running: AppUpdateVersion,
-                       lastUpToDate: Date?) {
+                       lastUpToDate: Date?, testFeed: URL? = nil) {
         renderOnly = true
         self.automatic = automatic
         self.state = state
         self.decision = decision
         self.running = running
         self.lastUpToDate = lastUpToDate
+        testFeedURL = testFeed
     }
 
     /// Set by showForRender: events change nothing and start nothing.
@@ -179,7 +193,8 @@ final class AppUpdater: ObservableObject {
     // MARK: Quit
 
     /// applicationWillTerminate (the quit flow has saved and asked about every project): installs the staged copy if this
-    /// copy installs it, then relaunches when the quit is Restart and Update's.
+    /// copy installs it, then relaunches when the quit is Restart and Update's. A copy an earlier run staged is installed
+    /// only once this launch's first check has confirmed it or failed to reach the feed (until then the phase isn't ready).
     func installAtQuit() {
         defer { AppUpdateRestart.finishQuit() }
         guard decision == .updates, state.phase == .ready, let offer = state.offer, let running,
@@ -204,7 +219,13 @@ final class AppUpdater: ObservableObject {
         for effect in state.apply(event, mode: mode) { run(effect) }
     }
 
+    /// File effects go straight onto AppUpdateWork's serial queue, in order, ahead of anything a download started by the same
+    /// transition queues there; and only for a copy that installs (the state machine gives a copy that only tells none).
     private func run(_ effect: AppUpdateEffect) {
+        let files = files
+        if effect.touchesFiles {
+            guard decision == .updates else { return }
+        }
         switch effect {
         case .download(let feed):
             startDownload(feed)
@@ -212,8 +233,11 @@ final class AppUpdater: ObservableObject {
             downloadTask?.cancel()
             downloadTask = nil
         case .discardStaged:
-            let files = files
-            Task { await AppUpdateWork.run { files.removeStaged(except: nil); files.removeDownloads() } }
+            AppUpdateWork.queue.addOperation { files.removeStaged(except: nil) }
+        case .discardDownloads(let kept):
+            AppUpdateWork.queue.addOperation { files.removeDownloads(except: kept.map(files.dmg(for:))) }
+        case .saveRetry(let record):
+            AppUpdateWork.queue.addOperation { files.writeRetry(record) }
         case .answer(let answer):
             // After this turn: the answer window must not run its modal loop inside a transition.
             Task { @MainActor in AppUpdateAlerts.show(answer) }
@@ -225,13 +249,18 @@ final class AppUpdater: ObservableObject {
         guard let running else { return }
         let files = files
         let asked = state.downloadAsked
+        let bundle = Bundle.main.bundleURL
+        let stager = AppUpdateStager(files: files, bundleIdentifier: Bundle.main.bundleIdentifier ?? "") { copy, feed in
+            try AppUpdateVerifier.verify(copy, feed: feed, runningApp: bundle, running: running, atQuit: false)
+        }
         lastProgressPercent = nil
         downloadTask = Task { @MainActor [weak self] in
-            let staged = await Self.downloadAndStage(feed, files: files, asked: asked, running: running) { fraction in
+            let outcome = await AppUpdatePipeline.run(feed, files: files, stager: stager, appName: bundle.lastPathComponent,
+                                                      asked: asked) { fraction in
                 Task { @MainActor in self?.progressed(fraction) }
             }
             guard !Task.isCancelled, let self else { return }
-            self.send(staged ? .staged(feed) : .downloadFailed)
+            self.send(outcome.event(for: feed, at: Date()))
         }
     }
 
@@ -241,40 +270,5 @@ final class AppUpdater: ObservableObject {
         guard percent != lastProgressPercent else { return }
         lastProgressPercent = percent
         send(.downloadProgress(fraction))
-    }
-
-    /// A copy of this release already staged (auto install off, then Download and Install; or an earlier run's), else
-    /// download, check, open, copy, verify and stage it. False for any failure (said to nobody).
-    nonisolated static func downloadAndStage(_ feed: AppUpdateFeed, files: AppUpdateFiles, asked: Bool, running: AppUpdateVersion,
-                                             progress: @escaping @Sendable (Double) -> Void) async -> Bool {
-        let bundle = Bundle.main.bundleURL
-        let adopted = await AppUpdateWork.run { () -> Bool in
-            guard var record = files.readStaged(), record.feed.isSameRelease(as: feed),
-                  FileManager.default.fileExists(atPath: record.appPath) else { return false }
-            if asked, !record.asked {
-                record.asked = true
-                try? files.writeStaged(record)
-            }
-            return true
-        }
-        if adopted { return true }
-        let dmg = files.dmg(for: feed)
-        do {
-            try await AppUpdateWork.run { Result { try files.makeFolders() } }.get()
-            try await AppUpdateHTTP.download(feed, to: dmg, progress: progress)
-            try Task.checkCancellation()
-        } catch {
-            log.notice("download failed: \(error.localizedDescription, privacy: .public)")
-            return false
-        }
-        let stager = AppUpdateStager(files: files, bundleIdentifier: Bundle.main.bundleIdentifier ?? "") { copy, feed in
-            try AppUpdateVerifier.verify(copy, feed: feed, runningApp: bundle, running: running, atQuit: false)
-        }
-        let staged = await AppUpdateWork.run { () -> Result<AppUpdateStagedRecord, Error> in
-            defer { files.removeDownloads() }
-            return Result { try stager.stage(dmg, feed: feed, appName: bundle.lastPathComponent, asked: asked) }
-        }
-        if case .failure(let error) = staged { log.notice("staging failed: \(error.localizedDescription, privacy: .public)") }
-        return (try? staged.get()) != nil
     }
 }

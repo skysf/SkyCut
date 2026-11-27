@@ -4,31 +4,26 @@ import Security
 // MARK: - What the updater learns once per launch, off the main thread
 //
 // What it does: gathers AppUpdateEligibility's facts about the running copy (its bundle, signing team, version, volume,
-// which folders this user can write, the environment, the test hook) and, for a copy that checks, reads the installer's
-// marker once (then removes it), cleans what the last update left (the replaced app to the Trash, old staged copies,
-// downloads, image mounts of a killed run) and reads the staged record. Blocking file and code-signature work: run it with
-// AppUpdateWork.run, never on the launch path itself (AppUpdater.start).
-// What it doesn't: decide (AppUpdateEligibility), keep state (AppUpdater).
+// which folders this user can write, whether it runs from inside the Updates folder, the home folder, the environment, the
+// test hook) and hands the Updates folder to AppUpdateLaunchFiles, which reads and cleans it only for a copy that installs.
+// Blocking file and code-signature work: run it with AppUpdateWork.run, never on the launch path itself (AppUpdater.start).
+// What it doesn't: decide (AppUpdateEligibility), clean (AppUpdateLaunchFiles), keep state (AppUpdater).
 // Rules: docs/architecture/app-updates.md "Who updates" and "Files".
 
 enum AppUpdateLaunch {
     struct Reading: Sendable {
         let decision: AppUpdateEligibility.Decision
         let running: AppUpdateVersion?
-        let staged: AppUpdateStagedRecord?
-        let installed: AppUpdateInstalledNote?
+        let files: AppUpdateLaunchFiles
     }
 
     static func read(files: AppUpdateFiles, source: AppUpdateFeed.Source) -> Reading {
         let facts = facts(files: files, source: source)
         let decision = AppUpdateEligibility.decide(facts)
         let running = facts.version.flatMap(AppUpdateVersion.init)
-        guard decision.checks, let running else { return Reading(decision: decision, running: running, staged: nil, installed: nil) }
-        let installed = files.readInstalledNote()
-        files.removeInstalledNote()
-        AppUpdateStager(files: files, bundleIdentifier: facts.bundleIdentifier ?? "", verify: { _, _ in }).detachLeftovers()
-        files.cleanAtLaunch(running: running, trash: { item in try FileManager.default.trashItem(at: item, resultingItemURL: nil) })
-        return Reading(decision: decision, running: running, staged: files.readStaged(), installed: installed)
+        let found = AppUpdateLaunchFiles.take(from: files, decision: decision, running: running, runningBundle: Bundle.main.bundleURL,
+                                              trash: { item in try FileManager.default.trashItem(at: item, resultingItemURL: nil) })
+        return Reading(decision: decision, running: running, files: found)
     }
 
     static func facts(files: AppUpdateFiles, source: AppUpdateFeed.Source) -> AppUpdateEligibility.Facts {
@@ -45,7 +40,9 @@ enum AppUpdateLaunch {
             teamIdentifier: signingTeam(),
             version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
             environment: ProcessInfo.processInfo.environment,
+            homeDirectory: manager.homeDirectoryForCurrentUser.path,
             testHookIsLoopback: source.isLoopback,
+            insideUpdatesFolder: files.holds(bundle),
             onReadOnlyDiskImage: InstallerDisk.containing(bundle) != nil,
             folderWritable: manager.isWritableFile(atPath: folder.path),
             bundleWritable: manager.isWritableFile(atPath: bundle.path),

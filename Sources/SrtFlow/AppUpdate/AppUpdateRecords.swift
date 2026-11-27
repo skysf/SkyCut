@@ -12,7 +12,7 @@ import Foundation
 
 struct AppUpdateStagedRecord: Equatable, Sendable {
     var feed: AppUpdateFeed
-    /// The verified copy (Updates/staged/<version>/<name>.app).
+    /// The verified copy (Updates/staged.noindex/<version>/<name>.app; the installer takes only that: AppUpdateFiles.stagedCopy).
     var appPath: String
     /// Downloaded because the person clicked Download and Install (auto install off): it then installs at quit anyway.
     var asked: Bool

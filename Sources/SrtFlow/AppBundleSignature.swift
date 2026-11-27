@@ -27,6 +27,12 @@ enum AppBundleSignature {
     /// requirement: its stapled ticket offline; with `network` macOS may also ask Apple whether the ticket still stands).
     /// For the Developer ID the designated requirement names the team, so a new build of the team passes.
     static func verify(_ copy: URL, matchesNotarized original: URL, network: Bool) throws {
+        try verify(copy, satisfies: notarizedRequirement(of: original), network: network)
+    }
+
+    /// `original`'s designated requirement with `notarized` in the same requirement. Throws when the original can't be read
+    /// (the updater then knows the running app, not the copy, is the problem: AppUpdateVerifier).
+    static func notarizedRequirement(of original: URL) throws -> SecRequirement {
         var text: CFString?
         let designated = try designatedRequirement(of: original)
         guard SecRequirementCopyString(designated, [], &text) == errSecSuccess, let text else {
@@ -35,7 +41,7 @@ enum AppBundleSignature {
         var combined: SecRequirement?
         let status = SecRequirementCreateWithString("(\(text as String)) and notarized" as CFString, [], &combined)
         guard status == errSecSuccess, let combined else { throw Failure(description: message(status, nil)) }
-        try verify(copy, satisfies: combined, network: network)
+        return combined
     }
 
     /// Throws unless `copy` is validly signed (strictly: every architecture, nested code, sealed resources) and satisfies
