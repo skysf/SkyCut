@@ -49,6 +49,12 @@ struct AppThemePalette {
     var playhead: Color { isForest ? accent : .white }
     var dragAccent: Color { isForest ? accent : .teal }
 
+    // MARK: On / off, current and selected at a glance (docs/architecture/app-themes.md "On / off at a glance")
+
+    /// Behind an "on" icon toggle, the current subtitle line and the workbench's shown panels. Forest: look A's light green
+    /// (the user's pick, 2026-11-27); Classic: the workbench chip it always had (Classic's icon toggles stay AppKit's own).
+    var onChip: Color { isForest ? Self.color(0xcfe0c8) : .primary.opacity(0.08) }
+
     func blockLabel(classic: Color) -> Color {
         isForest ? Self.color(0x243c2f) : classic
     }

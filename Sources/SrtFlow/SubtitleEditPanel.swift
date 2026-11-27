@@ -174,8 +174,7 @@ struct SubtitleEditPanel: View {
                     Toggle(isOn: $followsPlayback) {
                         Image(systemName: "text.line.last.and.arrowtriangle.forward")
                     }
-                    .toggleStyle(.button)
-                    .buttonStyle(.borderless)
+                    .stateToggle(classicTint: nil)
                     .instantHelp("Scroll to the line being spoken during playback")
 
                     Spacer()

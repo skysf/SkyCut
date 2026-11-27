@@ -278,10 +278,8 @@ extension VideoEditInspectorView {
         )) {
             Image(systemName: horizontal ? "arrow.left.and.right" : "arrow.up.and.down")
         }
-        .toggleStyle(.button)
-        .buttonStyle(.borderless)
+        .stateToggle(classicTint: AppThemePalette.current.toggleAccent)
         .controlSize(.small)
-        .tint(AppThemePalette.current.toggleAccent)
         .instantHelp(horizontal ? "Flip horizontally" : "Flip vertically")
     }
 
