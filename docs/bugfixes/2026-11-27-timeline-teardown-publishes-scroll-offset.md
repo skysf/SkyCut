@@ -42,19 +42,25 @@
 
 ## Verification
 
-- `scripts/check-e2e-gui.sh`, case `checks/E2EGUI/TimelineTeardown.swift`: with no AppKit event loop, so each closed window
-  is released at once, it closes a project window the way `set_view background` does, a window whose root is the timeline,
-  and the same project's window with its close button. Each time it requires the hosting view released, the geometry no
-  longer registered, and nothing published by the geometry from the close on. Counting the publishes keeps the case red on
-  a macOS whose teardown order would not abort. Main: red (the project window published once; run alone, the timeline-only
-  window aborted once and published once in two runs). With the fix: green in 5 of 5 runs.
-- The same suite now has to print `GUI E2E: every case ran`: in its process the main loop is the Swift runtime's
-  `CFRunLoopRun`, which exits with status 0 when a framework stops the main run loop. Closing a project window with its
-  close button as the case's first close did that in 4 of 4 runs and the suite passed without finishing; that setup is red
-  now. The close-button close runs last.
+- `scripts/check-e2e-gui.sh`, case `checks/E2EGUI/TimelineTeardown.swift`. With no AppKit event loop, only an autorelease
+  pool still holds a closed window: its hosting view goes about 0.3 s after the close, and the case polls for that. It
+  closes a project window the way `set_view background` does, a window whose root is the timeline, and the first project's
+  window with its close button. Each time it requires the hosting view released, the geometry no longer registered, and
+  nothing published by the geometry from the close on. Counting the publishes keeps the case red on a macOS whose teardown
+  order would not abort. Main: red (the project window published once; run alone, the timeline-only window aborted once and
+  published once in two runs). With the fix: green in every run (9 before the save step below was added: 7 by the author,
+  2 in the first review; 3 of 3 of the final case).
+- The same suite now has to print `GUI E2E: every case ran`. Its process has no `NSApp.run`: the main loop is the Swift
+  runtime's `CFRunLoopRun`, which exits with status 0 once the main run loop is stopped. A close that has to save first makes
+  `windowShouldClose` answer false, and `-[NSButtonCell performClick:]` then waits in a nested AppKit event loop that also
+  stops the main loop: in 4 of 4 such runs the suite ended halfway with status 0 and passed. That setup is red now. The case
+  also saves the project, and requires `flushToFile()` to return `.saved`, before its close-button close: until review FBC1
+  that step depended on the background step's save (`VideoEditView.onDisappear`) finishing first, by about 0.6 s here.
 - `checks/timeline-drag-wiring/teardown.sh` (a scan): `dismantleNSView` lets go through `onDetach`, `detach` writes no
   `offset` and sends nothing, `attach(nil)` reaches `detach` before any write. Main: red on all four. A single `offset = .zero`
-  put into `detach`: red. With the fix: green.
+  put into `detach`: red. A target renamed (`attach(_:owner:)`'s label, `detach(owner:)`): red; before review FBC1 that
+  printed ✗ and stayed green, because `require_func` reports a miss with `fail` inside `$(…)`, so each block now counts it
+  itself. With the fix: green.
 - In the real App (in-process smoke, step 1 of this work): the deinit runs from `-[NSApplication run]`'s autorelease pool at
   the next event, the teardown published, nothing aborted. Evidence was kept outside the repository.
 
@@ -67,5 +73,6 @@
   cheap way to see it, and a check should count the publishes rather than wait for the abort.
 - To see whether a closed window is released, give AppKit one more event (or run without its event loop): until then its
   record of the last event keeps the window.
-- A check process whose main loop is the Swift runtime's can end with status 0 halfway: make it print a completion line and
-  require it.
+- A check process whose main loop is the Swift runtime's can end with status 0 halfway (here: AppKit's nested event loop in
+  `performClick:`, when a close has to save first): make it print a completion line and require it, and don't let a step
+  depend on another step's asynchronous work having finished.

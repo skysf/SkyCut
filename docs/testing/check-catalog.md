@@ -27,10 +27,11 @@
   It checks a folder returned by the fixture panel and a typed path after the fixture reports failure, a version restored and undone,
   a new native preset and its inspector rows, and a web template card placed on the timeline and re-rendered in the inspector.
   It also takes the timeline down with no event loop running: a project window sent to the background, a window whose root
-  is the timeline, then the project window closed with its close button. Each hosting view must be released, the timeline's
-  scroll geometry unregistered, and nothing published by it meanwhile (`checks/E2EGUI/TimelineTeardown.swift`). The suite
-  must print `GUI E2E: every case ran`: its main loop is the Swift runtime's, which exits with status 0 if a framework
-  stops the main run loop early.
+  is the timeline, then the project window closed with its close button. Each hosting view must be released (about 0.3 s
+  after the close, from an autorelease pool), the timeline's scroll geometry unregistered, and nothing published by it
+  meanwhile (`checks/E2EGUI/TimelineTeardown.swift`). The suite must print `GUI E2E: every case ran`: its main loop is the
+  Swift runtime's, which exits with status 0 once the main run loop is stopped, and AppKit's nested loop in `performClick:`
+  does that when a close has to save first, so the case saves the project before its close-button close.
   It locates controls from its own window pixels using AppKit and on-device Vision. The row and its icon-only button
   must be found in the same drawing. The 20 s control window covers the 15 s export destination probe and scheduling.
   Re-render uses the helper's frame-based deadline plus teardown and commit time. The system service, external volumes,

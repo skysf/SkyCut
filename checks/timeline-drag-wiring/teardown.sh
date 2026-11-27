@@ -15,16 +15,22 @@ grep -q 'onDisappear' "$VIEW" || fail "时间线没有 onDisappear：视图消�
 # dismantleNSView runs inside NSHostingView.deinit -> GraphHost.invalidate(). A publish there can reach the header column and
 # the ruler (they observe `offset`) while SwiftUI holds exclusive access, and Swift aborts with "Fatal access conflict"
 # (docs/bugfixes/2026-11-27-timeline-teardown-publishes-scroll-offset.md).
+# require_func reports a missing target with `fail` inside `$(…)`, a subshell, so that FAILED=1 is lost: every block below
+# counts the miss itself (`else FAILED=1`).
 if BODY="$(require_func 'static func dismantleNSView(' "$GEOMETRY")"; then
   grep -q 'onDetach?()' <<<"$BODY" \
     || fail "dismantleNSView no longer lets go through onDetach (TimelineScrollGeometry.detach, which publishes nothing)"
   grep -q 'onAttach?(' <<<"$BODY" \
     && fail "dismantleNSView calls onAttach again: attaching writes offset, a publish inside SwiftUI's teardown"
+else
+  FAILED=1
 fi
 WRITES_OFFSET='(^|[^A-Za-z0-9_])offset[[:space:]]*=([^=]|$)'
 if BODY="$(require_func 'func detach(owner: VideoEditProject)' "$GEOMETRY")"; then
   grep -qE "${WRITES_OFFSET}|objectWillChange" <<<"$BODY" \
     && fail "TimelineScrollGeometry.detach writes offset or publishes: it runs inside SwiftUI's teardown"
+else
+  FAILED=1
 fi
 # A probe that loses its scroll view (it left the tree) calls attach(nil): that must be the same detach, before any write.
 if BODY="$(require_func 'func attach(_ scrollView: NSScrollView?, owner: VideoEditProject)' "$GEOMETRY")"; then
@@ -34,4 +40,6 @@ if BODY="$(require_func 'func attach(_ scrollView: NSScrollView?, owner: VideoEd
   if [ -z "${TO_DETACH}" ] || { [ -n "${FIRST_WRITE}" ] && [ "${FIRST_WRITE}" -lt "${TO_DETACH}" ]; }; then
     fail "TimelineScrollGeometry.attach(nil) does not go to detach before writing offset: a probe leaving the tree would publish"
   fi
+else
+  FAILED=1
 fi

@@ -3,12 +3,13 @@ import Combine
 import SwiftUI
 @testable import SrtFlow
 
-// Take the timeline down three times with no AppKit event loop running, so each closed window and its hosting view are
-// released right after the close: a project window (the full editor) closed the way set_view background closes it, the same
-// project's window closed with its close button, and a window whose root is the timeline (the off-screen renderers' shape).
-// Taking the timeline down must publish nothing. Until 2026-11-27 the scroll accessor wrote the @Published offset from
-// dismantleNSView, inside SwiftUI's graph invalidation: the timeline-only window aborted with "Fatal access conflict", and
-// the project windows published too and survived only by SwiftUI's teardown order
+// Take the timeline down three times with no AppKit event loop running, so only an autorelease pool still holds a closed
+// window: its hosting view goes about 0.3 s after the close (the pool is popped inside a Core Animation commit), and the poll
+// waits for that. A project window (the full editor) closed the way set_view background closes it, a window whose root is
+// the timeline (the off-screen renderers' shape), then the first project's window closed with its close button. Taking the
+// timeline down must publish nothing. Until 2026-11-27 the scroll accessor wrote the @Published offset from dismantleNSView,
+// inside SwiftUI's graph invalidation: the timeline-only window aborted with "Fatal access conflict", and the project windows
+// published too and survived only by SwiftUI's teardown order
 // (docs/bugfixes/2026-11-27-timeline-teardown-publishes-scroll-offset.md). Counting the publishes keeps the check meaningful
 // on a macOS whose teardown order would not abort.
 @MainActor enum TimelineTeardownGUI {
@@ -20,9 +21,15 @@ import SwiftUI
             OpenProjects.shared.moveToBackground(project)
         }
         try await timelineAsRoot(other)
-        // The close button last: it saves (the project has a file, so nothing asks), then closes the window and the project.
-        // In this process a framework may stop the main run loop around such a close, which ends the suite with status 0;
-        // the completion line in Main.swift (required by scripts/check-e2e-gui.sh) turns that into a failure.
+        // The close button, on a saved project. A close that has to save first gets false from windowShouldClose, and
+        // -[NSButtonCell performClick:] then waits in a nested AppKit event loop that also stops this process's main loop
+        // (the Swift runtime's CFRunLoopRun): the suite would end with status 0 halfway, which only the completion line in
+        // Main.swift catches. So save here and require it, rather than count on the background step's save
+        // (VideoEditView.onDisappear) having finished.
+        guard await project.flushToFile() == .saved else {
+            throw CheckFailure("Could not save the project before its close-button close (\(project.notice ?? "no notice")): "
+                               + "a close that has to save would stop this suite halfway")
+        }
         try await projectWindow(project, "the project window closed with its close button") {
             OpenProjects.shared.window(of: project)?.performClose(nil)
         }
