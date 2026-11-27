@@ -5,8 +5,9 @@ import UniformTypeIdentifiers
 // MARK: - The helper next to a macOS open / save window
 //
 // What it does: SkyCut's own small window (in-process, so it keeps working when the system's panel service hangs) for
-// SystemFileWindows: while the system window has been up a while, a strip next to it with "Close It"; when the system
-// window failed, the same job without it — type or paste a path, drag the files from Finder, or try the window again.
+// SystemFileWindows: when the person asks for another file window while the system window is up, a strip next to it with
+// "Close It" (never on a timer since 2026-11-27); when the system window failed, the same job without it — type or paste
+// a path, drag the files from Finder, or try the window again.
 // What it doesn't: the system window or when it failed (SystemFileChooser); which request is open (SystemFileWindows);
 // the export panel's folder row (it has its own inline version, ExportFolderRow).
 // Rules: docs/architecture/system-file-windows.md.
@@ -78,14 +79,15 @@ final class FileWindowHelper: NSObject, FileWindowHelping, NSWindowDelegate {
     }
 }
 
-/// While the system window is up: a way to close it if it stopped responding.
+/// The person asked for another file window while the system window is up: it is still open, and a way to close it if it
+/// stopped responding.
 struct FileWindowStripView: View {
     let close: () -> Void
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         HStack(spacing: 10) {
-            Text("If the macOS window stops responding, close it here.")
+            Text("A macOS file window is still open. If it isn't responding, close it here.")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Close It") { close() }

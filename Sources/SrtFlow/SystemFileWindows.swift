@@ -6,10 +6,13 @@ import UniformTypeIdentifiers
 // MARK: - Every macOS open / save window outside the export panel
 //
 // What it does: one shared SystemFileChooser for the whole app — one system window at a time, as with the modal panels
-// before — that callers ask with a FileWindowRequest and answer in a closure or awaited. While the window has been up a
-// while, a small helper next to it offers "Close It" (a window whose service hangs has dead buttons); when the system
-// window fails — never appears, vanishes, comes back empty at once, closed as stuck, or the last run ended with one open —
-// the helper offers the same job without it: type or paste a path, drag the files from Finder, or try the window again.
+// before — that callers ask with a FileWindowRequest and answer in a closure or awaited. Nothing appears next to the system
+// window while the person chooses, however long they take. When they ask for another file window while it is up (the only
+// sign SkyCut gets that it may be stuck: a window whose service hangs has dead buttons and macOS says nothing), a small
+// helper next to it offers "Close It"; when the system window fails — never appears, vanishes, comes back empty at once,
+// closed as stuck, or the last run ended with one open — the helper offers the same job without it: type or paste a path,
+// drag the files from Finder, or try the window again. Until 2026-11-27 the strip came on a 5 s timer, next to every
+// window a person took longer over (docs/bugfixes/2026-11-27-close-it-strip-popped-up-next-to-every-file-window.md).
 // What it doesn't: the window itself (SystemFileChooser); the export panel's folder row (its own chooser and UI); what a
 // caller does with the files (a caller whose project changed meanwhile checks that itself).
 // A save's answer says whether replacing a file already there was confirmed (`SaveLocation`): only macOS's own save
@@ -21,7 +24,8 @@ import UniformTypeIdentifiers
 /// What the helper next to the system window can show (a seam: the checks record what would be shown).
 @MainActor
 protocol FileWindowHelping: AnyObject {
-    /// Next to the system window: "If the macOS window stops responding, close it here."
+    /// Next to the open system window, when the person asked for another one meanwhile: "A macOS file window is still
+    /// open. If it isn't responding, close it here."
     func showStrip(near frame: NSRect, close: @escaping () -> Void)
     /// The system window failed: the same job without it.
     func showFallback(
@@ -37,8 +41,6 @@ final class SystemFileWindows {
 
     let chooser: SystemFileChooser
     private let helper: FileWindowHelping
-    /// How long the system window stays up before the helper offers "Close It" (most picks take less).
-    private let stripDelay: TimeInterval
     /// Asks the answered save location's drive whether a file is there (the checks pass a drive that never answers).
     private let probe: ExportDestinationProbe
     /// How long that look may take (the export panel's look at its folder; the checks shorten it).
@@ -46,17 +48,12 @@ final class SystemFileWindows {
     /// The caller still waiting for an answer; the flag says it came from macOS's own window (not the helper).
     private var answer: (([URL]?, Bool) -> Void)?
     private var phaseWatch: AnyCancellable?
-    private var stripTask: Task<Void, Never>?
 
     /// nil: the real window and helper (the checks pass fakes).
-    init(
-        chooser: SystemFileChooser? = nil, helper: FileWindowHelping? = nil, stripDelay: TimeInterval = 5,
-        probe: ExportDestinationProbe = .shared
-    ) {
+    init(chooser: SystemFileChooser? = nil, helper: FileWindowHelping? = nil, probe: ExportDestinationProbe = .shared) {
         let chooser = chooser ?? SystemFileChooser()
         self.chooser = chooser
         self.helper = helper ?? FileWindowHelper()
-        self.stripDelay = stripDelay
         self.probe = probe
         phaseWatch = chooser.$phase.dropFirst().sink { [weak self] phase in
             MainActor.assumeIsolated { self?.phaseChanged(phase) }
@@ -64,7 +61,8 @@ final class SystemFileWindows {
     }
 
     /// Asks for `request`; `then` gets the picked URLs (never called when nothing was picked). While a window is already
-    /// up, a second request brings nothing new up and gets no answer: the open window is what the person is answering.
+    /// up, a second request brings nothing new up and gets no answer: the open window is what the person is answering, and
+    /// the strip next to it offers to close it (`offerToCloseOpenWindow`).
     func open(_ request: FileWindowRequest, then: @escaping ([URL]) -> Void) {
         start(request) { urls, _ in
             if let urls, !urls.isEmpty { then(urls) }
@@ -103,7 +101,10 @@ final class SystemFileWindows {
     }
 
     private func start(_ request: FileWindowRequest, answer: @escaping ([URL]?, Bool) -> Void) {
-        guard chooser.phase != .choosing else { return answer(nil, false) }
+        guard chooser.phase != .choosing else {
+            offerToCloseOpenWindow()
+            return answer(nil, false)
+        }
         // A failed window's fallback still up for an earlier request: that caller gets nothing.
         chooser.dismissFailure()
         finish(nil, inSystemWindow: false)
@@ -125,9 +126,16 @@ final class SystemFileWindows {
         finish(urls, inSystemWindow: false)
     }
 
+    /// The person asked for another file window while one is up: the one sign SkyCut gets that it may be stuck (macOS says
+    /// nothing when its panel service hangs; the window just stops answering). "Close It" next to the open window, only
+    /// while it is on screen (one that never comes is given up by the chooser's watcher). Never on a timer: choosing a file
+    /// takes as long as the person likes, and nothing pops up by itself.
+    private func offerToCloseOpenWindow() {
+        guard chooser.windowIsVisible else { return }
+        helper.showStrip(near: chooser.windowFrame) { [weak self] in self?.chooser.closeStuckWindow() }
+    }
+
     private func finish(_ urls: [URL]?, inSystemWindow: Bool) {
-        stripTask?.cancel()
-        stripTask = nil
         helper.hide()
         let pending = answer
         answer = nil
@@ -135,20 +143,9 @@ final class SystemFileWindows {
     }
 
     private func phaseChanged(_ phase: SystemFileChooser.Phase) {
-        stripTask?.cancel()
-        stripTask = nil
         switch phase {
         case .choosing:
-            let delay = stripDelay
-            stripTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                // Only next to a window that is on screen (one that never comes is given up by the chooser's watcher).
-                while let self, !Task.isCancelled, self.chooser.phase == .choosing, !self.chooser.windowIsVisible {
-                    try? await Task.sleep(nanoseconds: 250_000_000)
-                }
-                guard let self, !Task.isCancelled, self.chooser.phase == .choosing else { return }
-                self.helper.showStrip(near: self.chooser.windowFrame) { [weak self] in self?.chooser.closeStuckWindow() }
-            }
+            break   // nothing next to the window while the person chooses (offerToCloseOpenWindow)
         case .failed(let failure):
             guard answer != nil, let request = chooser.request else { return }
             helper.showFallback(

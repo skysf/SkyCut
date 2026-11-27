@@ -68,6 +68,21 @@ require "the chooser leaves its in-flight record before asking AppKit for the wi
   Sources/SrtFlow/SystemFileChooser.swift 'record\.markStarted\(\)'
 require "the views' FilePicker goes through the shared non-modal windows" \
   Sources/SrtFlow/SystemFileWindows.swift 'SystemFileWindows\.shared\.open\(request'
+# Nothing appears next to a system file window while the person chooses, however long they take (2026-11-27,
+# docs/bugfixes/2026-11-27-close-it-strip-popped-up-next-to-every-file-window.md): "Close It" is offered only when the
+# person asks for another file window while one is up (offerToCloseOpenWindow, from start), never on a timer.
+WINDOWS_SWIFT=Sources/SrtFlow/SystemFileWindows.swift
+STRIP_CALLS="$(grep -cE '^[^/]*\.showStrip\(' "${WINDOWS_SWIFT}" || true)"
+OFFER_CALLS="$(grep -cE '^[^/]*offerToCloseOpenWindow\(\)' "${WINDOWS_SWIFT}" || true)"
+OFFER_BODY="$(awk '/    private func offerToCloseOpenWindow\(\) \{/,/^    \}/' "${WINDOWS_SWIFT}")"
+START_BODY="$(awk '/    private func start\(_ request: FileWindowRequest/,/^    \}/' "${WINDOWS_SWIFT}")"
+if [ "${STRIP_CALLS}" != 1 ] || [ "${OFFER_CALLS}" != 2 ] || ! grep -qF 'helper.showStrip(' <<<"${OFFER_BODY}" \
+  || ! grep -qF 'offerToCloseOpenWindow()' <<<"${START_BODY}"; then
+  echo "✗ 接线守卫：the Close It strip is offered only from offerToCloseOpenWindow, called when the person asks for another file window while one is up (start); found ${STRIP_CALLS} showStrip and ${OFFER_CALLS} offerToCloseOpenWindow lines" >&2
+  WIRING_FAIL=1
+fi
+forbid "nothing next to a system file window comes on a timer (no sleep or timer in SystemFileWindows)" \
+  "${WINDOWS_SWIFT}" '^[^/]*(Task\.sleep|asyncAfter|Timer\.|scheduledTimer)'
 require "the folder window never starts on a drive the last check found not answering (windowStart)" \
   Sources/SrtFlow/ExportFolderRow.swift 'chooser\.choose\(\.exportFolder\(startingAt: destination\.windowStart\)\)'
 for f in Sources/SrtFlow/VideoEditExportSheet.swift Sources/SrtFlow/ExportFolderRow.swift Sources/SrtFlow/ExportDestinationState.swift; do

@@ -1708,7 +1708,7 @@
 "Quit Anyway" = "Salir de todos modos";
 
 /* macOS open / save windows without a modal session, and the helper next to them (SystemFileWindows, 2026-11-19). */
-"If the macOS window stops responding, close it here." = "Si la ventana de macOS deja de responder, ciérrala aquí.";
+"A macOS file window is still open. If it isn't responding, close it here." = "Una ventana de archivos de macOS sigue abierta. Si no responde, ciérrala aquí.";
 "Close the macOS window" = "Cerrar la ventana de macOS";
 "Open the macOS window again" = "Abrir de nuevo la ventana de macOS";
 "Save Here" = "Guardar aquí";
