@@ -244,3 +244,17 @@ the word, escaped, or paired in the same expansion is fine.
 **Guard**: `checks/shell-syntax.sh` (in `scripts/check-all.sh`). Every shell script that `git ls-files` lists (`.sh`, or a
 bash / sh shebang) must parse under `/bin/bash -n`, and no line may hold a lone apostrophe in such a word. The rule is in
 [coding standards](../architecture/coding-standards.md) section 6.
+
+## Trap 9 (2026-11-27): `mount` prints resolved paths, and TMPDIR is under a link
+
+`scripts/write-update-feed.sh` mounted the release DMG under `${TMPDIR}`, and its EXIT trap looked for the mount with
+`mount | grep -F " on ${MOUNT} "`. `TMPDIR` is `/var/folders/…`, `/var` is a link to `/private/var`, and `mount` prints
+`/private/var/folders/…`, so the test never matched. A run that failed after the mount left the DMG attached, and `rm -rf`
+ran over the mounted volume ([case](2026-11-27-feed-writer-apostrophe-never-parsed.md), follow-up).
+
+**Fix**: compare devices (`stat -f %d` of the mount point against its parent), or resolve the folder with `pwd -P` before
+comparing paths (`scripts/check-app-update.sh` does that for its own cleanup).
+
+**Guard**: `scripts/check-app-update.sh` runs the release script's mount and cleanup (`scripts/update-feed/mount.sh`) in a
+folder reached through a link and fails right after the attach. The rule: [coding standards](../architecture/coding-standards.md)
+section 6.

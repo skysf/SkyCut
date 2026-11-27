@@ -87,3 +87,51 @@ The script came in with the updater (#565, its only commit `f903c9e1`) and has n
    [coding standards](../architecture/coding-standards.md) section 6.
 3. **`bash -n` passing proves little**: with two such apostrophes the script parses and is wrong. Run each branch once
    with `/bin/bash` (lesson 4 of the shell traps case); the guard's rule 3 looks for the apostrophe itself.
+
+## Follow-up (same PR): the cleanup missed its mount, and relative arguments resolved against the repository
+
+Both were found while fixing the parse error and folded into the same PR before review.
+
+**Symptom.**
+1. A run that failed after the mount left the DMG attached (hidden), and `rm -rf` ran over the mounted read-only
+   volume. Failures that get there: Gatekeeper refusing the app, a wrong bundle id, a volume still busy at the final
+   detach. Reproduced with the previous version and a scratch copy of the 0.18.70 DMG: a probe held the volume busy so
+   the script's own unforced detach failed. The run printed `rm: …/mount/…: Read-only file system`, the image stayed
+   attached (`/dev/disk4`) and the work folder stayed.
+2. Relative arguments meant the repository, not the caller's folder. Run from another folder, `../fixture.dmg` gave
+   «no DMG at ../fixture.dmg»; a relative output path would have written the feed into the repository.
+
+**Root cause.**
+1. The EXIT trap looked for its mount with `mount | grep -F " on ${MOUNT} "`. The mount point is under `${TMPDIR}`
+   (`/var/folders/…`), `/var` is a link to `/private/var`, and `mount` prints the resolved path, so the test never
+   matched, on any Mac. `scripts/check-app-update.sh` had met this in its own cleanup and resolves its folder with
+   `pwd -P`; the release script didn't.
+2. The script `cd`s to the repository before it reads the files it was given.
+
+**Fix.** The mount and its cleanup moved into `scripts/update-feed/mount.sh`, which both the script and the check source:
+- `feed_mounted` compares the device of the mount point with its parent's (`stat -f %d`), not paths;
+- `feed_cleanup` forces off whatever is still mounted, and removes the work folder only when nothing is mounted inside;
+- `feed_detach` says when the volume didn't detach.
+
+The script makes `DMG`, `NOTES` and `OUT` absolute (from `$PWD`) before its `cd`.
+
+**Verification.**
+- The real DMG again: exit 0, byte-identical to ops' feed, 0 images attached before and after, the DMG unchanged.
+- A forced failure after the mount, with the real script and a scratch copy of the DMG: the probe holds the volume busy,
+  the unforced detach fails («the DMG did not detach (busy?)»), exit 1. Afterwards 0 images are attached, there is no
+  work folder and no feed. The same run with the previous version left the image attached (above).
+- A late failure, an unwritable output folder: «could not write …», exit 1, nothing attached, no work folder, nothing
+  written.
+- New cases in `scripts/check-app-update.sh`, on a scratch image:
+  - relative arguments from another folder reach Gatekeeper and name the caller's path;
+  - the mount fails right after the attach, in a folder reached through a link: `feed_mounted` sees it, nothing stays
+    attached, no work folder stays.
+
+  Reversed: without the absolute paths the first case is red («no DMG at ../fixture.dmg»). With the old path match all
+  three mount assertions are red, and the check's own cleanup still detached the image.
+
+**Lessons.**
+4. Ask whether a volume is mounted by device, not by path: TMPDIR is under `/var`, and `mount` prints resolved paths.
+   The rule: [coding standards](../architecture/coding-standards.md) section 6; trap 9 of the
+   [shell traps](2026-08-06-build-version-and-shell-traps.md).
+5. A script that `cd`s before it uses its arguments makes them absolute first.

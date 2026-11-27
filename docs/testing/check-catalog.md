@@ -1019,6 +1019,13 @@
   - **The feed writer** (`scripts/update-feed/FeedWriter.swift`) on fixture values: writes a release's feed and a loopback
     test feed with `--test-feed`; refuses another host, the redirect, a development version, a SHA-256 in capitals, a size of
     0, notes without Spanish or with an empty line, a loopback DMG in a release feed and a test feed address SkyCut refuses.
+  - **The feed writer's shell wrapper** (`scripts/write-update-feed.sh`) on a scratch image that Gatekeeper refuses (no
+    notarized DMG here): run from another folder with relative arguments, it gets as far as Gatekeeper and names the image
+    by the caller's path, and leaves no work folder. Its mount and cleanup (`scripts/update-feed/mount.sh`) then attach the
+    image in a folder reached through a link (as TMPDIR's `/var` is) and fail right after: `feed_mounted` sees the mount,
+    nothing stays attached, no work folder stays. Reverse verification (2026-11-27): without the absolute paths the first
+    case is red («no DMG at ../fixture.dmg»); with the old cleanup's path match all three mount assertions are red, and the
+    check's own cleanup still detaches the image ([case](../bugfixes/2026-11-27-feed-writer-apostrophe-never-parsed.md)).
   - **The wiring guard**: one feed address and test-hook key; `renamex_np` / `RENAME_SWAP` in the app only in the installer,
     which moves nothing else onto the destination and keeps the default swap at quit; the updater started once in
     `startServices()`, the install last in `applicationWillTerminate`, the menu item after About, the Settings section, the

@@ -220,7 +220,9 @@ than the running one stays; the rest goes.
   instants (after every kill both paths hold a whole, valid app), what a launch reads and cleans, and the relaunch shell
   (with a recorder for `/usr/bin/open`); the Updates folder's own rules (a link at its root never followed, deletions in
   one step, the Data volume's spelling, a sibling folder). Every request's headers against the allow-list, `Accept: */*`
-  exactly, and no query string (§3). FeedWriter on fixture values.
+  exactly, and no query string (§3). FeedWriter on fixture values. The shell wrapper `scripts/write-update-feed.sh` on a
+  scratch image: relative arguments from another folder, and its mount (`scripts/update-feed/mount.sh`) failing right after
+  the attach with nothing left attached.
 - `checks/app-update-wiring.sh` (check-all): one feed address, the swap only through `renamex_np` with `RENAME_SWAP`,
   deletions only inside the Updates folder and the Trash only for the replaced app, the wiring at start / quit / menu /
   Settings / both toolbars, the quit-cancel hook, blocking work on its queue, no administrator rights, the release team,

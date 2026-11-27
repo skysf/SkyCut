@@ -184,6 +184,44 @@ writes "a loopback DMG for a test feed on that origin" yes 0.19.0 1 15.0 "${LOCA
 writes "a loopback DMG in a release feed" no 0.19.0 1 15.0 "${LOCAL_DMG}" 42431367 "${SHA}" "${NOTES}"
 writes "a test feed address SkyCut refuses" no 0.19.0 1 15.0 "${LOCAL_DMG}" 42431367 "${SHA}" "${NOTES}" "http://example.com/skycut.json"
 
+# The wrapper itself on a scratch image (docs/bugfixes/2026-11-27-feed-writer-apostrophe-never-parsed.md). Gatekeeper
+# refuses an image that isn't notarized, so a wrapper run ends there, before the mount. Relative arguments given from
+# another folder must reach that point (the wrapper cds to the repository), and its work folder must be gone. The mount
+# and its cleanup (scripts/update-feed/mount.sh) then run on their own and fail right after the attach, in a folder reached
+# through a link the way TMPDIR's /var is (`mount` prints the resolved path): nothing may stay attached.
+echo "==> the feed writer's wrapper"
+REPO="$(pwd)"
+FIXTURE="${WORK}/wrapper/fixture.dmg"
+mkdir -p "${WORK}/wrapper/elsewhere" "${WORK}/wrapper/tmp"
+ln -s "${WORK}/wrapper/tmp" "${WORK}/wrapper/tmp-link"
+/usr/bin/hdiutil create -quiet -size 2m -fs HFS+ -volname FeedWrapper "${FIXTURE}"
+cp "${NOTES}" "${WORK}/wrapper/notes.json"
+WRAPPER_OUTPUT="$(cd "${WORK}/wrapper/elsewhere" && TMPDIR="${WORK}/wrapper/tmp/" /bin/bash "${REPO}/scripts/write-update-feed.sh" \
+  --test-feed http://127.0.0.1:8123/skycut.json ../fixture.dmg http://127.0.0.1:8123/fixture.dmg ../notes.json feed.json 2>&1 || true)"
+case "${WRAPPER_OUTPUT}" in
+  *"Gatekeeper doesn't accept ${WORK}/wrapper/elsewhere/../fixture.dmg as notarized Developer ID"*) ;;
+  *) echo "FAIL: feed writer wrapper: relative arguments from another folder: ${WRAPPER_OUTPUT}"; FAILED=1 ;;
+esac
+cat > "${WORK}/wrapper/fails-after-mount.sh" <<'SH'
+set -euo pipefail
+. scripts/update-feed/mount.sh
+feed_mount_init
+trap feed_cleanup EXIT
+feed_attach "$1"
+if feed_mounted; then echo "mounted"; fi
+exit 1
+SH
+MOUNT_OUTPUT="$(TMPDIR="${WORK}/wrapper/tmp-link/" /bin/bash "${WORK}/wrapper/fails-after-mount.sh" "${FIXTURE}" 2>&1 || true)"
+if [ "${MOUNT_OUTPUT}" != "mounted" ]; then
+  echo "FAIL: feed writer wrapper: the mount was not made, or feed_mounted missed it: ${MOUNT_OUTPUT}"; FAILED=1
+fi
+if [ "$(/usr/bin/hdiutil info | grep -cF "${FIXTURE}" || true)" != "0" ]; then
+  echo "FAIL: feed writer wrapper: a run that failed after the mount left the DMG attached"; FAILED=1
+fi
+if [ -n "$(ls -A "${WORK}/wrapper/tmp")" ]; then
+  echo "FAIL: feed writer wrapper: a work folder stayed: $(ls -A "${WORK}/wrapper/tmp")"; FAILED=1
+fi
+
 if [ "${FAILED}" -ne 0 ]; then
   echo "app-update: FAILED"
   exit 1

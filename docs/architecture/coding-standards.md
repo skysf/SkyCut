@@ -4,7 +4,7 @@
 > 适用于仓库里的全部代码：`Sources/` 下的 App 与核心库，`checks/`、`scripts/` 下的检查和
 > 工具（Swift / shell / Python），测试也算。行数上限由 `checks/source-file-size.sh` 钉住；
 > 其余几条守卫够不着，写的人和审的人按第五节的清单过一遍。
-> Shell scripts: section 6 (since 2026-11-27), pinned by `checks/shell-syntax.sh`.
+> Shell scripts: section 6 (since 2026-11-27).
 
 ## 一、为什么
 
@@ -104,8 +104,9 @@
 ## 六、Shell scripts (2026-11-27)
 
 The traps this repository's shell scripts fell into, each with its guard, are collected in
-[build version and shell traps](../bugfixes/2026-08-06-build-version-and-shell-traps.md) (traps 1–8). Read it before
-changing a shell script (AGENTS.md「验证纪律」). Two rules hold for every script, and `checks/shell-syntax.sh` pins both:
+[build version and shell traps](../bugfixes/2026-08-06-build-version-and-shell-traps.md) (traps 1–9). Read it before
+changing a shell script (AGENTS.md「验证纪律」). These rules hold for every script. `checks/shell-syntax.sh` pins the first
+two everywhere; the other two are review items (`scripts/check-app-update.sh` pins them for the update feed writer):
 
 1. **Every shell script parses under `/bin/bash -n`**: macOS's bash 3.2, the shell `scripts/check-all.sh` and CI run
    scripts with. That includes the scripts no check runs: release tools, smokes, asset pipelines. The guard takes every
@@ -118,3 +119,9 @@ changing a shell script (AGENTS.md「验证纪律」). Two rules hold for every 
    silently takes everything between them as one string, so rule 1 alone can't catch it and the guard looks for the
    apostrophe itself. One inside a nested `"…"` in the word, escaped (`\'`) or paired (`'…'`) in the same expansion is
    fine. Case: [the update feed writer never parsed](../bugfixes/2026-11-27-feed-writer-apostrophe-never-parsed.md).
+3. **Ask whether a volume is mounted by device, not by path**: the mount point's `stat -f %d` against its parent's, or
+   resolve the folder with `pwd -P` before comparing paths. TMPDIR is under `/var`, a link to `/private/var`, and `mount`
+   prints resolved paths, so a match on the path as written never finds the mount. A cleanup built that way never detached
+   (the same case, follow-up; `scripts/update-feed/mount.sh`, run by `scripts/check-app-update.sh`).
+4. **A script that `cd`s before it uses its arguments makes them absolute first** (from `$PWD`), so relative paths mean the
+   caller's folder.
