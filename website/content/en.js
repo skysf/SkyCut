@@ -88,7 +88,7 @@ export default {
     ['Review and export', 'Play it back, refine the details and export. The export panel tells you if a watermark applies. Cloud generation is billed separately in Sky Studio credits.']
   ],
   docsCompatibility: 'Staying up to date',
-  docsCompatibilityBody: 'These steps describe the current public download. If your copy of SkyCut has no Sky Studio settings, download it again to get the latest version.',
+  docsCompatibilityBody: 'These steps describe the current public download. SkyCut 0.18.70 and later update themselves: a new version downloads in the background and is installed when you quit SkyCut, or right away with Restart and Update. An older copy needs one more download from this site. In Settings → General → Software Update you can turn off automatic download and install; SkyCut then still checks and shows New Version in the toolbar.',
   docsClients: 'Supported AI clients',
   docsClientsBody: 'Claude Desktop, Claude Code and Codex have built-in setup. Other clients need local stdio MCP support. A regular ChatGPT web chat cannot connect directly to the local SkyCut MCP server.',
   docsKey: 'Open Sky Studio',
@@ -99,7 +99,7 @@ export default {
     ['Retention and unsubscribe', 'We keep your signup data until you unsubscribe or request deletion. To unsubscribe or have your data deleted, email support@skycut.app.'],
     ['Website preferences', 'We store your language and animation preference in your browser. We do not add advertising trackers. Hosting and email providers may process technical information needed to deliver their services.'],
     ['Film and downloads', 'Playing the demo loads video from downloads.skylu.ai. Downloading the Mac app takes you to the existing Sky Lu download service.'],
-    ['The Mac app', 'This page describes the website. Connected AI tools and Sky Studio services have their own data handling. Your editing project stays on your Mac; content used in a cloud request can be sent to the service you choose.']
+    ['The Mac app', 'This page describes the website. Connected AI tools and Sky Studio services have their own data handling. Your editing project stays on your Mac; content used in a cloud request can be sent to the service you choose. To check for a new version, SkyCut fetches one small file from skylu.ai about a minute after it starts and then once a day while it runs; new versions download from downloads.skylu.ai. These requests carry no account information, no Sky Studio Key and no identifier of you or your Mac; like any web request, they include your IP address and your language preference.']
   ],
   errorTitle: 'A little off the timeline.', errorBody: 'That page is not here. Let’s get you back.'
 };

@@ -185,7 +185,7 @@ Supported AI clients: Claude Desktop, Claude Code and Codex have built-in setup.
 - Retention and unsubscribe: We keep your signup data until you unsubscribe or request deletion. To unsubscribe or have your data deleted, email support@skycut.app.
 - Website preferences: We store your language and animation preference in your browser. We do not add advertising trackers. Hosting and email providers may process technical information needed to deliver their services.
 - Film and downloads: Playing the demo loads video from downloads.skylu.ai. Downloading the Mac app takes you to the existing Sky Lu download service.
-- The Mac app: This page describes the website. Connected AI tools and Sky Studio services have their own data handling. Your editing project stays on your Mac; content used in a cloud request can be sent to the service you choose.
+- The Mac app: This page describes the website. Connected AI tools and Sky Studio services have their own data handling. Your editing project stays on your Mac; content used in a cloud request can be sent to the service you choose. To check for a new version, SkyCut fetches one small file from skylu.ai about a minute after it starts and then once a day while it runs; new versions download from downloads.skylu.ai. These requests carry no account information, no Sky Studio Key and no identifier of you or your Mac; like any web request, they include your IP address and your language preference.
 
 ## Guides
 
