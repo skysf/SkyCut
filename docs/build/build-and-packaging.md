@@ -946,6 +946,119 @@ Updating and permissions:
 
 No git tag and no GitHub release, as before.
 
+2026-11-27, publish **0.18.71**, the first release an installed SkyCut fetched by itself. **Superseded the same night**: in
+0.18.70 and 0.18.71, choosing SkyCut › Check for Updates… crashes SkyCut, so 0.18.72 followed a few hours later. The user's
+OK: 「发，刚好看下，这次软件是不是能看到这个更新」; the Chinese notes approved: 「说明没有问题」. Release and verification facts
+by Claude.
+
+Build:
+- Source: main `dc7cf44205359bedd3f7bdac34b2d32dbb40ee65`; its main run 45981762219 was green (`check-all`). Client changes
+  since 0.18.70: #570 (get_status reports the update state; the Forest theme's on / off chips, current line and
+  selections) and #571 (closing a window whose root is the timeline no longer aborts). #567–#569 are docs and the feed
+  writer's fix.
+- In the main checkout: `VERSION=0.18.71 arch -arm64 /bin/bash scripts/build-app.sh` (Release compile 334 s), built once.
+
+Product:
+- `SkyCut-0.18.71-arm64.dmg`, 42,662,799 bytes; SHA-256
+  `6cb72e26ec58f0ab3acd5f0f2b5f51cac37bb4527762223c281e14e5a9d61dc2`; the App's CDHash `1c835b7f…`.
+- Notarization: the App, submission `534c8b23-cf77-46a7-ac76-dbc51884d4f8`; the DMG, submission
+  `8ad5cf3b-9233-4c42-aac2-86c549a899cd`; both Accepted and stapled.
+
+Checks: as for 0.18.70 (the package, the signing chain and team, deep strict verify locally and mounted, `spctl`
+«Notarized Developer ID» and `stapler validate` for the App and the DMG, the mounted `skycut-mcp` initializing as `skycut` /
+`0.18.71` with 64 tools, ffmpeg 8.1, `skycut-web-motion`, `scripts/check-dmg.sh`), all passed; #570's new get_status strings
+are in the binary.
+
+Publish:
+- Public object: `skycut/SkyCut-0.18.71-6cb72e26ec58-arm64.dmg`. Claude Code's permission system refused the upload from
+  the release session, so the user ran the same upload script (it checks the size and SHA-256 first): 200 in 8.7 s. Then
+  read back in full with `--url`: the same size and SHA-256.
+- The feed: `scripts/write-update-feed.sh` at `dc7cf442`, five notes each in zh-Hans, en and es.
+- Personal site [skystudio PR #26](https://github.com/skysf/skystudio/pull/26) (merge `4294152`): both entries and
+  `updates/skycut.json`; `/updates/*` stayed no-cache. Live: both entries and `--feed` passed, the live feed byte for byte
+  the written one, `cache-control: no-cache`.
+- Tool vocabulary: `skycut-0.18.71.json` from `dc7cf442`, 64 tools, 69 guide topics, 797 known names (#570 added 5), not
+  dirty.
+
+The first self-update on a real Mac (the user's, 0.18.70 → 0.18.71, seen in SkyCut's log, the Updates folder and the
+Trash; nothing touched):
+- After two crashes at Check for Updates… (19:32 and 19:33, both 0.18.70, `EXC_BREAKPOINT` / `EXC_BAD_ACCESS` in Swift's
+  executor check under an AppKit event observer: the bug #572 fixed), SkyCut was opened at 19:35:12. It fetched the feed 64 s
+  later, downloaded the 42.7 MB DMG in 129.5 s, verified it (Gatekeeper) and staged it, with nothing shown but the pill.
+- At the quit at 21:45:53.8 it logged `install at quit: installed(from: 0.18.70, to: 0.18.71)`; the replaced 0.18.70 went to
+  the Trash (`SkyCut.app 21-45-53-793.app`), and `/Applications/SkyCut.app` holds the published build (CDHash `1c835b7f…`).
+  `open` started 0.18.71 0.13 s after the old process exited, with no AI helper active, which matches Restart and Update's
+  relaunch. 0.18.71's first launch consumed `installed.json`, and the Updates folder was left empty.
+- [App updates](../architecture/app-updates.md) §10 left over from 0.18.70: this run covered the real check, download,
+  verification, staging and swap from the public feed, and most likely Restart and Update's relaunch. The menu's
+  Check for Updates… crashed (fixed in 0.18.72). Still for a person: Restart and Update while an export runs and with an
+  unsaved project, the Settings switch, a quit with Wi-Fi off, and the pill's popovers.
+
+2026-11-28, publish **0.18.72**, the fix for the crash at SkyCut › Check for Updates…. The user's OK, covering 0.18.72 and
+0.18.73: 「全部都完成了，允许你直接发布，记得把 skycut.app 里面的下载连接也一起更新了，这样下载的是最新版。绿了你就合并，有bug就直接修复」.
+The notes were written by Master and released under that OK. Release and verification facts by Claude.
+
+Build:
+- Source: main `b331b2687722acbf804e6ebd571e9811d14c1bf0` (#572); its main run 46044822561 was green (`check-all`). #572: the
+  owner of `AppUserPresence`'s tracking area exported the wrong selectors, and the swallowed exception corrupted the
+  executor tracking during a modal alert run from a Task. The same fix ends the crash (and lost edits) at the
+  untitled-project save question and the Replace question. The Close It strip next to open / save windows now appears
+  only when the person asks for another file window while one is open.
+- In the main checkout: `VERSION=0.18.72 …` (Release compile 507 s), built once.
+
+Product:
+- `SkyCut-0.18.72-arm64.dmg`, 42,662,007 bytes; SHA-256
+  `78f4de1843942d30d1bab770418fb33f74ce1ed4ccb40506c17175f333813ec1`; the App's CDHash `00b6e788…`.
+- Notarization: the App `335c7b4e-e161-4911-a5de-228367ba6045`, the DMG `276bac78-1bba-42ae-8300-77c6ad49ab9a`; both
+  Accepted and stapled.
+
+Checks: as for 0.18.71, all passed (`skycut` / `0.18.72`); #572's new strings are in the binary and its three string
+tables.
+
+Publish:
+- Public object: `skycut/SkyCut-0.18.72-78f4de184394-arm64.dmg`, uploaded from the release session (200 in 9.6 s), read
+  back in full with `--url`.
+- The feed: `scripts/write-update-feed.sh` at `b331b268`, three notes each.
+- Personal site [skystudio PR #27](https://github.com/skysf/skystudio/pull/27) (merge `df42715`). Live: both entries and
+  `--feed` passed, `cache-control: no-cache`; skycut.app's download buttons (en / zh / es / de) go through
+  `https://skylu.ai/download/skycut`, which redirected to this DMG.
+- Tool vocabulary: `skycut-0.18.72.json` from `b331b268`, same counts as 0.18.71, not dirty.
+- It never reached the user's Mac: the running 0.18.71 had made its first check before 0.18.72 was out, and checks once a
+  day.
+
+2026-11-28, publish **0.18.73**, the untitled-project fix, under the same OK as 0.18.72. Release and verification facts by
+Claude.
+
+Build:
+- Source: main `aa1e78088756edfdec7fd3d9ae5e44b64e94e944` (#573); its main run 46067269722 was green (`check-all`). #573: an
+  untitled project holding only ruler markers, notes, review reasons, a translation track or a pinned Sky Studio style
+  version closed (and Quit / New / Open replaced it) without the save question. Untitled projects have no autosave, so
+  those were lost; `isEmpty` now counts them.
+- In the main checkout: `VERSION=0.18.73 …` (Release compile 267 s), built once.
+
+Product:
+- `SkyCut-0.18.73-arm64.dmg`, 42,663,158 bytes; SHA-256
+  `7002e72b10e73deea2e4935b00f17303e3aa829deaf37539fba44f1dabffc016`; the App's CDHash `88d6fb28…`.
+- Notarization: the App `9bc01646-c976-4487-8d14-35c8d1b72a97`, the DMG `eba2f617-72d8-4183-a31b-9a9729a87853`; both
+  Accepted and stapled.
+
+Checks: as for 0.18.71, all passed (`skycut` / `0.18.73`). #573 changes logic only, so there was no string to look for.
+
+Publish:
+- Public object: `skycut/SkyCut-0.18.73-7002e72b10e7-arm64.dmg`, uploaded from the release session (200 in 135.8 s on a
+  slow uplink), read back in full with `--url`.
+- Personal site [skystudio PR #28](https://github.com/skysf/skystudio/pull/28) (merge `aa61144`): both entries and the feed,
+  first with 0.18.73's one note. Live: both entries, `--feed`, no-cache, and skycut.app's buttons all land on this DMG.
+- **Cumulative notes**: most copies updating to 0.18.73 skip 0.18.72, so the feed was rewritten from the same DMG with four
+  notes per language (0.18.73's first, then 0.18.72's three) in
+  [skystudio PR #29](https://github.com/skysf/skystudio/pull/29) (merge `9e8c726`; only `updates/skycut.json`). Live:
+  `--feed` passed with the four notes, the live feed byte for byte the written one, `cache-control: no-cache`. When one
+  release follows another before most copies have updated, the next feed carries the skipped release's notes too.
+- Tool vocabulary: `skycut-0.18.73.json` from `aa1e7808`, same counts, not dirty.
+
+No git tag and no GitHub release for 0.18.71–0.18.73, as before. Sky Studio's `min_version`, the Beta and the website are
+unchanged.
+
 ## CI（.github/workflows/checks.yml）
 
 CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runner 上并行跑。
