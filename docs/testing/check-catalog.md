@@ -26,6 +26,11 @@
 - `scripts/check-e2e-gui.sh` hosts production views in AppKit windows and injects events into those specific windows.
   It checks a folder returned by the fixture panel and a typed path after the fixture reports failure, a version restored and undone,
   a new native preset and its inspector rows, and a web template card placed on the timeline and re-rendered in the inspector.
+  It also takes the timeline down with no event loop running: a project window sent to the background, a window whose root
+  is the timeline, then the project window closed with its close button. Each hosting view must be released, the timeline's
+  scroll geometry unregistered, and nothing published by it meanwhile (`checks/E2EGUI/TimelineTeardown.swift`). The suite
+  must print `GUI E2E: every case ran`: its main loop is the Swift runtime's, which exits with status 0 if a framework
+  stops the main run loop early.
   It locates controls from its own window pixels using AppKit and on-device Vision. The row and its icon-only button
   must be found in the same drawing. The 20 s control window covers the 15 s export destination probe and scheduling.
   Re-render uses the helper's frame-based deadline plus teardown and commit time. The system service, external volumes,
@@ -287,7 +292,7 @@
   only with it — a new source range on a screen recording keeps them; typed subtitles over a silent picture follow it like text — group 1k `LinkageVoiceCues.swift`; a merged translation goes by all its originals' speech, head or tail trims alike — group 1l `LinkageMergedTranslation.swift`）：
   `scripts/check-timeline-snap.sh`；拖动/框选接线扫描：`checks/timeline-drag-wiring.sh`（拆在 `checks/timeline-drag-wiring/` 下的几节一起
   `source` 进来，含「拖动会话不进时间线的 @State」`drag-box.sh`、联动的接线 `linkage.sh`：`perform` / `liveApply` 收尾调 `TimelineLinkage.follow`、
-  只有 ⌫ / delete_items / cut_speech 传 `deletesContent: true`、三个拖动计划带上压着的东西）。
+  只有 ⌫ / delete_items / cut_speech 传 `deletesContent: true`、三个拖动计划带上压着的东西；the teardown `teardown.sh`: the auto-scroll heartbeat stops and `dismantleNSView` lets go through `detach`, which publishes nothing）。
 - 冒烟拷工程的脚本不许整夹拷「下载」「桌面」「文稿」、家目录、根目录，太大的文件夹也不拷（真跑脚本、假的家目录）：`checks/copy-project-guard.sh`。
 - **进程内 GUI 冒烟**（人在用这台机器时也能跑：不动鼠标、不抢前台，按步骤表点 / 拖 / 滚 / 按键，
   结果里带选择、各段位置和每个视图重算了几次）：`scripts/gui-smoke/in-process/run.sh <步骤.json> [工程拷贝]`。

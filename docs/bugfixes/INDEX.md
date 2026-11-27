@@ -314,6 +314,7 @@
 - [2026-09-21 刚加进轨道的素材没贴左边](2026-09-21-timeline-content-centered-horizontally.md) — 09-20 播放头断线那次的横向孪生：`ScrollView` 两轴都会居中，内容可能比视口小的容器两轴一起钉。
 - [2026-09-23 从 Finder 拖文件进时间线标尺以下没反应](2026-09-23-timeline-file-drop-claimed-by-inner-drop-region.md) — 拖入由最里面的落点区独占认领；「两套路由」的结论已在同一天的「卡片拖不进时间线」那份里更正。
 - [2026-09-21 时间线右边小半个视口是死区](2026-09-21-timeline-right-padding-dead-zone.md) — `minWidth` 撑出来的空白不自带命中区：命中区要盖在填满视口之后。
+- [2026-11-27 Taking the timeline down published its scroll offset: windows whose root is the timeline aborted](2026-11-27-timeline-teardown-publishes-scroll-offset.md) — A representable never publishes from `dismantleNSView`: it runs inside SwiftUI's teardown, and whether that aborts is only SwiftUI's teardown order.
 - [2026-11-11 系统深色时按钮提示深底深字](2026-11-11-tooltip-dark-on-dark-in-forest-theme.md) — `.preferredColorScheme` 只改得了宿主是 contentView 的窗口，嵌套的宿主要设 `windowAppearance`。
 - [2026-11-11 森林色的提示外面套着一圈直角方框](2026-11-11-tooltip-square-frame-in-forest-theme.md) — 透明面板的根要自己裁成气泡的形状；截图里每处异样都要对上原因再结案。
 - [2026-08-23 提示悬浮在打开文件对话框上](2026-08-23-tooltip-survives-open-panel.md) — 靠 hover 退出维护的状态要有打断信号兜底（mouseDown / keyDown / resignKey）。
