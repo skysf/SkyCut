@@ -62,20 +62,23 @@ struct TransitionMaskView: View {
             let height = max(14, rowHeight - 10)
             // 选中态和转场卡片同一套视觉，不另发明一种。
             let isSelected = project.selectedTransitionSeamID == outgoing.id
+            // Forest: a selected cap is look A's chip (shows over dark footage too); Classic: the black cap, as before.
+            let palette = AppThemePalette.current
+            let selectedFill = isSelected ? palette.selectedCapFill : nil
             ZStack {
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(.black.opacity(0.35))
+                    .fill(selectedFill ?? .black.opacity(0.35))
                     .overlay(
                         RoundedRectangle(cornerRadius: 4)
                             .strokeBorder(
-                                isSelected ? Color.accentColor : .white.opacity(0.75),
+                                isSelected ? AppThemePalette.current.highlight : .white.opacity(0.75),
                                 lineWidth: isSelected ? 2 : 1
                             )
                     )
                 if width > 22 {
                     Image(systemName: "square.filled.and.line.vertical.and.square")
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle((isSelected ? palette.selectedCapIcon : nil) ?? .white)
                 }
             }
             .frame(width: width, height: height)

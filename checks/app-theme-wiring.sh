@@ -49,4 +49,85 @@ if grep -E '\.id\(|scheduleRebuild|VideoEditProject|PlayerClock' Sources/SrtFlow
   echo 'FAIL: changing a theme must not replace the editor or rebuild its media' >&2
   exit 1
 fi
-echo 'PASS: theme roots, hand-built panel appearance, native settings, palette, toolbar and MCP wiring.'
+# On / off, current and selected at a glance (docs/architecture/app-themes.md "On / off at a glance",
+# docs/bugfixes/2026-11-27-on-off-invisible-in-forest.md). Code lines only (comments skipped).
+code_lines() { grep -rn --include='*.swift' "$1" Sources/SrtFlow | grep -vE '^[^:]*:[0-9]+:[[:space:]]*//' || true; }
+# 1. Button-style toggles only through the shared style (StateMarks.swift). Allowlist, one line each with its reason:
+#    the Upscale compare's Loop is a *bordered* button toggle: AppKit's bezel shows on / off in both themes (audit 2026-11-27).
+RAW="$( (code_lines 'toggleStyle(.button)'; code_lines 'ButtonToggleStyle') | grep -v '^Sources/SrtFlow/StateMarks.swift:' \
+  | grep -v '^Sources/SrtFlow/Upscale/UpscaleCompareView.swift:' || true)"
+if [ -n "${RAW}" ]; then
+  echo "FAIL: app-theme: a button-style toggle outside the shared style; use .stateToggle(classicTint:) (StateMarks.swift):" >&2
+  printf '%s\n' "${RAW}" >&2
+  exit 1
+fi
+[ "$(code_lines 'toggleStyle(.button)' | grep -c '^Sources/SrtFlow/Upscale/UpscaleCompareView.swift:')" = 1 ] \
+  || { echo "FAIL: app-theme: the Upscale compare's allowlisted Loop toggle moved or multiplied (one bordered button toggle)" >&2; exit 1; }
+# 2. No on-state tint of its own: toggleAccent (Classic's teal) only as the shared style's Classic tint.
+TINTS="$(code_lines 'toggleAccent' | grep -v '^Sources/SrtFlow/AppThemePalette.swift:' | grep -v 'stateToggle(classicTint: AppThemePalette.current.toggleAccent)' || true)"
+if [ -n "${TINTS}" ]; then
+  echo "FAIL: app-theme: toggleAccent tints a control outside .stateToggle(classicTint:):" >&2
+  printf '%s\n' "${TINTS}" >&2
+  exit 1
+fi
+# 3. Color.accentColor only in the palette: the theme root's .accentColor(_:) doesn't reach it, so anywhere else it draws the
+#    macOS accent in Forest (yellow, blue…). The root's .accentColor(palette.accent) modifier itself is the one other use.
+# Also the AppKit spelling (controlAccentColor), review FBG1 G2. Allowlist, with its reason: ScreenRecordingRegionPanel draws
+# over the user's whole screen, outside SkyCut's themed windows, as macOS's own screenshot selection does (white-edged
+# handles in the system accent); the theme doesn't reach that overlay, in either theme.
+ACCENTS="$(grep -rniE --include='*.swift' 'accentColor' Sources | grep -vE '^[^:]*:[0-9]+:[[:space:]]*//' \
+  | grep -v '^Sources/SrtFlow/AppThemePalette.swift:' | grep -vF '.accentColor(palette.accent)' \
+  | grep -v '^Sources/SrtFlow/ScreenRecordingRegionPanel.swift:' || true)"
+if [ -n "${ACCENTS}" ]; then
+  echo "FAIL: app-theme: Color.accentColor outside AppThemePalette (use highlight, rowSelectionFill, overVideo…):" >&2
+  printf '%s\n' "${ACCENTS}" >&2
+  exit 1
+fi
+# 4. The controls the audit found use the shared looks; the shared look uses the palette values check-app-theme measures.
+[ "$(grep -c 'stateToggle(classicTint: AppThemePalette.current.toggleAccent)' Sources/SrtFlow/VideoEditToolbarIcons.swift)" = 1 ] \
+  && [ "$(grep -c 'stateToggle(classicTint: AppThemePalette.current.toggleAccent)' Sources/SrtFlow/VideoEditInspector+Transform.swift)" = 1 ] \
+  && [ "$(grep -c 'stateToggle(classicTint: nil)' Sources/SrtFlow/VideoEditSubtitlePanel.swift)" = 1 ] \
+  && [ "$(grep -c 'stateToggle(classicTint: nil)' Sources/SrtFlow/SubtitleEditPanel.swift)" = 1 ] \
+  || { echo "FAIL: app-theme: the toolbar, flip and both follow-playback toggles use .stateToggle(classicTint:)" >&2; exit 1; }
+require Sources/SrtFlow/SubtitleEditPanel.swift 'content.chipText(isCurrent, normal: Color.primary, semibold: true)'
+require Sources/SrtFlow/SubtitleIndexColumn.swift '.chipText(isCurrent, normal: Color.secondary, semibold: false)'
+require Sources/SrtFlow/VideoEditSubtitleCueRow.swift 'SubtitleIndexColumn.editLabel(index: cue.index, template: indexTemplate, isCurrent: isCurrent)'
+require Sources/SrtFlow/SubtitleEditPanel.swift '.frame(width: indexWidth, alignment: .trailing)'
+for card in Sources/SrtFlow/VideoEditFilterLibrary.swift Sources/SrtFlow/VideoEditTransitionPicker.swift; do
+  require "${card}" '.chipText(isSelected, normal: Color.primary, semibold: false)'
+done
+require Sources/SrtFlow/VideoEditTimelineTransitionMask.swift '.fill(selectedFill ?? .black.opacity(0.35))'
+require Sources/SrtFlow/VideoEditTimelineShapeRow.swift 'if let inner = AppThemePalette.current.selectionInnerStroke {'
+require Sources/SrtFlow/VideoEditTextFrameBox.swift '.overVideoOutlineCasing(Rectangle(), lineWidth: 1)'
+require Sources/SrtFlow/BurnInMarginGuides.swift '.overVideoCasing(Rectangle())'
+require Sources/SrtFlow/VideoEditPreviewTransform.swift '.overVideoOutlineCasing(Rectangle(), lineWidth: 1.5)'
+# Every icon toggle has a VoiceOver name (review FBG1 U4).
+require "Sources/SrtFlow/VideoEditInspector+Transform.swift" '.accessibilityLabel(Text(horizontal ? "Flip horizontally" : "Flip vertically"))'
+require Sources/SrtFlow/VideoEditSubtitlePanel.swift '.accessibilityLabel(Text("Scroll to the line being spoken during playback"))'
+require Sources/SrtFlow/SubtitleEditPanel.swift '.accessibilityLabel(Text("Scroll to the line being spoken during playback"))'
+require Sources/SrtFlow/VideoEditToolbarIcons.swift '.accessibilityLabel(help)'
+require Sources/SrtFlow/VideoEditSubtitleCueRow.swift '.fill(isSelected ? AppThemePalette.current.rowSelectionFill : Color.clear)'
+require Sources/SrtFlow/VideoEditSubtitleCueRow.swift 'if isSelected, let stroke = AppThemePalette.current.rowSelectionStroke {'
+require Sources/SrtFlow/VideoEditTimelineShapeRow.swift 'strokeBorder(AppThemePalette.current.selectionStroke, lineWidth: 1.5)'
+[ "$(grep -c '.workbenchChip(isOn: ' Sources/SrtFlow/VideoEditWorkbenchToolbar.swift)" = 2 ] \
+  || { echo "FAIL: app-theme: the workbench's Library and Subtitles buttons both show on with .workbenchChip(isOn:)" >&2; exit 1; }
+require Sources/SrtFlow/StateMarks.swift '.foregroundStyle(configuration.isOn ? palette.accent : palette.secondaryText)'
+require Sources/SrtFlow/StateMarks.swift 'if configuration.isOn { RoundedRectangle(cornerRadius: 5).fill(palette.onChip) }'
+require Sources/SrtFlow/StateMarks.swift '.foregroundStyle(marked ? palette.accent : normal)'
+require Sources/SrtFlow/StateMarks.swift 'RoundedRectangle(cornerRadius: 4).fill(palette.onChip)'
+# VoiceOver gets the style's plain button as one toggle button (review FBG1 U4): no accessibility representation, which
+# made each toggle an image plus an unnamed switch. Count-neutral by construction (G1): no ViewModifier type and no counter
+# in StateMarks.swift (a toggle style's makeBody re-runs on every evaluation of its view).
+if grep -nE 'accessibilityRepresentation|: ViewModifier|PerfCounters\.' Sources/SrtFlow/StateMarks.swift | grep -vE '^[0-9]+:[[:space:]]*//'; then
+  echo "FAIL: app-theme: StateMarks.swift adds no accessibility representation, ViewModifier type or counted body (review FBG1 U4, G1)" >&2
+  exit 1
+fi
+# A hand-made toggle in the very pair of the bug (the accent on, the text colour off): use the shared look (review FBG1 G2).
+HAND="$(grep -rnE --include='*.swift' '\? *(AppThemePalette\.current|palette)\.accent *: *(AppThemePalette\.current|palette)\.text\b' Sources \
+  | grep -vE '^[^:]*:[0-9]+:[[:space:]]*//' || true)"
+if [ -n "${HAND}" ]; then
+  echo "FAIL: app-theme: an on / off look in the accent against the text colour (#123F32 / #19221D in Forest): use .stateToggle or .chipText:" >&2
+  printf '%s\n' "${HAND}" >&2
+  exit 1
+fi
+echo 'PASS: theme roots, hand-built panel appearance, native settings, palette, toolbar and MCP wiring; on / off, current and selected through the shared looks, no Color.accentColor outside the palette.'

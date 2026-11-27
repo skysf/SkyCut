@@ -11,7 +11,13 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -wmo \
   Sources/SrtFlow/AppThemePalette.swift \
   Sources/SrtFlow/AppThemeAppearance.swift \
   Sources/SrtFlow/TimelineMagnetSymbol.swift \
+  Sources/SrtFlow/StateMarks.swift \
+  Sources/SrtFlow/SubtitleIndexColumn.swift \
   checks/Shared/ScratchDefaults.swift \
   checks/AppTheme/main.swift \
+  checks/AppTheme/StateRuleChecks.swift \
+  checks/AppTheme/StateViewChecks.swift \
   -o "${WORK}/check-app-theme"
-"${WORK}/check-app-theme"
+# With counters on, the shared theme store keeps nothing on disk (AppThemeStore.shared): the view checks switch themes
+# without writing the login user's preferences.
+SRTFLOW_BENCH_OUT="${WORK}/unused-bench-output" "${WORK}/check-app-theme"

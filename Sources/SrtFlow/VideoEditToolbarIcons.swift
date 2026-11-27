@@ -64,9 +64,7 @@ struct ToolbarToggle: View {
             }
             .frame(width: 20, height: 18)
         }
-        .toggleStyle(.button)
-        .buttonStyle(.borderless)
-        .tint(AppThemePalette.current.toggleAccent)
+        .stateToggle(classicTint: AppThemePalette.current.toggleAccent)
         .instantHelp(help, shortcut: shortcut)
         .accessibilityLabel(help)
     }

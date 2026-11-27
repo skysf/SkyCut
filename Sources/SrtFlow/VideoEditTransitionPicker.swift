@@ -237,14 +237,14 @@ private struct TransitionCard: View, Equatable {
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
                         .strokeBorder(
-                            isSelected ? Color.accentColor : Color.primary.opacity(0.15),
+                            isSelected ? AppThemePalette.current.highlight : Color.primary.opacity(0.15),
                             lineWidth: isSelected ? 2 : 1
                         )
                 )
                 Text(LocalizedStringKey(kind.title))
                     .font(.caption2)
                     .lineLimit(1)
-                    .foregroundStyle(isSelected ? Color.accentColor : .primary)
+                    .chipText(isSelected, normal: Color.primary, semibold: false)
             }
         }
         .buttonStyle(.plain)

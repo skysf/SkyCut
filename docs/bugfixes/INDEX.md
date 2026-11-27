@@ -194,6 +194,7 @@
 - [2026-11-18 AI project-template reuse loses the official origin](2026-11-18-official-template-origin-on-reuse.md) — Preserve a resolved source identity separately from the ID used to find it; UI and AI copies must retain the same defaults.
 - [2026-11-18 Official collision title does not fade with its duration](2026-11-18-official-word-shadow-fade.md) — Compare actual pixels at common times; a duration change must not pass merely because its frame count changed.
 - [2026-11-17 Projects saved before the freeze fix still delete the clip with its freeze tail](2026-11-17-old-freeze-tails-stay-linked.md) — Fixing how data is made leaves the data already made: repair old files on open; pieces of one clip in one link group play in step.
+- [2026-11-27 Forest: on and off look the same, the current line is the macOS accent](2026-11-27-on-off-invisible-in-forest.md) — Measure on vs off and keep a failing sample; theme colours come from the palette, never `Color.accentColor`.
 - [2026-11-19 A one-frame head or tail at 60 fps crashed inspect_video](2026-11-19-one-frame-edge-crashes-inspection.md) — Check a window's bounds as numbers before building a range: a trap stops the app and no job can catch it; test edges at every frame rate.
 - [2026-08-04 半透明绿底](2026-08-04-opacity-green-background.md) — 默认合成器背景陷阱。
 - [2026-10-17 open_folder 的结果里 output_folder 还是上一个](2026-10-17-open-folder-reports-previous-output-folder.md) — task-local 里只放整个调用里不变的身份，会变的状态现查。

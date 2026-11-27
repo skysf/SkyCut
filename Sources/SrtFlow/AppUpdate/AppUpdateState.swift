@@ -130,6 +130,10 @@ struct AppUpdateState: Equatable, Sendable {
     var unconfirmed: AppUpdateStagedRecord?
     /// The DMG held back from automatic checks (Updates/retry.json).
     var retry: AppUpdateRetryRecord?
+    /// The newest release a check found, for reporting only (get_status's `app_update`, AppUpdateStatusReport): an
+    /// automatic download that failed or a DMG the retry record holds back clears `offer`, but SkyCut still knows the
+    /// version. No transition reads it; a check that finds nothing newer clears it (review FBG1, E1).
+    var lastFound: AppUpdateFeed?
 
     var pill: Pill? {
         switch phase {
@@ -238,12 +242,14 @@ struct AppUpdateState: Equatable, Sendable {
             if let pending { adopt(pending, mode: mode) }
             return ([], .failed)
         case .upToDate:
+            lastFound = nil
             // Nothing newer than the running version: whatever this run held, staged or downloaded, was withdrawn.
             var effects = withdraw()
             if pending != nil { effects.append(.discardStaged) }
             clearRelease()
             return (effects + [.discardDownloads(keeping: nil)], .upToDate)
         case .offer(let feed):
+            lastFound = feed
             var effects: [AppUpdateEffect] = []
             if let pending {
                 // The feed still names it: it shows now. Another release: it goes, never having shown.

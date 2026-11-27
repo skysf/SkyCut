@@ -351,7 +351,7 @@ private struct PositionGrid: View {
                             position = candidate
                         } label: {
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(position == candidate ? Color.accentColor : Color.primary.opacity(0.08))
+                                .fill(position == candidate ? AppThemePalette.current.highlight : Color.primary.opacity(0.08))
                                 .frame(height: 22)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 4)

@@ -171,12 +171,8 @@ struct SubtitleEditPanel: View {
                         .disabled(selection.isEmpty)
                         .instantHelp("Delete the selected lines")
 
-                    Toggle(isOn: $followsPlayback) {
-                        Image(systemName: "text.line.last.and.arrowtriangle.forward")
-                    }
-                    .toggleStyle(.button)
-                    .buttonStyle(.borderless)
-                    .instantHelp("Scroll to the line being spoken during playback")
+                    // Its own small view: the panel's body runs on every clock tick, the toggle doesn't have to.
+                    BurnInFollowToggle(isOn: $followsPlayback)
 
                     Spacer()
 
@@ -240,15 +236,24 @@ struct SubtitleEditPanel: View {
         return cues.last { $0.start <= time && time < $0.end }?.id
     }
 
+    /// The "#" column's width for this file's largest number (SubtitleIndexColumn.tableWidth).
+    private var indexWidth: CGFloat {
+        SubtitleIndexColumn.tableWidth(largest: max(cues.count, cues.last?.index ?? 0), chip: AppThemePalette.current.isForest)
+    }
+
     private var cueTable: some View {
         ScrollViewReader { proxy in
             Table(cues, selection: $selection) {
                 TableColumn(Text("#")) { cue in
+                    // One line; the column fits the largest number, chip included (SubtitleIndexColumn), so 256 or 8888
+                    // never truncate, current or not. The look before the frame: the chip hugs the number.
                     Text("\(cue.index)")
-                        .frame(width: 30, alignment: .trailing)
+                        .lineLimit(1)
+                        .fixedSize()
                         .modifier(CurrentCueHighlight(isCurrent: cue.id == currentCueID))
+                        .frame(width: indexWidth, alignment: .trailing)
                 }
-                .width(30)
+                .width(indexWidth)
                 TableColumn(Text("Start")) { cue in
                     TimecodeField(value: binding(for: cue.id, \.start, default: 0))
                 }
@@ -379,14 +384,28 @@ struct SubtitleEditPanel: View {
     }
 }
 
-/// 播放头正落在的那句加个重音。
+/// The Burn In table's follow-playback toggle, apart from the panel: the panel's body runs on every clock tick (it reads
+/// the playhead for the current line); this view's inputs don't change then, so SwiftUI leaves it alone (review FBG1, G1).
+struct BurnInFollowToggle: View {
+    @Binding var isOn: Bool
+
+    var body: some View {
+        let _ = PerfCounters.body(Self.self)
+        Toggle(isOn: $isOn) {
+            Image(systemName: "text.line.last.and.arrowtriangle.forward")
+        }
+        .stateToggle(classicTint: nil)
+        .accessibilityLabel(Text("Scroll to the line being spoken during playback"))
+        .instantHelp("Scroll to the line being spoken during playback")
+    }
+}
+
+/// 播放头正落在的那句加个重音。The look is the shared current line (StateMarks.swift): semibold, and in Forest on the chip.
 struct CurrentCueHighlight: ViewModifier {
     let isCurrent: Bool
     func body(content: Content) -> some View {
         let _ = PerfCounters.body(Self.self)
-        content
-            .fontWeight(isCurrent ? .semibold : .regular)
-            .foregroundStyle(isCurrent ? Color.accentColor : Color.primary)
+        content.chipText(isCurrent, normal: Color.primary, semibold: true)
     }
 }
 

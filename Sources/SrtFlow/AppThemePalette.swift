@@ -49,6 +49,37 @@ struct AppThemePalette {
     var playhead: Color { isForest ? accent : .white }
     var dragAccent: Color { isForest ? accent : .teal }
 
+    // MARK: On / off, current and selected at a glance (docs/architecture/app-themes.md "On / off at a glance")
+
+    /// Behind an "on" icon toggle, the current subtitle line and the workbench's shown panels. Forest: look A's light green
+    /// (the user's pick, 2026-11-27); Classic: the workbench chip it always had (Classic's icon toggles stay AppKit's own).
+    var onChip: Color { isForest ? Self.color(0xcfe0c8) : .primary.opacity(0.08) }
+    /// What marks a selected, current or drop-target thing in lists, cards and on the timeline. Classic: the macOS accent
+    /// exactly as SwiftUI draws it. **The one place `Color.accentColor` is named** (checks/app-theme-wiring.sh): the theme
+    /// root's `.accentColor(_:)` doesn't reach it, so in Forest it drew the macOS accent (yellow / blue), not Forest green.
+    var highlight: Color { isForest ? accent : Color.accentColor }
+    /// A selected row of the edit page's subtitle list. Classic fills it with the macOS accent at 18 %; Forest outlines it in
+    /// its accent (a light fill would melt into the current line's chip on a row that is both).
+    var rowSelectionFill: Color { isForest ? .clear : Color.accentColor.opacity(0.18) }
+    var rowSelectionStroke: Color? { isForest ? accent : nil }
+    /// Selection drawn over the video (the text frame box, the Burn In margin guides) reads on any picture: Forest draws it
+    /// white in a dark casing 1 pt beyond each side (on white and on black, review FBG1 U2; the clip transform box gets the
+    /// same casing in Forest); Classic keeps the macOS accent and no casing.
+    var overVideo: Color { isForest ? .white : Color.accentColor }
+    var overVideoCasing: Color? { isForest ? .black.opacity(0.75) : nil }
+    /// Inside a hollow handle over the video (Classic: white, as always).
+    var overVideoHollow: Color { isForest ? .black.opacity(0.45) : .white }
+    /// Behind the Burn In margin guides' white numbers.
+    var overVideoLabel: Color { isForest ? .black : Color.accentColor }
+
+    /// A selected transition cap in Forest is look A's chip with the accent's ring and icon, so it shows over dark footage
+    /// too (review FBG1 U3); nil in Classic: its black cap and white icon, as before.
+    var selectedCapFill: Color? { isForest ? onChip : nil }
+    var selectedCapIcon: Color? { isForest ? accent : nil }
+    /// Inside the dark selection outline of a timeline shape block in Forest, a light line, so a dark shape's selection shows
+    /// too (review FBG1 E3); nil in Classic.
+    var selectionInnerStroke: Color? { isForest ? .white.opacity(0.9) : nil }
+
     func blockLabel(classic: Color) -> Color {
         isForest ? Self.color(0x243c2f) : classic
     }

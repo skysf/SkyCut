@@ -191,6 +191,17 @@ the replaced app going to the Trash. Every deletion, the download's own file inc
 Views subscribe to `AppUpdater` only (never a project or the player clock); every popover has `.appLanguage()`; tooltips are
 `instantHelp`; colours are `AppThemePalette`'s.
 
+**Who reads the state** (since 2026-11-27, MCP-85): the toolbar pill and its popovers, the app menu, Settings' status line, and
+a connected AI through get_status's `app_update` (`AppUpdater.statusReport` → `AppUpdateStatusReport`, pure; the fields and
+states: [AI 接口（MCP）](ai-control-mcp.md) section 4 item 69). get_status reads the state as it is on the main actor and
+says what the pill and Settings say (a copy an earlier run staged stays unseen until this launch's first check, there too),
+and one thing more: a newer release a check found stays `available` after its automatic download failed or the retry record
+held its DMG back (`AppUpdateState.lastFound`, read by nothing but the report). The hints quote the App's buttons in its
+language.
+Reading it never starts a check, a download or an install, and nothing lets the AI install, restart or quit SkyCut: it
+passes on the hint, the user's own steps. Its guide topic tells it to mention updates only when the user asks or a newer
+version may fix what they hit, once (the quiet rule above).
+
 ## 8. Files
 
 `Application Support/SrtFlow/Updates/`: `downloads/` (a finished download, kept until installed, §4),
@@ -217,7 +228,9 @@ than the running one stays; the rest goes.
   state machine (with the retry record and the unconfirmed staged copy), what a restart waits for, the status line; then
   against a loopback server and scratch folders: fetch, download (wrong SHA-256, wrong size either way, redirect, cancelled,
   and which of them count), staging from real images, the pipeline (kept downloads, staged copies, what counts), the
-  verifier's steps on their own (Gatekeeper alone, the running app unreadable), a killed run's image, the install (order,
+  verifier's steps on their own (Gatekeeper alone, the running app unreadable), get_status's `app_update` (every state
+  against hand-written JSON, which wins when two hold, notes and hints only where they belong, then through the state
+  machine's own transitions), a killed run's image, the install (order,
   refusals, the stager's own copy only, no downgrade, cross-volume), 24 loops of atomic swaps killed with SIGKILL at random
   instants (after every kill both paths hold a whole, valid app), what a launch reads and cleans, and the relaunch shell
   (with a recorder for `/usr/bin/open`); the Updates folder's own rules (a link at its root never followed, deletions in
@@ -232,12 +245,16 @@ than the running one stays; the rest goes.
   the production verifier at quit and when staging, `decision == .updates` before an install and before the launch reads
   the folder, the relaunch shell (this pid, `/usr/bin/open`, never `-n`), the test hook line in Settings; file effects only
   for a copy that installs; the schedule's origin, the retry record at launch, the real home folder, the cadence, a
-  cancelled download's silence, the record matched to the offer (review FBU2). Deletion calls (`removeItem`, `unlink`,
+  cancelled download's silence, the record matched to the offer (review FBU2); get_status's one `app_update` line, and the
+  report only mapping a state it is given (Foundation only, no check, download, install or restart). Deletion calls (`removeItem`, `unlink`,
   `rmdir`, `recycle`) only in `AppUpdateFiles.swift`.
 - Reverse-verified on 2026-11-27 (#565): replacing the swap with two renames turns the kill loop red (the destination missing
   after kills); removing the cancellation check or the incoming staging folder turns their cases red; each wiring line
   removed turns the guard red. Again for the fixes before the first release (U1b, two rounds): each new case and guard line
-  was red with its fix undone; the tables are in the PR.
+  was red with its fix undone; the tables are in the PR. get_status's `app_update` (U2): a renamed state, `checking` ahead
+  of `just_updated`, the restart flag dropped, notes while downloading, the switch reported for every copy and the moving
+  hint dropped each turn the status cases red; removing get_status's line, or a check started from the report or from
+  `statusReport`, turns the guard red.
 - `scripts/render-app-updates.sh <folder>` (graphical session, not in check-all): the pill states, popovers, menu answers and
   Settings section in zh-Hans / en / es.
 
