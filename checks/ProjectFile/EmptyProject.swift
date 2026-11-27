@@ -4,9 +4,9 @@ import SrtFlowCore
 // 54: what an empty project is (`TimelineState.isEmpty`, docs/architecture/video-edit-project-file.md §5 "What an empty
 // project is"): the one answer to "would its file hold anything the person made?". Closing an untitled project asks only
 // when it would (docs/bugfixes/2026-11-27-untitled-project-with-only-markers-closes-unasked.md: markers on the ruler and
-// their notes were not counted, so they were thrown away unasked). Each kind of content alone counts, markers on the ruler
-// with or without a note too; settings, switches, review marks of findings and the style record alone do not; a file that
-// holds only ruler markers reads back with them and is not empty either.
+// their notes, then in review round CXL1 review reasons and a pinned Sky Studio style version, were not counted, so they
+// were thrown away unasked). Each kind of content alone counts; settings, switches and a style's source alone do not; a
+// file that holds only ruler markers, or only review reasons, reads back with them and is not empty either.
 
 func checkEmptyProject(root: URL) throws {
     check(TimelineState().isEmpty, "a new timeline is empty")
@@ -15,6 +15,10 @@ func checkEmptyProject(root: URL) throws {
     var filter = FilterClip(preset: .tealOrange, timelineStart: 0, duration: 3)
     filter.markers = [ClipMarker(sourceTime: 1, text: "Grade ends here")]
     let lines = SubtitleDocumentModel(cues: [SubtitleCue(index: 1, start: 0, end: 1, text: "Hello")])
+    let anchor = DeliveryFindingAnchor(kind: "picture_jump", items: [UUID()], reference: nil, from: 1, to: 1.1,
+                                       tolerance: 0.05, context: "")
+    let reason = DeliveryIntentionalMark(anchor: anchor, reason: "An intended jump cut")
+    let checksum = String(repeating: "c", count: 64)
 
     // Content: anything the person made, each kind alone.
     let content: [(String, (inout TimelineState) -> Void)] = [
@@ -30,6 +34,12 @@ func checkEmptyProject(root: URL) throws {
         ("a grade carrying a marker", { $0.filters = [filter] }),
         ("a storyboard", { $0.production = FilmProductionState(revision: 1, story: "A short film", shots: [], soundCues: []) }),
         ("an explicit ending", { $0.minimumDuration = 12 }),
+        // Listed by inspect_video until explicitly cleared (finished-video-inspection.md), also with the clips gone.
+        ("a review reason", { $0.deliveryIntentions = [reason] }),
+        // Decides which version of the style the film reads next time (video-edit-project-file.md, v40).
+        ("a pinned Sky Studio style version", {
+            $0.editingStyle = EditingStyleRecord(id: "film-trailer", source: "sky_studio", version: "1.0", sha256: checksum)
+        }),
     ]
     for (name, make) in content {
         var state = TimelineState()
@@ -37,9 +47,7 @@ func checkEmptyProject(root: URL) throws {
         check(!state.isEmpty, "a project whose only content is \(name) is not empty: closing it untitled must ask")
     }
 
-    // Not content: how an empty project is set up, and records about content that is no longer there.
-    let anchor = DeliveryFindingAnchor(kind: "picture_jump", items: [UUID()], reference: nil, from: 1, to: 1.1,
-                                       tolerance: 0.05, context: "")
+    // Not content: how an empty project is set up.
     let settings: [(String, (inout TimelineState) -> Void)] = [
         ("the canvas shape", { $0.canvasRatio = .tall9x16 }),
         ("the frame rate", { $0.frameRate = .fps30 }),
@@ -52,11 +60,8 @@ func checkEmptyProject(root: URL) throws {
             $0.subtitleHighlight = SubtitleWordHighlight()
             $0.subtitleMaxLines = 2
         }),
-        ("review marks of findings on clips that are gone", {
-            $0.deliveryIntentions = [DeliveryIntentionalMark(anchor: anchor, reason: "An intended jump cut")]
-        }),
-        ("the editing-style record", {
-            $0.editingStyle = EditingStyleRecord(id: "documentary", source: "built_in", sha256: String(repeating: "c", count: 64))
+        ("a preset's style record (recorded, never pinned)", {
+            $0.editingStyle = EditingStyleRecord(id: "documentary", source: "built_in", sha256: checksum, skycutVersion: "0.18.70")
         }),
     ]
     for (name, make) in settings {
@@ -65,12 +70,15 @@ func checkEmptyProject(root: URL) throws {
         check(state.isEmpty, "\(name) alone is no content: the project stays empty")
     }
 
-    // A file that holds only ruler markers: they are in it, and what reads back is not empty.
+    // Files that hold only ruler markers, or only review reasons: they are in them, and what reads back is not empty.
     var marked = TimelineState()
     marked.rulerMarkers = [ClipMarker(sourceTime: 2, color: .green, text: "Music comes in")]
-    let file = root.appendingPathComponent("only-ruler-markers.skycut")
-    try VideoEditProjectIO.save(marked, to: file)
-    let loaded = try VideoEditProjectIO.load(from: file).timeline
-    checkEqual(loaded.rulerMarkers, marked.rulerMarkers, "a project file keeps ruler markers that are its only content")
-    check(!loaded.isEmpty, "a project read back with only ruler markers is not empty")
+    var reviewed = TimelineState()
+    reviewed.deliveryIntentions = [reason]
+    for (name, state) in [("ruler markers", marked), ("review reasons", reviewed)] {
+        let file = root.appendingPathComponent("only-\(name.replacingOccurrences(of: " ", with: "-")).skycut")
+        try VideoEditProjectIO.save(state, to: file)
+        let loaded = try VideoEditProjectIO.load(from: file).timeline
+        check(loaded == state && !loaded.isEmpty, "a project read back with only \(name) keeps them and is not empty")
+    }
 }

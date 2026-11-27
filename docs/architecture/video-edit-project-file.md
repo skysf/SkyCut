@@ -519,16 +519,20 @@ both sides.
 - **Content** (each alone makes the project not empty): clips on any track (with their markers, curves and keyframes), the
   original subtitle track, a translation track (SkyCut keeps it only beside an original, but the file can hold it alone),
   shapes (covers too), texts, grades (with their markers), **markers on the ruler, with or without a note**, the storyboard
-  (`production`), an explicit ending (`minimumDuration`).
+  (`production`), an explicit ending (`minimumDuration`), **review reasons** (`deliveryIntentions`: `inspect_video` keeps
+  listing them, as not reproduced once their clips are gone, until they are explicitly cleared —
+  [finished-video inspection](finished-video-inspection.md)), and **a pinned Sky Studio style version** (`editingStyle` with
+  `isPinned`: it decides which version of the style the film reads next time, v40 below).
 - **Not content** (alone): the canvas shape and frame rate, the faders, the eyes and the magnet, tracks without clips, the
   project's subtitle style, place, word highlight and line count, a subtitle companion's languages and generation settings
-  without a translation, review marks of findings (`deliveryIntentions`: they describe clips and moments that are no longer
-  there, and nothing shows them), the editing-style record, and outside the timeline the row heights (decoration, above) and
-  the media table (made from the clips).
+  without a translation, a style record that only says where a style came from (a preset's or the user's own: recorded,
+  never pinned), and outside the timeline the row heights (decoration, above) and the media table (made from the clips).
 
 Ruler markers were missing from the list until
 [an untitled project with only ruler markers closed without asking](../bugfixes/2026-11-27-untitled-project-with-only-markers-closes-unasked.md):
-the markers and their notes were thrown away unasked.
+the markers and their notes were thrown away unasked. Review reasons and the pinned version joined the list in that case's
+review round (CXL1): an untitled project left with only a review reason closed on New Project without asking, and the reason
+was gone.
 
 ### 切工程必须是事务性的
 
@@ -626,8 +630,9 @@ made before it no longer finds the moved file — until then this only worked be
 3. `scripts/check-project-saves.sh` — the project file written off the main thread (§5 "Writing the project file off the main
    thread"): slow, stuck and failing drives, switching away, Save As, Quit; an edit made while New / a close / Quit is
    writing, Quit looking again at a project it let through, a document opened in a project after "Quit Anyway" was chosen
-   for the one before it, a save window answered too late; an untitled project with only a ruler marker and its note asked
-   about by every close (§5 "What an empty project is"). Real windows and a real drive, before a release:
+   for the one before it, a save window answered too late; an untitled project left with only a ruler marker and its note
+   asked about by every close, and one left with only a review reason or a pinned style version asked about by New Project
+   (§5 "What an empty project is"). Real windows and a real drive, before a release:
    - a project on a USB hard drive that has gone to sleep: edit, wait for the autosave — the timeline stays responsive while
      the drive spins up; ⌘S right after — no beachball, the notice says the drive is not responding if it takes over 15 s;
    - the same project, then ⌘Q while the drive is asleep: SkyCut quits once the drive answers, or after about 3 s shows

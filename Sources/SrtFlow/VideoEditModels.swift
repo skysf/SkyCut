@@ -332,13 +332,14 @@ struct TimelineState: Hashable, Sendable {
     var editingStyle: EditingStyleRecord?
 
     /// Nothing the person made is in it: the one answer to "is this project empty?" (closing an untitled one asks only when
-    /// it isn't; the start screen, Play and Export follow it too). Ruler markers and their notes and a translation track
-    /// count; settings, switches, review marks and the style record alone don't — the list and why:
-    /// docs/architecture/video-edit-project-file.md §5 "What an empty project is".
+    /// it isn't; the start screen, Play and Export follow it too). Ruler markers and their notes, a translation track, review
+    /// reasons and a pinned Sky Studio style version count; settings, switches and a style's source alone don't — the list
+    /// and why: docs/architecture/video-edit-project-file.md §5 "What an empty project is".
     var isEmpty: Bool {
         mainClips.isEmpty && overlayTracks.allSatisfy(\.clips.isEmpty) && audioTracks.allSatisfy(\.clips.isEmpty)
             && subtitle == nil && subtitleCompanion?.translation == nil && shapes.isEmpty && textOverlays.isEmpty
-            && filters.isEmpty && rulerMarkers.isEmpty && production == nil && minimumDuration == 0
+            && filters.isEmpty && rulerMarkers.isEmpty && deliveryIntentions.isEmpty && editingStyle?.isPinned != true
+            && production == nil && minimumDuration == 0
     }
 
     /// Content end, extended by the explicit ending when one is set.
