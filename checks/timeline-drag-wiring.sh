@@ -302,10 +302,9 @@ done
 # shellcheck source=checks/timeline-drag-wiring/zoom.sh
 source checks/timeline-drag-wiring/zoom.sh
 
-# ── 7. 自动滚动的心跳必须有取消兜底 ────────────────────────────────────
-grep -q 'deinit' "$DRAG" || fail "TimelineAutoScroller 没有 deinit 兜底，timer 可能永远留在 RunLoop 上"
-grep -q 'dismantleNSView' "$GEOMETRY" || fail "滚动视图参照物没有 dismantleNSView：视图树拆掉后心跳还在跑"
-grep -q 'onDisappear' "$VIEW" || fail "时间线没有 onDisappear：视图消失时自动滚动不会停"
+# ── 7. Teardown: the auto-scroll heartbeat stops, the scroll geometry lets go and publishes nothing (own file) ──
+# shellcheck source=checks/timeline-drag-wiring/teardown.sh
+source checks/timeline-drag-wiring/teardown.sh
 
 # ── 8. 块内装饰内容不吃事件 ────────────────────────────────────────────
 # `.clipped()` / `.clipShape` 只裁绘制，**不裁命中区**。缩略图 `.scaledToFill()`
@@ -940,4 +939,4 @@ fi
 if [ "$FAILED" -ne 0 ]; then
   exit 1
 fi
-echo "✓ timeline-drag-wiring：拖动会话不进时间线的 @State（盒子持有不订阅、块只收自己那份、覆盖层唯一订阅者）/ 整轨换位（输入是值、量在不动的坐标系上、调行高只在下边缘、松手落一次、两边同一个位移）/ 插入缝（位置一份纯值、两边垫同一行、停够才拉开、按指针判、拖动中不写 state）/ 音量线只吃线那一条窄带（窄带 ∪ 小圆）、拖点跟手不跳且拖动中不写 state / 波形 / 标尺 / 缩略图只画可见条带、对数缩放滑杆 / 轨道头对齐与整行点选 / 行高一轨一个值且不进撤销栈 / 文件分工（都在） / 开关默认值 / 播放头把手钉住 / 滚动量现读 / 纵向滚动两处钉住同源 / 动画豁免 / 拖动中不写 state / 输入冻结 / 落点单一 / 三类同一个位移 / 拖框中不写 project / 手势坐标系 / 缩放钳制 / 心跳兜底 / 装饰不吃事件 / 转场遮罩 / 转场拖放接线 / 时间线唯一落点与四套分派 / 文件拖进轨道与 ⌘V 接线 / 滚动内容两轴填满视口 / 命中区盖在填满视口之后 / 点非素材处移播放头与唯一夹紧 / 扫帧 peek 唯一所有者"
+echo "✓ timeline-drag-wiring：拖动会话不进时间线的 @State（盒子持有不订阅、块只收自己那份、覆盖层唯一订阅者）/ 整轨换位（输入是值、量在不动的坐标系上、调行高只在下边缘、松手落一次、两边同一个位移）/ 插入缝（位置一份纯值、两边垫同一行、停够才拉开、按指针判、拖动中不写 state）/ 音量线只吃线那一条窄带（窄带 ∪ 小圆）、拖点跟手不跳且拖动中不写 state / 波形 / 标尺 / 缩略图只画可见条带、对数缩放滑杆 / 轨道头对齐与整行点选 / 行高一轨一个值且不进撤销栈 / 文件分工（都在） / 开关默认值 / 播放头把手钉住 / 滚动量现读 / 纵向滚动两处钉住同源 / 动画豁免 / 拖动中不写 state / 输入冻结 / 落点单一 / 三类同一个位移 / 拖框中不写 project / 手势坐标系 / 缩放钳制 / 心跳兜底 / 装饰不吃事件 / 转场遮罩 / 转场拖放接线 / 时间线唯一落点与四套分派 / 文件拖进轨道与 ⌘V 接线 / 滚动内容两轴填满视口 / 命中区盖在填满视口之后 / 点非素材处移播放头与唯一夹紧 / 扫帧 peek 唯一所有者 / teardown publishes nothing"

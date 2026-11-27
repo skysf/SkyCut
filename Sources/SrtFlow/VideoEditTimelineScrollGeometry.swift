@@ -53,23 +53,14 @@ final class TimelineScrollGeometry: ObservableObject {
     private var anchorGeneration = 0
 
     /// 由 `TimelineScrollViewAccessor` 在滚动内容里认出滚动视图后挂上来（`owner`：这条时间线是哪个工程的）。
+    /// nil (the probe lost its scroll view: it left the tree) is `detach`, which publishes nothing.
     func attach(_ scrollView: NSScrollView?, owner: VideoEditProject) {
+        guard let scrollView else { return detach(owner: owner) }
         guard scrollView !== self.scrollView else { return }
-        if let boundsObserver {
-            NotificationCenter.default.removeObserver(boundsObserver)
-            self.boundsObserver = nil
-        }
+        removeBoundsObserver()
         self.scrollView = scrollView
-        let key = ObjectIdentifier(owner)
-        if scrollView != nil {
-            Self.live[key] = Weak(geometry: self)
-        } else if Self.live[key]?.geometry === self {
-            Self.live[key] = nil
-        }
-        guard let clipView = scrollView?.contentView else {
-            offset = .zero
-            return
-        }
+        Self.live[ObjectIdentifier(owner)] = Weak(geometry: self)
+        let clipView = scrollView.contentView
         clipView.postsBoundsChangedNotifications = true
         boundsObserver = NotificationCenter.default.addObserver(
             forName: NSView.boundsDidChangeNotification,
@@ -82,6 +73,24 @@ final class TimelineScrollGeometry: ObservableObject {
             }
         }
         offset = clipView.bounds.origin
+    }
+
+    /// Lets go of the scroll view when the timeline is taken down (`dismantleNSView`, or the probe leaving the tree) and
+    /// **publishes nothing**. This runs inside SwiftUI's teardown (`NSHostingView.deinit` → `GraphHost.invalidate()`): a publish
+    /// there can reach the header column and the ruler of the same graph while SwiftUI holds exclusive access, and Swift aborts
+    /// with "Fatal access conflict" (docs/bugfixes/2026-11-27-timeline-teardown-publishes-scroll-offset.md). `offset` keeps its
+    /// last value: nothing reads it once the tree is gone, and the next `attach` publishes the real one.
+    func detach(owner: VideoEditProject) {
+        removeBoundsObserver()
+        scrollView = nil
+        let key = ObjectIdentifier(owner)
+        if Self.live[key]?.geometry === self { Self.live[key] = nil }
+    }
+
+    private func removeBoundsObserver() {
+        guard let boundsObserver else { return }
+        NotificationCenter.default.removeObserver(boundsObserver)
+        self.boundsObserver = nil
     }
 
     deinit {
@@ -232,29 +241,41 @@ struct TimelineScrollViewAccessor: NSViewRepresentable {
     func makeNSView(context: Context) -> ScrollViewProbe {
         let view = ScrollViewProbe(frame: .zero)
         view.onAttach = attach
+        view.onDetach = detach
         return view
     }
 
     func updateNSView(_ nsView: ScrollViewProbe, context: Context) {
         PerfCounters.update(Self.self)
         nsView.onAttach = attach
+        nsView.onDetach = detach
         attach(nsView.enclosingScrollView)
     }
 
     /// 视图树被拆掉（切栏目、关窗）时把滚动视图撤下来，心跳跟着停。
+    /// Only through `detach`, which publishes nothing: this runs inside SwiftUI's teardown of the hosting view
+    /// (`TimelineScrollGeometry.detach(owner:)` says why).
     static func dismantleNSView(_ nsView: ScrollViewProbe, coordinator: ()) {
-        nsView.onAttach?(nil)
+        nsView.onDetach?()
         nsView.onAttach = nil
+        nsView.onDetach = nil
     }
 
     private func attach(_ scrollView: NSScrollView?) {
+        guard let scrollView else { return detach() }
         geometry.attach(scrollView, owner: owner)
-        scroller.attach(scrollView == nil ? nil : geometry)
+        scroller.attach(geometry)
+    }
+
+    private func detach() {
+        geometry.detach(owner: owner)
+        scroller.attach(nil)
     }
 
     @MainActor
     final class ScrollViewProbe: NSView {
         var onAttach: ((NSScrollView?) -> Void)?
+        var onDetach: (() -> Void)?
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()

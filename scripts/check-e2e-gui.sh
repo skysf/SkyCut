@@ -27,4 +27,8 @@ xcrun swiftc -wmo -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_D
   checks/E2EGUI/*.swift @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${app}/Contents/MacOS/SkyCutGUICheck"
 codesign --force --deep --sign - "${app}"
 
-python3 -I -B scripts/gui-smoke/e2e/launch.py gui "${app}" "${FFMPEG}"
+# Status 0 is not enough: the Swift runtime also exits 0 when something stops the suite's main run loop early. Only the
+# completion line printed after the last case (checks/E2EGUI/Main.swift) proves that every case ran.
+python3 -I -B scripts/gui-smoke/e2e/launch.py gui "${app}" "${FFMPEG}" | tee "${root}/suite.log"
+grep -qx 'GUI E2E: every case ran' "${root}/suite.log" \
+  || { echo "GUI E2E stopped before its last case: no completion line" >&2; exit 1; }

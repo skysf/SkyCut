@@ -179,3 +179,6 @@ p2 里拨吸附，p1 跟着变；关掉 p2 的窗口之后开着的只剩 p1。
 - [ ] AI 正在剪主窗口里的工程时，用户 ⌘N / ⌘O / 最近打开 / 双击一个工程文件（.skycut / .srtflowproj）：开到新的工程窗口里，主窗口里 AI 的工程原样、AI 接着改照样成功。
 - [ ] 两个工程窗口，A 在导出（面板起的、AI 起的各一次）：A 的工具栏有进度条、预览条上有停止；B 的工具栏没有进度条、预览条上没有停止，B 点导出打开面板，
       底下写「“A 的名字”正在导出… 42%」、导出键是灰的、没有停止键；A 导完，B 的面板里不出现 A 的成片，A 的面板里有。
+- [ ] Close a project window whose timeline shows a clip with its close button, then move the mouse; let the AI
+      `set_view background` another one: SkyCut keeps running each time (the timeline's teardown publishes nothing,
+      [case](../bugfixes/2026-11-27-timeline-teardown-publishes-scroll-offset.md); CI closes these windows without AppKit's event loop).
