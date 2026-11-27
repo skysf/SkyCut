@@ -57,6 +57,7 @@ enum AIProjectTools {
         }
         // 存了 Sky Studio 的 Key：告诉 AI 花的是积分、今天还剩多少（2026-10-28 起；之前是 fal 的美元）。花钱的工具 2026-10-30 起始终在清单里。
         if let generation = SkyStudioGenerateTool.statusJSON() { result["generation"] = generation }
+        result["app_update"] = try? JSONValue.decode(AppUpdater.shared.statusReport.encoded())  // read only (app-updates.md §7)
         if try args.bool("models") == true {
             result["generation_models"] = await SkyStudioModelStatus.read(model: try args.string("model"))
         }

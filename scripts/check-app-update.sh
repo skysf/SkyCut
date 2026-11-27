@@ -38,6 +38,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -wmo \
   Sources/SrtFlow/AppUpdate/AppUpdateRetry.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateEligibility.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateState.swift \
+  Sources/SrtFlow/AppUpdate/AppUpdateStatusReport.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateBusy.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateFiles.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateLaunchFiles.swift \
@@ -56,6 +57,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -wmo \
   checks/AppUpdate/FeedChecks.swift \
   checks/AppUpdate/EligibilityChecks.swift \
   checks/AppUpdate/StateChecks.swift \
+  checks/AppUpdate/StatusReportChecks.swift \
   checks/AppUpdate/FlowChecks.swift \
   checks/AppUpdate/PipelineChecks.swift \
   checks/AppUpdate/InstallChecks.swift \

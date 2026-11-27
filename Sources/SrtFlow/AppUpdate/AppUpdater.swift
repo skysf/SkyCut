@@ -69,6 +69,12 @@ final class AppUpdater: ObservableObject {
     /// The release the pill, popovers and menu talk about.
     var offerVersion: String? { state.offer?.version.description }
 
+    /// get_status's `app_update`: what the pill and Settings show, read as it is now. Never a check, a download or an install.
+    var statusReport: AppUpdateStatusReport {
+        AppUpdateStatusReport.make(state, decision: decision, automatic: automatic, lastUpToDate: lastUpToDate,
+                                   language: AppLanguageStore.shared.language.resolvedCode)
+    }
+
     // MARK: Starting and checking
 
     /// From startServices. Everything blocking happens off the main thread; the first check waits about a minute.
