@@ -88,7 +88,7 @@ export default {
     ['Revisa y exporta', 'Reproduce, afina los detalles y exporta. El panel de exportación indica si se aplica una marca de agua. La generación en la nube se cobra aparte en créditos de Sky Studio.']
   ],
   docsCompatibility: 'Mantente al día',
-  docsCompatibilityBody: 'Estos pasos describen la descarga pública actual. Si tu SkyCut no tiene ajustes de Sky Studio, vuelve a descargarlo para obtener la última versión.',
+  docsCompatibilityBody: 'Estos pasos describen la descarga pública actual. Desde la versión 0.18.70, SkyCut se actualiza solo: las nuevas versiones se descargan en segundo plano y se instalan al salir de SkyCut, o al momento con el botón Reiniciar y actualizar. Si tu copia es anterior, descárgala una vez más desde este sitio. En Ajustes → General → Actualizaciones puedes desactivar la descarga y la instalación automáticas; SkyCut seguirá buscando actualizaciones y mostrará el botón Nueva versión en la barra de herramientas.',
   docsClients: 'Clientes de IA compatibles',
   docsClientsBody: 'Claude Desktop, Claude Code y Codex tienen configuración integrada. Otros clientes necesitan compatibilidad con MCP local mediante stdio. Un chat web normal de ChatGPT no puede conectarse directamente al servidor MCP local de SkyCut.',
   docsKey: 'Abrir Sky Studio',
@@ -99,7 +99,7 @@ export default {
     ['Conservación y baja', 'Conservamos tus datos de registro hasta que te des de baja o solicites su eliminación. Para darte de baja o eliminar tus datos, escribe a support@skycut.app.'],
     ['Preferencias del sitio', 'Guardamos tus preferencias de idioma y animación en el navegador. No añadimos rastreadores publicitarios. Los proveedores de alojamiento y correo pueden procesar información técnica necesaria para prestar sus servicios.'],
     ['Corto y descargas', 'Al reproducir la demo se carga vídeo desde downloads.skylu.ai. La descarga de la app para Mac te lleva al servicio de descargas existente de Sky Lu.'],
-    ['La app para Mac', 'Esta página describe el sitio web. Las herramientas de IA conectadas y los servicios de Sky Studio tienen sus propios procesos de datos. Tu proyecto de edición permanece en el Mac; el contenido usado en una solicitud a la nube puede enviarse al servicio que elijas.']
+    ['La app para Mac', 'Esta página describe el sitio web. Las herramientas de IA conectadas y los servicios de Sky Studio tienen sus propios procesos de datos. Tu proyecto de edición permanece en el Mac; el contenido usado en una solicitud a la nube puede enviarse al servicio que elijas. Para buscar nuevas versiones, SkyCut consulta un pequeño archivo en skylu.ai aproximadamente un minuto después de abrirse y luego una vez al día mientras está abierto; las nuevas versiones se descargan desde downloads.skylu.ai. Estas solicitudes no incluyen datos de tu cuenta, tu Key de Sky Studio ni ningún identificador tuyo o de tu Mac; como cualquier solicitud web, sí llevan tu dirección IP y tu preferencia de idioma.']
   ],
   errorTitle: 'Un poco fuera de la línea de tiempo.', errorBody: 'Esta página no está aquí. Volvamos al inicio.'
 };

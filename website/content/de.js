@@ -88,7 +88,7 @@ export default {
     ['Prüfen und exportieren', 'Spiele den Schnitt ab, verfeinere Details und exportiere. Das Exportfenster zeigt an, ob ein Wasserzeichen hinzugefügt wird. Cloud-Generierung wird separat in Sky Studio-Credits abgerechnet.']
   ],
   docsCompatibility: 'Aktuell bleiben',
-  docsCompatibilityBody: 'Diese Schritte beschreiben den aktuellen öffentlichen Download. Fehlen in deinem SkyCut die Sky Studio-Einstellungen, lade die App erneut herunter, um die neueste Version zu erhalten.',
+  docsCompatibilityBody: 'Diese Schritte beschreiben den aktuellen öffentlichen Download. Ab Version 0.18.70 aktualisiert sich SkyCut selbst: Neue Versionen werden im Hintergrund geladen und beim Beenden von SkyCut installiert, auf Wunsch auch sofort mit „Neu starten und aktualisieren“. Ist deine Version älter, lade SkyCut einmal neu von dieser Website. Unter Einstellungen → Allgemein → Softwareupdate kannst du das automatische Laden und Installieren ausschalten; SkyCut sucht dann weiterhin nach Updates und zeigt in der Symbolleiste „Neue Version“ an.',
   docsClients: 'Unterstützte KI-Clients',
   docsClientsBody: 'Claude Desktop, Claude Code und Codex lassen sich direkt einrichten. Andere Clients müssen lokales stdio MCP unterstützen. Ein gewöhnlicher ChatGPT-Webchat kann sich nicht direkt mit dem lokalen SkyCut-MCP-Server verbinden.',
   docsKey: 'Sky Studio öffnen',
@@ -99,7 +99,7 @@ export default {
     ['Speicherdauer und Abbestellen', 'Wir speichern deine Anmeldedaten, bis du die Benachrichtigungen abbestellst oder ihre Löschung verlangst. Zum Abbestellen oder Löschen deiner Daten schreibe an support@skycut.app.'],
     ['Website-Einstellungen', 'Wir speichern deine Sprach- und Animationsauswahl im Browser und setzen keine Werbetracker ein. Hosting- und E-Mail-Anbieter können technische Informationen verarbeiten, die zur Bereitstellung ihrer Dienste nötig sind.'],
     ['Film und Downloads', 'Beim Abspielen der Demo wird das Video von downloads.skylu.ai geladen. Der Mac-App-Download führt zum bestehenden Download-Dienst von Sky Lu.'],
-    ['Die Mac-App', 'Diese Seite beschreibt die Website. Verbundene KI-Tools und Sky Studio-Dienste verarbeiten Daten nach ihren eigenen Bedingungen. Dein Schnittprojekt bleibt auf dem Mac; für Cloud-Anfragen verwendete Inhalte können an den gewählten Dienst gesendet werden.']
+    ['Die Mac-App', 'Diese Seite beschreibt die Website. Verbundene KI-Tools und Sky Studio-Dienste verarbeiten Daten nach ihren eigenen Bedingungen. Dein Schnittprojekt bleibt auf dem Mac; für Cloud-Anfragen verwendete Inhalte können an den gewählten Dienst gesendet werden. Um nach neuen Versionen zu suchen, ruft SkyCut etwa eine Minute nach dem Start und danach einmal täglich, solange die App läuft, eine kleine Datei von skylu.ai ab; neue Versionen werden von downloads.skylu.ai geladen. Diese Anfragen enthalten keine Kontodaten, keinen Sky Studio-Key und keine Kennung von dir oder deinem Mac; wie jede Webanfrage übermitteln sie deine IP-Adresse und deine Spracheinstellung.']
   ],
   errorTitle: 'Kurz neben der Timeline.', errorBody: 'Diese Seite gibt es nicht. Zurück zum Anfang.'
 };
