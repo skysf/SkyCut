@@ -152,6 +152,9 @@ import SrtFlowMCPKit
             // A Burn In subtitle's unsaved edits are asked about before anything drops them (2026-11-28 case).
             print("SUBTITLE EDITS: asked before a video's ✕, Clear Finished or another file drops them"); fflush(stdout)
             await SubtitleEditsChecks.run(root: root, source: source, require: require)
+            // ...and the editor's Export As writes only the subtitle it was pressed for, unedited (2026-11-28 case).
+            print("SUBTITLE EXPORT: Replace writes only the subtitle Export As was pressed for"); fflush(stdout)
+            await SubtitleExportChecks.run(root: root, source: source, require: require)
             require(project.state == state && !project.effectiveUndoManager!.canUndo && VideoEditExporter.shared.settings == remembered,
                     "exports preserve project, undo stack and remembered formal quality")
         } catch { failures += 1; print("FAIL: \((error as? AIToolError)?.message ?? error.localizedDescription)") }

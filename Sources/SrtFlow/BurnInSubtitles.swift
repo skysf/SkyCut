@@ -53,6 +53,13 @@ struct BurnInSubtitles {
         }
     }
 
+    /// The place the subtitle panel edits for its preview row `item`: that row while it has a subtitle, else the standalone
+    /// file (the panel's own rule, SubtitleEditPanel.document).
+    func panelPlace(boundTo item: EncodeItem.ID?) -> Place {
+        if let item, held(.row(item)) != nil { return .row(item) }
+        return .standalone
+    }
+
     /// A write of what `place` holds landed on its own file: no unsaved edits.
     func markSaved(_ place: Place) {
         switch place {

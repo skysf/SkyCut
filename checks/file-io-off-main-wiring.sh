@@ -182,9 +182,25 @@ require "a Save As that may not replace never writes at the name: it takes it in
 require "the project's Save As from a window asks before replacing" \
   Sources/SrtFlow/VideoEditProjectSaving.swift 'await saveAs\(chosen: location\)'
 require "the subtitle editor's Save and Export As write with the answer's permission, off the main thread" \
-  Sources/SrtFlow/SubtitleEditPanel.swift 'await SubtitleFileSave\.write\(data, to: location\.url, replacing: location\.mayReplace\)'
-forbid "the subtitle editor writes files only through SubtitleFileSave (a plain Data.write replaces what is there, on the main thread)" \
-  Sources/SrtFlow/SubtitleEditPanel.swift '^[^/]*\.write\(to:'
+  Sources/SrtFlow/SubtitleEditorExport.swift 'await SubtitleFileSave\.write\(data, to: location\.url, replacing: location\.mayReplace\)'
+for f in Sources/SrtFlow/SubtitleEditPanel.swift Sources/SrtFlow/SubtitleEditorExport.swift; do
+  forbid "the subtitle editor writes files only through SubtitleFileSave (a plain Data.write replaces what is there, on the main thread)" \
+    "$f" '^[^/]*\.write\(to:'
+done
+# The editor's Export As writes only the subtitle it was pressed for, unedited (2026-11-28,
+# docs/bugfixes/2026-11-28-subtitle-replace-writes-another-subtitle.md): the panel's buttons only call SubtitleEditorExport,
+# whose every write (the window's answer, the Replace retry) first checks that subtitle is still there, unedited.
+# scripts/check-export-profile.sh (SubtitleExportChecks) checks the behaviour.
+forbid "the subtitle panel opens no save window and writes nothing itself (SubtitleEditorExport does)" \
+  Sources/SrtFlow/SubtitleEditPanel.swift '^[^/]*(FilePicker\.|SubtitleFileSave\.(write|data)\(|FileReplaceQuestion\.)'
+require "the panel's Save goes through SubtitleEditorExport" \
+  Sources/SrtFlow/SubtitleEditPanel.swift 'export\.save\(boundTo: itemID\)'
+require "the panel's Export As goes through SubtitleEditorExport" \
+  Sources/SrtFlow/SubtitleEditPanel.swift 'export\.exportAs\(format, boundTo: itemID\)'
+require "every subtitle editor write first checks the subtitle pressed for is still there, unedited" \
+  Sources/SrtFlow/SubtitleEditorExport.swift 'guard pressed\.held\.sameText\(as: subtitles\.held\(pressed\.place\)\) else \{'
+require "the Replace retry writes the subtitle pressed for (checked again), never what the panel shows then" \
+  Sources/SrtFlow/SubtitleEditorExport.swift 'write\(pressed, format, to: SaveLocation\(url: location\.url, mayReplace: true\)\)'
 require "a manual screen recording replaces a file only when macOS's own window confirmed it" \
   Sources/SrtFlow/ScreenRecordingCoordinator.swift 'session\.replacesExistingOutput = session\.replacesExistingOutput && options\.replacesExistingOutput'
 require "the recording setup carries the save window's confirmation" \

@@ -180,13 +180,13 @@ struct SubtitleEditPanel: View {
 
                     Menu("Export As") {
                         ForEach(SubtitleFormat.allCases, id: \.self) { format in
-                            Button(format.displayName) { exportAs(format) }
+                            Button(format.displayName) { export.exportAs(format, boundTo: itemID) }
                         }
                     }
                     .fixedSize()
                     .controlSize(.small)
 
-                    Button("Save") { save() }
+                    Button("Save") { export.save(boundTo: itemID) }
                         .controlSize(.small)
                         .disabled(!hasUnsavedEdits)
                         .instantHelp("Write the changes back to the subtitle file", shortcut: .command("S"))
@@ -330,55 +330,10 @@ struct SubtitleEditPanel: View {
         selection.removeAll()
     }
 
-    private func save() {
-        guard let document else { return }
-        guard let url = subtitleURL else {
-            exportAs(document.format)
-            return
-        }
-        write(document.format, to: SaveLocation(url: url, mayReplace: true))   // its own file
-    }
-
-    private func exportAs(_ format: SubtitleFormat) {
-        guard let picked = document else { return }
-        let base = subtitleURL?.deletingPathExtension().lastPathComponent ?? picked.title
-        FilePicker.chooseSaveLocation(types: [format.utType], name: "\(base).\(format.fileExtension)") { location in
-            write(format, to: location)
-        }
-    }
-
-    /// Writes what the document holds now (the save window is not modal), off the main thread (SubtitleFileSave). A file
-    /// already there is replaced only when allowed — its own file, or confirmed in macOS's own window — or when the person
-    /// answers Replace to the question asked here (a typed or dropped answer, SaveLocation.swift). The document is marked
-    /// saved when the write lands, even after "not responding", and only if it still is what was written: an edit made
-    /// meanwhile, or another document in the panel, stays unsaved.
-    private func write(_ format: SubtitleFormat, to location: SaveLocation) {
-        guard let document else { return }
-        let item = boundItem?.id
-        let data = SubtitleFileSave.data(document, format: format)
-        Task {
-            let answer = await SubtitleFileSave.write(data, to: location.url, replacing: location.mayReplace) { landed in
-                // 导出成同一个文件（等于就是保存），未保存标记也该消掉。
-                guard landed == .written, location.url == subtitleURL, format == document.format, boundItem?.id == item,
-                      self.document == document else { return }
-                markSaved()
-            }
-            switch answer {
-            case .written: break
-            case .occupied:
-                if FileReplaceQuestion.ask(location.url) { write(format, to: SaveLocation(url: location.url, mayReplace: true)) }
-            case .failed(let reason): saveError = reason
-            case .notResponding: saveError = SubtitleFileSave.notRespondingText(location.url)
-            }
-        }
-    }
-
-    private func markSaved() {
-        if let id = boundItem?.id {
-            queue.markBurnInSaved(for: id)
-        } else {
-            standalone.hasUnsavedEdits = false
-        }
+    /// Save and Export As: the subtitle shown when the button is pressed, written only while it is still there unedited
+    /// (SubtitleEditorExport); what it has to say goes to the "Could Not Save" alert.
+    private var export: SubtitleEditorExport {
+        SubtitleEditorExport(subtitles: BurnInSubtitles(queue: queue, standalone: standalone)) { saveError = $0 }
     }
 }
 
