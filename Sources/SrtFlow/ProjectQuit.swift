@@ -11,8 +11,11 @@ import Foundation
 // again if it changed while another one was being settled (an AI edit while an alert was up), and the reply is given in
 // the same main-thread turn as that last look, so no edit lands between them. "Quit Anyway" gives up the document its
 // alert showed: another document opened in that project since is settled like any other.
+// The Burn In page's subtitles with unsaved edits are asked about on the same path, after the projects: Save / Don't Save /
+// Cancel each (BurnInSubtitleEdits, since 2026-11-28, docs/bugfixes/2026-11-28-burn-in-subtitle-edits-dropped-unasked.md),
+// and they are part of the last look before the reply.
 // What it doesn't: the write (ProjectFileWriter); a running screen recording (ScreenRecordingCoordinator settles it first,
-// then asks here); which projects are open (OpenProjects).
+// then asks here); which projects are open (OpenProjects); the subtitles' question and saves (BurnInSubtitleEdits).
 //
 // Why (2026-11-19, docs/bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md): Quit wrote every project on the main
 // thread inside applicationShouldTerminate — a project on a stuck external drive made Quit hang until Force Quit.
@@ -32,15 +35,22 @@ enum ProjectQuit {
     private static var replies: [@MainActor (Bool) -> Void] = []
     /// How the person is asked while a drive does not answer (a seam: the checks answer for them).
     static var askAboutDrive: @MainActor (VideoEditProject) async -> DriveChoice = { waitForDrive($0) }
-    /// Told when a quit stops because a project stayed: Restart and Update then no longer restarts (AppUpdateRestart).
+    /// Told when a quit stops because a project or a Burn In subtitle stayed: Restart and Update then no longer restarts
+    /// (AppUpdateRestart).
     static var quitCancelled: (@MainActor () -> Void)?
 
     /// applicationShouldTerminate: `.terminateNow` when nothing needs writing or asking; otherwise `.terminateLater`, and
     /// AppKit gets the answer once every project is settled.
     static func begin() -> NSApplication.TerminateReply {
-        if OpenProjects.shared.all.allSatisfy({ $0.closesAtOnce() }) { return .terminateNow }
+        if quitsAtOnce() { return .terminateNow }
         prepareAll { NSApp.reply(toApplicationShouldTerminate: $0) }
         return .terminateLater
+    }
+
+    /// Nothing to write or ask: every project closes at once and no Burn In subtitle has unsaved edits.
+    static func quitsAtOnce() -> Bool {
+        OpenProjects.shared.all.allSatisfy({ $0.closesAtOnce() })
+            && !BurnInSubtitleEdits.shared.needsAsking(after: BurnInSubtitleEdits.Discarded())
     }
 
     /// Every open project written and asked about; the first one that stays stops the quit (the later ones are not asked).
@@ -69,17 +79,24 @@ enum ProjectQuit {
 
     /// Settles every open project that needs it, again and again until a look finds each one with nothing to write, let
     /// through and unchanged since, or given up ("Quit Anyway") and still the document that alert showed. Projects opened
-    /// meanwhile are included, and so is another document opened since in a project already settled.
+    /// meanwhile are included, and so is another document opened since in a project already settled. Then the Burn In
+    /// subtitles with unsaved edits, each saved or given up ("Don't Save") as it is (a Save waits for its drive at most
+    /// `grace`, then is asked about again); Cancel stays. Asking them takes time, so the projects are looked at again after
+    /// them, and the last look covers both.
     private static func prepareEach() async -> Bool {
         var marks: [ObjectIdentifier: QuitMark] = [:]
-        while let project = OpenProjects.shared.all.first(where: { needsSettling($0, marks[ObjectIdentifier($0)]) }) {
-            switch await settle(project) {
-            case .letThrough: marks[ObjectIdentifier(project)] = .letThrough(QuitMark.Snapshot(project))
-            case .gaveUp(let generation): marks[ObjectIdentifier(project)] = .gaveUp(generation: generation)
-            case .stays: return false
+        var subtitles = BurnInSubtitleEdits.Discarded()
+        while true {
+            while let project = OpenProjects.shared.all.first(where: { needsSettling($0, marks[ObjectIdentifier($0)]) }) {
+                switch await settle(project) {
+                case .letThrough: marks[ObjectIdentifier(project)] = .letThrough(QuitMark.Snapshot(project))
+                case .gaveUp(let generation): marks[ObjectIdentifier(project)] = .gaveUp(generation: generation)
+                case .stays: return false
+                }
             }
+            guard BurnInSubtitleEdits.shared.needsAsking(after: subtitles) else { return true }
+            guard await BurnInSubtitleEdits.shared.settleForQuit(into: &subtitles, deadline: grace) else { return false }
         }
-        return true
     }
 
     /// Not yet settled and something to write or ask; or let through, then changed (an edit, another document, a write);

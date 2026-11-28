@@ -149,6 +149,9 @@ import SrtFlowMCPKit
             // ...nor to look at the files the AI names, or to read and write subtitle files (2026-11-19 case).
             print("ENCODE INPUTS OFF MAIN: named files looked at, read and written off the main thread"); fflush(stdout)
             await EncodeInputsOffMainChecks.run(root: root, input: source, project: project, require: require)
+            // A Burn In subtitle's unsaved edits are asked about before anything drops them (2026-11-28 case).
+            print("SUBTITLE EDITS: asked before a video's ✕, Clear Finished or another file drops them"); fflush(stdout)
+            await SubtitleEditsChecks.run(root: root, source: source, require: require)
             require(project.state == state && !project.effectiveUndoManager!.canUndo && VideoEditExporter.shared.settings == remembered,
                     "exports preserve project, undo stack and remembered formal quality")
         } catch { failures += 1; print("FAIL: \((error as? AIToolError)?.message ?? error.localizedDescription)") }

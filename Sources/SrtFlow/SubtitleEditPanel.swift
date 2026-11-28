@@ -366,11 +366,7 @@ struct SubtitleEditPanel: View {
             case .occupied:
                 if FileReplaceQuestion.ask(location.url) { write(format, to: SaveLocation(url: location.url, mayReplace: true)) }
             case .failed(let reason): saveError = reason
-            case .notResponding:
-                saveError = String(
-                    format: L10n("The drive with “%@” is not responding. It may be asleep or disconnected, or macOS may be asking for permission."),
-                    ProjectSaveText.driveName(of: location.url)
-                )
+            case .notResponding: saveError = SubtitleFileSave.notRespondingText(location.url)
             }
         }
     }

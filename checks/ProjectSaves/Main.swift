@@ -16,6 +16,7 @@ import SrtFlowCore
 // - OffMainWriteChecks.swift: the subtitle editor's writes and a saved version's media never wait on the main thread.
 // - UntitledContentChecks.swift: an untitled project left with only a ruler marker and its note, a review reason or a pinned
 //   style version is asked about before it closes.
+// - SubtitleQuitChecks.swift: Quit asks about the Burn In page's subtitles with unsaved edits (Save / Don't Save / Cancel).
 
 @MainActor
 final class Checks {
@@ -53,6 +54,7 @@ final class Checks {
         await ReplaceChecks.run(checks, root: root)
         await OffMainWriteChecks.run(checks, root: root)
         await UntitledContentChecks.run(checks, root: root)
+        await SubtitleQuitChecks.run(checks, root: root)
         print("Project saves: \(checks.count) assertions, \(checks.failures) failures")
         exit(checks.failures == 0 ? 0 : 1)
     }

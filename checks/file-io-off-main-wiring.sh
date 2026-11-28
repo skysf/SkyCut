@@ -20,8 +20,10 @@
 # - web-motion recovery's movie checks, Compress / Burn In's names and sizes, compress_videos / burn_subtitles' folder
 #   (2026-11-19, docs/bugfixes/2026-11-19-drive-checks-on-main-thread.md);
 # - the files the AI encode tools name, burn_subtitles' subtitle reads, convert_subtitles' reads and writes
-#   (2026-11-19, docs/bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md).
-# Rules: docs/architecture/export-settings.md §8 and §5 item 8, docs/architecture/video-edit-project-file.md §5,
+#   (2026-11-19, docs/bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md);
+# - a Burn In subtitle's unsaved edits asked about before anything drops them, the question from a run-loop turn
+#   (2026-11-28, docs/bugfixes/2026-11-28-burn-in-subtitle-edits-dropped-unasked.md).
+# Rules: docs/architecture/export-settings.md §8, §5 item 8 and §9, docs/architecture/video-edit-project-file.md §5,
 # docs/architecture/system-file-windows.md, docs/architecture/blocking-media-reads.md "Destination drives".
 # Moved out of checks/project-file-wiring.sh on 2026-11-19 (that file reached the 600-line limit).
 #
@@ -198,6 +200,24 @@ require "a saved version takes the project's media records without asking the me
   Sources/SrtFlow/ProjectVersionStore.swift 'motionCaches: \.reference, mediaRecords: \.known\)'
 forbid "a saved version never makes a fresh media record (that stats the media file, maybe on a sleeping drive)" \
   Sources/SrtFlow/ProjectVersionStore.swift '^[^/]*MediaRecord\(url:'
+
+# A Burn In subtitle's unsaved edits (2026-11-28, docs/bugfixes/2026-11-28-burn-in-subtitle-edits-dropped-unasked.md): a
+# row's ✕, Clear Finished and another subtitle file for a video go through BurnInSubtitleEdits, which asks first; Quit asks
+# on ProjectQuit's path; the question comes from a run-loop timer, never from a Swift task (system-file-windows.md rule 10).
+# scripts/check-export-profile.sh (SubtitleEditsChecks) and scripts/check-project-saves.sh (SubtitleQuitChecks) check the
+# behaviour.
+forbid "the Burn In page never drops a row or replaces its subtitle itself (BurnInSubtitleEdits asks first)" \
+  Sources/SrtFlow/BurnInView.swift '^[^/]*queue\.(remove\(id:|clearFinished\(|removeAll\(|updateBurnIn\()'
+require "a row's ✕ asks about its subtitle's unsaved edits first" \
+  Sources/SrtFlow/BurnInView.swift 'BurnInSubtitleEdits\.shared\.remove\(item\.id\)'
+require "Clear Finished asks about each finished row's unsaved edits first" \
+  Sources/SrtFlow/BurnInView.swift 'subtitleEdits\.clearFinished\(\)'
+require "Quit asks about the Burn In subtitles on the projects' path, a Save waiting at most Quit's grace" \
+  Sources/SrtFlow/ProjectQuit.swift 'await BurnInSubtitleEdits\.shared\.settleForQuit\(into: &subtitles, deadline: grace\)'
+require "the question's timer also runs while Quit waits for its answer (the modal-panel run-loop mode)" \
+  Sources/SrtFlow/SubtitleEditsQuestion.swift 'RunLoop\.main\.add\(timer, forMode: \.modalPanel\)'
+forbid "the question is never shown from a Swift task or a dispatch block" \
+  Sources/SrtFlow/SubtitleEditsQuestion.swift '^[^/]*(Task \{|Task\.detached|DispatchQueue\.main\.async)'
 
 # Compress / Burn In (2026-11-19, docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md): ffmpeg writes only the
 # job's own claimed file, which is handed over through ExportDelivery as a new file (never replacing); a failed or

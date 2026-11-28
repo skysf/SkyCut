@@ -276,6 +276,34 @@ never returns.
    English (`ExportDestinationText.message(…, L10n: { $0 })`). Neither file uses `FileManager.default`
    (`checks/file-io-off-main-wiring.sh`).
 
+## 九、Unsaved subtitle edits on the Burn In page (2026-11-28)
+
+Since [unsaved edits were dropped unasked](../bugfixes/2026-11-28-burn-in-subtitle-edits-dropped-unasked.md). A subtitle on
+the Burn In page lives in a video's row (`BurnInRequest`) or in the standalone file (`StandaloneSubtitleStore`), together
+`BurnInSubtitles`; its edits stay in memory until Save writes them.
+
+1. **Nothing drops unsaved edits without asking.** Choosing a subtitle file for a video whose subtitle has unsaved edits
+   (another file, or the same file again: a row's Choose…, the page's drop and its pairing by name), removing a video (✕),
+   Clear Finished, and Quit or Restart and Update ask "Save the changes to “X”?" with Save, Don't Save and Cancel, as for a
+   project (`BurnInSubtitleEdits`, `SubtitleEditsQuestion`). Save writes the subtitle to its own file first (the editor's
+   Save) and then goes on. Don't Save goes on. Cancel changes nothing. A Save that fails asks again with the reason. With
+   nothing unsaved, nothing is asked and the action happens at once, as before. Quit asks after the projects, on
+   `ProjectQuit`'s path; Cancel stays, and Restart and Update then no longer restarts. At Quit a Save waits for its drive
+   at most Quit's grace (3 s, as a project does), then asks again saying the drive is not responding; a write that lands
+   later still marks the subtitle saved. On the page a Save waits the editor's 15 s.
+2. **An answer covers only what it was asked about.** The action then touches a subtitle only while it is saved, or exactly
+   as it was when Don't Save was answered: one edited while a Save was being written is asked about again, never dropped.
+   Page actions run one after another, each after the questions and saves of the ones before it, so an older one never
+   lands after a newer one (a later choice of file for the same video wins).
+3. **The question comes from a run-loop turn** (a timer), never inside a Swift task
+   ([system file windows](system-file-windows.md) rule 10), and only while no other alert's modal loop runs. The timer also
+   runs in the modal-panel mode: while Quit waits for its answer (`terminateLater`), AppKit runs the run loop in that mode
+   with no modal window (measured on macOS 26.5 with a probe app: a timer in the default mode alone never fired, so Quit
+   would have waited forever).
+4. **Not covered yet** (each place keeps its own copy of the text): one subtitle file given to two videos, or open alone and
+   given to a video, is two copies, and saving one leaves the other's "saved" mark as it was; files are told apart by their
+   path (`a.srt` and `A.srt`, aliases, hard links); subtitle files are read on the main thread.
+
 ## 回归矩阵
 
 | 检查 | 守什么 |
@@ -290,6 +318,9 @@ never returns.
 | `scripts/check-export-frame-rate.sh`（第三组） | 剪辑导出**真跑一遍**读成片尺寸：16:9 / 9:16 选 720p、跟随工程、档位不小于画布时不缩；奇怪比例下像素是方的（守 `setsar=1`） |
 | `scripts/check-export-profile.sh` (`FileChooserChecks`, `DestinationChecks`, `AIExportFolderChecks`, `ExportTargetChecks`, `PanelTargetChecks`, `SubtitlePanelChecks`, `EncodeQueueChecks`, `EncodeOffMainChecks`, `EncodeInputsOffMainChecks`) | §8: a fake folder window that answers / is cancelled / comes back empty at once / never appears / vanishes / stays stuck + Close It, the force-quit record; a fake drive that never answers (deadline, main thread free), read-only, the per-drive cap; real folders (missing, a file, not writable only by the write test); typed paths; a real export whose delivery is held 1.2 s stays off the main thread; item 8: `export_video` / `export_subtitles` make a missing folder, number taken names, refuse a stuck, read-only or locked folder with the panel's sentence before any job, main thread free; §5 item 6: two projects' exports held at a listing barrier get two names and each reads back as its own, a file that appeared after the listing is never replaced; §5 item 7: a folder taken while Export is pressed, its check and the old folder's coming back in the reverse order, ends in the question about the new folder's file, which stays until Replace; Replace writes exactly that file; an export nobody was asked about never replaces; the subtitle files through the button's work (`SubtitlePanelChecks`): a VTT made while the question about the SRT is open, or a file a stale listing missed, is never replaced; §5 item 8: real Compress encodes — two inputs with one file name get two names and read back as their own, a new output folder names them apart, a file that appears at a planned name is kept and the encode moves on (also through `compress_videos` and its `get_job`), a failed, a cancelled and a quit job leave the file at their name alone and nothing of their own; names off the main thread: a taken name is passed once the folder's names are back, a drive that never answers leaves adding immediate and the main thread free, `compress_videos` names past a taken file before answering and refuses a stuck or read-only folder with nothing queued; the AI encode tools' own files (a recording fake drive): `compress_videos` / `burn_subtitles` look at what they are given and `burn_subtitles` / `convert_subtitles` read and write through the probe, never on the main thread, a slow read leaves it free, a drive that never answers is refused at the deadline |
 | `checks/file-io-off-main-wiring.sh` | §8 wiring: no `runModal` / `FilePicker` and no `FileManager.default` in the export panel's files, `begin`, the record before AppKit, the exporter delivers through `ExportDelivery`, Export checks the folder first; §5 item 8: the encode's ffmpeg writes the job's claim, delivery through `ExportDelivery`, cleanup only through `discard`, no output path or removal in the queue, the quit hook; names, sizes and the AI encode folder only through the probe (`EncodeOutputFolder`, `AIEncodeFolder`), nothing in the queue asks the drive; no drive call in `AIEncodeTools`, its files only through `AIEncodeInputs` and the probe's file system |
+| `scripts/check-export-profile.sh` (`SubtitleEditsChecks`) | §9 through the page's calls on a real queue and files, the production alert's buttons pressed by title: ✕, Clear Finished and another file (or the same one again) ask; Cancel keeps, Don't Save lets go, Save writes first, a failed Save asks again with the reason; nothing is asked without edits; an edit made during a Save is asked about again; a row edited after its Don't Save while another row is saved stays; a later choice for the same video wins; never asked inside a task |
+| `scripts/check-project-saves.sh` (`SubtitleQuitChecks`) | §9 item 1 at Quit: a row and the standalone file with unsaved edits keep Quit from quitting at once; Cancel stays (the restart is told), Don't Save goes on with nothing written; a Save whose drive does not answer within Quit's grace asks again saying so, and its late landing still marks it saved; Save writes first |
+| `checks/file-io-off-main-wiring.sh` (§9 part) | the page drops a row or replaces its subtitle only through `BurnInSubtitleEdits`; Quit settles the subtitles; the question's timer in the modal-panel mode, never from a task |
 
 ## 人工回归清单（自动化够不着，发版前实机过）
 
@@ -342,3 +373,9 @@ never returns.
 22. From an AI client (§5 item 8): `compress_videos`, `burn_subtitles` and `convert_subtitles` naming files on a sleeping USB
     hard drive: SkyCut stays responsive (scroll the timeline while the drive spins up); each call goes on once the drive
     answers or says the drive is not responding after about 15 s, with nothing queued.
+23. Unsaved subtitle edits on the Burn In page (§9): edit a line of a video's subtitle and press the row's ✕. The alert
+    "Save the changes to “X”?" shows Save (Return), Don't Save and Cancel (Escape), and each does what it says. Clear
+    Finished with two finished videos whose subtitles were edited asks twice. Delete every line of a video's subtitle and
+    use Choose… (the same file, then another one): asked each time. ⌘Q with an edited subtitle asks after any project, and
+    Cancel keeps SkyCut open; Restart and Update with an edited subtitle asks, and Cancel keeps this version running. In
+    Chinese and Spanish the alert is translated.

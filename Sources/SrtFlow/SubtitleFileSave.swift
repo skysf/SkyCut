@@ -36,6 +36,15 @@ enum SubtitleFileSave {
     /// One write at a time, in the order asked: two saves of the same file land in order.
     private static let queue = DispatchQueue(label: "SrtFlow.subtitleFile", qos: .userInitiated)
 
+    /// What the person is told when the drive with `url` did not answer within the deadline.
+    @MainActor
+    static func notRespondingText(_ url: URL) -> String {
+        String(
+            format: L10n("The drive with “%@” is not responding. It may be asleep or disconnected, or macOS may be asking for permission."),
+            ProjectSaveText.driveName(of: url)
+        )
+    }
+
     /// The file's bytes.
     static func data(_ document: SubtitleDocumentModel, format: SubtitleFormat) -> Data {
         var copy = document
