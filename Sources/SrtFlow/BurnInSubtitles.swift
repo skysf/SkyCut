@@ -61,11 +61,13 @@ struct BurnInSubtitles {
     }
 
     /// A write landed on `place`'s own file: its mark follows the drive. `written`: what was written, in the place's own
-    /// format. Saved when the place holds exactly that now; unsaved when it holds that file with other text (review CXM1:
-    /// never "saved" while the drive holds something else). Nothing when the place holds another file or nothing.
+    /// format. Saved when the place holds exactly that now and no newer Save of the file is still being written; unsaved
+    /// otherwise (reviews CXM1, CXM2: never "saved" while the drive holds, or is about to hold, something else). Nothing when
+    /// the place holds another file or nothing.
     func follow(_ place: Place, written: Held, inOwnFormat: Bool = true) {
-        guard let now = held(place), now.url == written.url else { return }
-        let saved = inOwnFormat && now.document == written.document
+        guard let now = held(place), let url = written.url, now.url == url else { return }
+        // A newer Save of this file still on its way decides when it lands: never "saved" before that (review CXM2).
+        let saved = inOwnFormat && now.document == written.document && !SubtitleFileSave.isWriting(url)
         switch place {
         case .row(let id): queue.markBurnInSaved(saved, for: id)
         case .standalone: standalone.hasUnsavedEdits = !saved

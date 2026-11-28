@@ -9,7 +9,8 @@ import SrtFlowCore
 // - ✕ on a row with unsaved edits asks; Cancel keeps the row and its edits, Don't Save removes it and leaves its file, Save
 //   writes the edits to its file and then removes it, a Save that fails asks again with the reason; a row without unsaved
 //   edits goes at once;
-// - Clear Finished asks about each finished row with unsaved edits; Cancel removes nothing, Don't Save lets them go;
+// - Clear Finished asks about each finished row with unsaved edits; Cancel removes nothing, Don't Save lets them go; a row
+//   edited after its Don't Save, while another row is saved, is asked about again;
 // - another subtitle file for a row with unsaved edits asks; Cancel keeps it, Don't Save attaches the other file, Save writes
 //   the old one first; the same file again asks too (Don't Save reads it from the drive), and without edits reads it at once;
 // - an edit typed while Save writes is asked about again, never dropped; a later choice for the same video lands after the
@@ -20,7 +21,9 @@ import SrtFlowCore
 // - review CXM1: a Save still being written (past its deadline) is asked about with Keep Waiting / Cancel only, never Don't
 //   Save, and nothing is read over the edits; when it lands the row's mark follows the drive; Keep Waiting goes on once it
 //   landed; a file being written is read into a row only once its write landed; a time still being typed in a cell, the
-//   only edit, is written before ✕ asks, so it is asked about.
+//   only edit, is written before ✕ asks, so it is asked about;
+// - review CXM2: two Saves and the text put back — the first landing leaves it unsaved while the second is written, and ✕
+//   asks; a time typed while ✕'s Save is written is asked about, not dropped; a failure after Cancel is shown next time.
 @MainActor enum SubtitleEditsChecks {
     static func run(root: URL, source: URL, require: (Bool, String) -> Void) async {
         let bench = SubtitleEditsBench(folder: root.appendingPathComponent("subtitle-edits", isDirectory: true))
@@ -36,6 +39,10 @@ import SrtFlowCore
         await readsOnlyAfterTheWrite(bench, videos, require)
         await lateWrite(bench, videos, require)
         await timeStillBeingTyped(bench, videos, require)
+        await twoSavesThenTextPutBack(bench, videos, require)
+        await unchangedSaveStillWriting(bench, videos, require)
+        await timeTypedWhileSaving(bench, videos, require)
+        await failureAfterCancel(bench, videos, require)
         require(!bench.askedInTask && bench.missingButtons.isEmpty,
                 "every question came from a run-loop turn with Save / Don't Save / Cancel: inside a task \(bench.askedInTask), missing \(bench.missingButtons)")
         bench.restore()
@@ -123,15 +130,16 @@ import SrtFlowCore
         edit(later, rows[1], "Saved B")
         rows.forEach(later.cancel(id:))
         bench.gate.arm()
-        bench.replies = ["Don't Save", "Save"]
+        bench.replies = ["Don't Save", "Save", "Cancel"]
         laterEdits.clearFinished()
         _ = await bench.until { bench.gate.isHolding }
         edit(later, rows[0], "Typed after Don't Save")
         bench.gate.open()
         await bench.idle(laterEdits)
-        require(later.items.map(\.id) == [rows[0]] && burnIn(later, rows[0])?.document?.cues.first?.text == "Typed after Don't Save"
+        require(later.items.count == 2 && burnIn(later, rows[0])?.document?.cues.first?.text == "Typed after Don't Save"
+                && bench.asked == [bench.question("A.srt"), bench.question("B.srt"), bench.question("A.srt")]
                 && bench.text(bench.file("B.srt")).contains("Saved B"),
-                "a finished row edited after its Don't Save, while another row's Save was written, stays with that edit; the saved row goes: \(later.items.count) rows")
+                "a finished row edited after its Don't Save, while another row's Save was written, is asked about again (Cancel keeps every row; the other one is saved): \(later.items.count) rows, asked \(bench.asked)")
     }
 
     private static func anotherFile(_ bench: SubtitleEditsBench, _ videos: [URL], _ require: (Bool, String) -> Void) async {
@@ -289,5 +297,93 @@ import SrtFlowCore
         require(queue.items.count == 1 && burnIn(queue, ids[0])?.document?.cues.first?.start == 0.75
                 && burnIn(queue, ids[0])?.hasUnsavedEdits == true && bench.asked == [bench.question("A.srt")],
                 "a time still being typed, the only edit, is written before ✕ asks: asked \(bench.asked), \(queue.items.count) rows")
+    }
+
+    /// "First" saved, then "Second" saved while that write is held, then the text put back to "First". The first write lands
+    /// while the second is still held: not saved, so ✕ asks (still being saved); when the second lands, the drive holds
+    /// "Second" and the row ("First") stays unsaved.
+    private static func twoSavesThenTextPutBack(_ bench: SubtitleEditsBench, _ videos: [URL], _ require: (Bool, String) -> Void) async {
+        let a = bench.file("A.srt")
+        let (queue, ids, edits) = page(bench, videos, [a])
+        let export = SubtitleEditorExport(subtitles: BurnInSubtitles(queue: queue, standalone: .shared))
+        edit(queue, ids[0], "First saved")
+        bench.gate.arm()
+        export.save(boundTo: ids[0])
+        _ = await bench.until { bench.gate.isHolding }
+        edit(queue, ids[0], "Second saved")
+        export.save(boundTo: ids[0])
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        edit(queue, ids[0], "First saved")
+        bench.gate.letOneThrough()
+        _ = await bench.until { bench.text(a).contains("First saved") && bench.gate.isHolding }
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        let savedEarly = burnIn(queue, ids[0])?.hasUnsavedEdits == false
+        bench.replies = ["Cancel"]
+        edits.remove(ids[0])
+        await bench.idle(edits)
+        let asked = bench.asked.last ?? ""
+        bench.gate.open()
+        _ = await bench.until { bench.text(a).contains("Second saved") && !SubtitleFileSave.isWriting(a) }
+        require(!savedEarly && queue.items.count == 1 && asked == String(format: L10n("“%@” is still being saved"), "A.srt")
+                && burnIn(queue, ids[0])?.document?.cues.first?.text == "First saved" && burnIn(queue, ids[0])?.hasUnsavedEdits == true,
+                "a landing with a newer Save still being written does not mark the row saved, ✕ asks, and the row stays unsaved against the drive: saved early \(savedEarly), asked \(asked)")
+    }
+
+    /// An unedited row whose Save onto its own file is still held: ✕ asks (still being saved) instead of removing it.
+    private static func unchangedSaveStillWriting(_ bench: SubtitleEditsBench, _ videos: [URL], _ require: (Bool, String) -> Void) async {
+        let (queue, ids, edits) = page(bench, videos, [bench.file("A.srt")])
+        bench.gate.arm()
+        SubtitleEditorExport(subtitles: BurnInSubtitles(queue: queue, standalone: .shared)).save(boundTo: ids[0])
+        _ = await bench.until { bench.gate.isHolding }
+        bench.replies = ["Cancel"]
+        edits.remove(ids[0])
+        await bench.idle(edits)
+        let kept = queue.items.count == 1 && bench.asked == [String(format: L10n("“%@” is still being saved"), "A.srt")]
+        bench.gate.open()
+        _ = await bench.until { !SubtitleFileSave.isWriting(bench.file("A.srt")) }
+        require(kept && burnIn(queue, ids[0])?.hasUnsavedEdits == false,
+                "a subtitle whose Save is still being written counts as unsaved: ✕ asks, then it is saved when it lands: asked \(bench.asked)")
+    }
+
+    /// ✕ answered Save, the write held; a time typed into the row's cell meanwhile (a draft, as TimecodeField registers it).
+    /// When the write lands the row is looked at again: the time is written and asked about, the row not removed.
+    private static func timeTypedWhileSaving(_ bench: SubtitleEditsBench, _ videos: [URL], _ require: (Bool, String) -> Void) async {
+        let (queue, ids, edits) = page(bench, videos, [bench.file("A.srt")])
+        edit(queue, ids[0], "Saved by the ✕")
+        bench.gate.arm()
+        bench.replies = ["Save", "Cancel"]
+        edits.remove(ids[0])
+        _ = await bench.until { bench.gate.isHolding }
+        PendingTimecode.began(UUID()) { queue.editBurnInDocument(for: ids[0]) { $0.cues[0].start = 0.75 } }
+        bench.gate.open()
+        await bench.idle(edits)
+        require(queue.items.count == 1 && burnIn(queue, ids[0])?.document?.cues.first?.start == 0.75
+                && burnIn(queue, ids[0])?.hasUnsavedEdits == true && bench.asked.count == 2,
+                "a time typed while ✕'s Save was written is asked about when it lands, not dropped with the row: \(queue.items.count) rows, asked \(bench.asked.count)")
+    }
+
+    /// ✕ answered Save, the write held past the deadline, "still being saved" answered Cancel; then the write fails. The next
+    /// ✕ shows why.
+    private static func failureAfterCancel(_ bench: SubtitleEditsBench, _ videos: [URL], _ require: (Bool, String) -> Void) async {
+        let deadline = SubtitleFileSave.deadline
+        SubtitleFileSave.deadline = 0.3
+        let a = bench.file("A.srt")
+        let (queue, ids, edits) = page(bench, videos, [a])
+        edit(queue, ids[0], "Not saved: refused later")
+        bench.gate.arm()
+        bench.replies = ["Save", "Cancel"]
+        edits.remove(ids[0])
+        _ = await bench.until { bench.asked.count == 2 }
+        await bench.idle(edits)
+        bench.gate.failing = true
+        bench.gate.open()
+        _ = await bench.until { !SubtitleFileSave.isWriting(a) }
+        bench.gate.failing = false
+        bench.replies = ["Cancel"]
+        edits.remove(ids[0])
+        await bench.idle(edits)
+        require(queue.items.count == 1 && bench.asked.count == 3 && bench.details.last?.contains(bench.failure(a)) == true,
+                "a write that fails after Cancel keeps its reason for the next question about the row: \(bench.details.last ?? "nothing asked")")
+        SubtitleFileSave.deadline = deadline
     }
 }

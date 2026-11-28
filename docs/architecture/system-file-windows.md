@@ -149,7 +149,8 @@ The real panel service can't be driven from a check (it needs the window server,
    The subtitle editor's Export As onto a USB hard drive that has gone to sleep: SkyCut stays responsive while it spins
    up, and says the drive is not responding if it takes over 15 s.
    On the Burn In page, with no video, open subtitle A on its own and press Export As. With the save window still open:
-   (a) type into A, or double-click another subtitle B in Finder (it takes A's place), then choose a name: nothing is
+   (a) type into A, or drag another subtitle B from Finder onto the page while A has no edits (B takes A's place: the
+   editor's title becomes B; a double-click in Finder while the page is open only stages B), then choose a name: nothing is
    written, and an alert says "Nothing was written: the subtitle changed. Export again.", also when you went to another
    page before choosing; (b) instead add a video with subtitle B, so the preview and the editor move to B's row while A
    stays open on its own, unedited, then choose a name: A is exported and nothing is said. Answer a typed path to an

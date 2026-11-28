@@ -110,6 +110,8 @@ final class SubtitleWriteGate: @unchecked Sendable {
     private var waiting = 0
     private var log: [String] = []
     private var failingNow = false
+    /// Held writes allowed through while armed (letOneThrough).
+    private var permits = 0
 
     /// Writes fail (no permission) while this is on.
     var failing: Bool {
@@ -122,7 +124,8 @@ final class SubtitleWriteGate: @unchecked Sendable {
         log.append(url.lastPathComponent)
         waiting += 1
         let end = Date().addingTimeInterval(3)
-        while armed, condition.wait(until: end) {}
+        while armed, permits == 0, condition.wait(until: end) {}
+        if armed, permits > 0 { permits -= 1 }
         waiting -= 1
         condition.unlock()
     }
@@ -136,6 +139,15 @@ final class SubtitleWriteGate: @unchecked Sendable {
     func open() {
         condition.lock()
         armed = false
+        permits = 0
+        condition.broadcast()
+        condition.unlock()
+    }
+
+    /// Lets the next held write through and keeps holding the ones after it.
+    func letOneThrough() {
+        condition.lock()
+        permits += 1
         condition.broadcast()
         condition.unlock()
     }

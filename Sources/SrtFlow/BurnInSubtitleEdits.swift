@@ -46,8 +46,9 @@ final class BurnInSubtitleEdits {
     /// Bumped when Quit takes over: page actions started before it ask nothing more and do nothing, so Quit's own
     /// question is the only one (review CXM1).
     private var epoch = 0
-    /// Why a Save that had answered "not responding" failed when it ended, per file: told with the next question.
-    private var lateFailures: [String: String] = [:]
+    /// The last write failure of each place's subtitle, on time or late: shown in the next question about it, also after a
+    /// Cancel (review CXM2); a write that lands clears it.
+    private var failures: [BurnInSubtitles.Place: String] = [:]
 
     init(_ subtitles: BurnInSubtitles) {
         self.subtitles = subtitles
@@ -110,9 +111,11 @@ final class BurnInSubtitleEdits {
 
     // MARK: - Asking
 
-    /// What `place` holds when it has unsaved edits and a file to save them to; nil otherwise.
+    /// What `place` holds when it has unsaved edits, or a Save of its file is still being written (it is not saved before the
+    /// newest one lands, review CXM2), and a file to save it to; nil otherwise.
     func unsaved(_ place: BurnInSubtitles.Place) -> BurnInSubtitles.Held? {
-        guard let held = subtitles.held(place), held.hasUnsavedEdits, held.url != nil else { return nil }
+        guard let held = subtitles.held(place), let url = held.url,
+              held.hasUnsavedEdits || SubtitleFileSave.isWriting(url) else { return nil }
         return held
     }
 
@@ -132,7 +135,12 @@ final class BurnInSubtitleEdits {
             await previous?.value
             let current = { [self] in epoch == started }
             var discarded = Discarded()
-            guard await settle(places(), into: &discarded, while: current), current() else { return }
+            // Asked again until nothing changed since the answers: a time typed while a Save was written (written now), or
+            // any other edit, is asked about instead of dropped (review CXM2).
+            repeat {
+                guard await settle(places(), into: &discarded, while: current), current() else { return }
+                PendingTimecode.commit()
+            } while places().contains { !discarded.allows($0, unsaved($0)) }
             if let file, !(await SubtitleFileSave.waitUntilWritten(file, deadline: SubtitleFileSave.deadline)) {
                 if current() { stillWriting() }
                 return
@@ -150,7 +158,6 @@ final class BurnInSubtitleEdits {
         while current: @escaping @MainActor () -> Bool
     ) async -> Bool {
         for place in places {
-            var failure: String?
             while let now = unsaved(place), !discarded.allows(place, now) {
                 guard current(), let url = now.url else { return false }
                 if SubtitleFileSave.isWriting(url) {
@@ -158,39 +165,36 @@ final class BurnInSubtitleEdits {
                     case .keepWaiting: _ = await SubtitleFileSave.waitUntilWritten(url, deadline: deadline ?? SubtitleFileSave.deadline)
                     case .cancel: return false
                     }
-                    failure = lateFailures.removeValue(forKey: url.standardized.path)
                     continue
                 }
-                switch await SubtitleEditsQuestion.ask(url.lastPathComponent, failure: failure, stillWanted: current) {
+                switch await SubtitleEditsQuestion.ask(url.lastPathComponent, failure: failures[place], stillWanted: current) {
                 case .cancel: return false
-                case .dontSave: discarded.answered[place] = now
-                case .save: failure = await save(now, at: place, deadline: deadline)
+                case .dontSave:
+                    discarded.answered[place] = now
+                    failures[place] = nil
+                case .save: await save(now, at: place, deadline: deadline)
                 }
             }
         }
         return true
     }
 
-    /// `held` written to its own file in its own format, off the main thread (the editor's Save). When it lands, the place's
-    /// mark follows the drive (`BurnInSubtitles.follow`), also after "not responding"; a failure that comes after that is
-    /// kept for the next question. nil: written, or still on its way (the loop then asks Keep Waiting / Cancel); otherwise
-    /// why it failed.
-    private func save(_ held: BurnInSubtitles.Held, at place: BurnInSubtitles.Place, deadline: TimeInterval?) async -> String? {
-        guard let url = held.url else { return nil }
+    /// `held` written to its own file in its own format, off the main thread (the editor's Save), waited for at most
+    /// `deadline`. Whenever it ends, on time or after "not responding": a landing clears the place's failure and its mark
+    /// follows the drive (`BurnInSubtitles.follow`); a failure is kept for the next question about the place. The loop then
+    /// looks again: still writing (Keep Waiting / Cancel), failed (asked with the reason), or saved.
+    private func save(_ held: BurnInSubtitles.Held, at place: BurnInSubtitles.Place, deadline: TimeInterval?) async {
+        guard let url = held.url else { return }
         let data = SubtitleFileSave.data(held.document, format: held.document.format)
-        var answered = false
-        let answer = await SubtitleFileSave.write(data, to: url, replacing: true, deadline: deadline) { [self] landed in
+        _ = await SubtitleFileSave.write(data, to: url, replacing: true, deadline: deadline) { [self] landed in
             switch landed {
-            case .written: subtitles.follow(place, written: held)
-            case .failed(let reason) where answered: lateFailures[url.standardized.path] = reason
-            default: break
+            case .written:
+                failures[place] = nil
+                subtitles.follow(place, written: held)
+            case .failed(let reason): failures[place] = reason
+            case .occupied: failures[place] = NewFileClaim.occupiedReason(url)
+            case .notResponding: break
             }
-        }
-        answered = true
-        switch answer {
-        case .written, .notResponding: return nil
-        case .occupied: return NewFileClaim.occupiedReason(url)
-        case .failed(let reason): return reason
         }
     }
 
