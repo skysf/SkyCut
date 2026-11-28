@@ -1816,3 +1816,10 @@
 "New versions download in the background and install when you quit." = "新版本在后台下好，退出时自动装上。";
 "You’re only told about new versions; nothing downloads until you click." = "有新版本时只提示，你点了才下载。";
 "Test update feed: %@" = "测试更新源：%@";
+"Save the changes to “%@”?" = "要保存对「%@」的改动吗？";
+"Your changes will be lost if you don't save them." = "不保存的话，改动会丢失。";
+"Don't Save" = "不保存";
+"Nothing was written: the subtitle changed. Export again." = "没有写入：字幕已经变了，请重新导出。";
+"“%@” is still being saved" = "「%@」还在保存中";
+"The drive has not finished writing it. Cancel leaves everything as it is, and the file is still saved when the drive finishes." = "磁盘还没写完。取消的话一切照旧，磁盘写完时文件照样会保存。";
+"Keep Waiting" = "继续等待";

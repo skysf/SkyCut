@@ -43,6 +43,7 @@
 - [2026-11-17 Black-bar removal disagreed with look and left thin edges](2026-11-17-black-bar-removal-keeps-residual-edges.md) — Measure the requested source window at one shared resolution and include the resampled boundary in the corrective crop.
 - [2026-08-06 构建版本与 shell 陷阱](2026-08-06-build-version-and-shell-traps.md) — 版本兜底、变量边界与 pipefail；改 shell 脚本前必读。
 - [2026-10-01 烧录页默认宽度下字幕列被裁](2026-10-01-burn-in-subtitle-column-clipped-at-default-width.md) — `HSplitView` 最后一栏的 ideal 要放得进；截图按用户默认的窗口大小拍。
+- [2026-11-28 A Burn In subtitle's unsaved edits were dropped without asking](2026-11-28-burn-in-subtitle-edits-dropped-unasked.md) — Every path that can drop unsaved work goes through one gate that asks; act only on what the answer was about.
 - [2026-10-29 提交返回的瞬间取消，丢了任务号](2026-10-29-cancelled-submit-loses-job-id.md) — 付费提交的身份先交给调用方，然后才能抛停止。
 - [2026-11-17 Changing the canvas stretches rectangles and resizes texts and shapes out of proportion](2026-11-17-canvas-change-resizes-texts-and-shapes.md) — A length stored against one edge of the frame needs a rule for a new shape: one factor for all of an item's lengths, one that a switch back undoes.
 - [2026-11-17 Changing the canvas silently stretches clips framed for the old shape](2026-11-17-canvas-change-stretches-framed-clips.md) — Values stored relative to the canvas need a rule for when it changes: keep x, y and scale, never re-crop, and tell the AI.
@@ -300,6 +301,7 @@
 - [2026-09-29 成片里的字幕比预览小一截](2026-09-29-subtitle-preview-bigger-than-burn.md) — libass 把字号当行高：预览按实际画字的字体乘 `SubtitleFontScale`；样本要带默认值。
 - [2026-09-29 预览上字幕的位置和行距和成片对不上](2026-09-29-subtitle-preview-line-box-differs-from-libass.md) — 「一份数值、两个渲染面」要比位置、不只比大小（`SubtitleLineMetrics`）。
 - [2026-10-15 预览的字幕折行是贪心的，成片是摊匀的](2026-10-15-subtitle-preview-wraps-greedily.md) — 折行点只有 `SubtitleLineWrap` 一份：照渲染器的源码 port，再真烧核。
+- [2026-11-28 The subtitle editor's Replace wrote another subtitle into the chosen file](2026-11-28-subtitle-replace-writes-another-subtitle.md) — A retry after a question writes what it asked about, checked unchanged, never what the screen shows by then.
 - [2026-08-09 同语种翻译](2026-08-09-subtitle-translate-after-same-language.md) — 可见选择与提交前预检。
 - [2026-10-18 字幕自动折行把中文的词拆在两行](2026-10-18-subtitle-wrap-splits-chinese-words.md) — 「能断」和「断在这儿好」是两件事：中日文在词和词之间断、比一整行还宽的词才拆；先求最少行数再挑断点，同一件事别写两份。
 - [2026-10-14 带入场动画的字在成片里闪没一帧](2026-10-14-text-blinks-at-animation-seam.md) — 序列末尾多渲两帧、各段左闭右开；自检场景要像用户的工程（不对齐的输入）。

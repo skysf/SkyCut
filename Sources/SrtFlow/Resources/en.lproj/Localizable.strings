@@ -1816,3 +1816,10 @@
 "New versions download in the background and install when you quit." = "New versions download in the background and install when you quit.";
 "You’re only told about new versions; nothing downloads until you click." = "You’re only told about new versions; nothing downloads until you click.";
 "Test update feed: %@" = "Test update feed: %@";
+"Save the changes to “%@”?" = "Save the changes to “%@”?";
+"Your changes will be lost if you don't save them." = "Your changes will be lost if you don't save them.";
+"Don't Save" = "Don't Save";
+"Nothing was written: the subtitle changed. Export again." = "Nothing was written: the subtitle changed. Export again.";
+"“%@” is still being saved" = "“%@” is still being saved";
+"The drive has not finished writing it. Cancel leaves everything as it is, and the file is still saved when the drive finishes." = "The drive has not finished writing it. Cancel leaves everything as it is, and the file is still saved when the drive finishes.";
+"Keep Waiting" = "Keep Waiting";

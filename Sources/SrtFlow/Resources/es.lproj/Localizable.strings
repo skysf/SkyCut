@@ -1816,3 +1816,10 @@
 "New versions download in the background and install when you quit." = "Las versiones nuevas se descargan en segundo plano y se instalan al salir.";
 "You’re only told about new versions; nothing downloads until you click." = "Solo te avisa cuando hay una versión nueva; no se descarga nada hasta que hagas clic.";
 "Test update feed: %@" = "Fuente de actualizaciones de prueba: %@";
+"Save the changes to “%@”?" = "¿Guardar los cambios en “%@”?";
+"Your changes will be lost if you don't save them." = "Si no los guardas, los cambios se perderán.";
+"Don't Save" = "No guardar";
+"Nothing was written: the subtitle changed. Export again." = "No se escribió nada: el subtítulo cambió. Vuelve a exportar.";
+"“%@” is still being saved" = "“%@” todavía se está guardando";
+"The drive has not finished writing it. Cancel leaves everything as it is, and the file is still saved when the drive finishes." = "La unidad aún no ha terminado de escribirlo. Si cancelas, todo queda como está y el archivo se guarda igualmente cuando la unidad termine.";
+"Keep Waiting" = "Seguir esperando";
