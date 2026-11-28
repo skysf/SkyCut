@@ -287,9 +287,10 @@ the Burn In page lives in a video's row (`BurnInRequest`) or in the standalone f
    Clear Finished, and Quit or Restart and Update ask "Save the changes to “X”?" with Save, Don't Save and Cancel, as for a
    project (`BurnInSubtitleEdits`, `SubtitleEditsQuestion`). Save writes the subtitle to its own file first (the editor's
    Save) and then goes on. Don't Save goes on. Cancel changes nothing. A Save that fails asks again with the reason; the last
-   failure of a subtitle is kept and shown the next time it is asked about, also after a Cancel (review CXM2). Don't Save
-   covers only the subtitle's unsaved edits: an Export As the person already confirmed for it is a separate action and still
-   writes its file. With
+   failure of a subtitle's file is kept (`SubtitleFileSave.lastFailure`) and shown the next time it is asked about, also
+   after a Cancel (review CXM2), until a later Save of it lands, the panel's included (review CXM3). Don't Save covers only
+   the subtitle's unsaved edits: an Export As the person already confirmed for it is a separate action and still writes its
+   file. With
    nothing unsaved, nothing is asked and the action happens at once, as before. Quit asks after the projects, on
    `ProjectQuit`'s path; Cancel stays, and Restart and Update then no longer restarts. At Quit a Save waits for its drive
    at most Quit's grace (3 s, as a project does); on the page, the editor's 15 s. A time typed into a start / end cell and

@@ -46,9 +46,6 @@ final class BurnInSubtitleEdits {
     /// Bumped when Quit takes over: page actions started before it ask nothing more and do nothing, so Quit's own
     /// question is the only one (review CXM1).
     private var epoch = 0
-    /// The last write failure of each place's subtitle, on time or late: shown in the next question about it, also after a
-    /// Cancel (review CXM2); a write that lands clears it.
-    private var failures: [BurnInSubtitles.Place: String] = [:]
 
     init(_ subtitles: BurnInSubtitles) {
         self.subtitles = subtitles
@@ -167,11 +164,10 @@ final class BurnInSubtitleEdits {
                     }
                     continue
                 }
-                switch await SubtitleEditsQuestion.ask(url.lastPathComponent, failure: failures[place], stillWanted: current) {
+                // The last failed write of its file, until a later one lands (also after a Cancel: reviews CXM2, CXM3).
+                switch await SubtitleEditsQuestion.ask(url.lastPathComponent, failure: SubtitleFileSave.lastFailure(url), stillWanted: current) {
                 case .cancel: return false
-                case .dontSave:
-                    discarded.answered[place] = now
-                    failures[place] = nil
+                case .dontSave: discarded.answered[place] = now
                 case .save: await save(now, at: place, deadline: deadline)
                 }
             }
@@ -180,21 +176,14 @@ final class BurnInSubtitleEdits {
     }
 
     /// `held` written to its own file in its own format, off the main thread (the editor's Save), waited for at most
-    /// `deadline`. Whenever it ends, on time or after "not responding": a landing clears the place's failure and its mark
-    /// follows the drive (`BurnInSubtitles.follow`); a failure is kept for the next question about the place. The loop then
-    /// looks again: still writing (Keep Waiting / Cancel), failed (asked with the reason), or saved.
+    /// `deadline`. Whenever it lands, on time or after "not responding", the place's mark follows the drive
+    /// (`BurnInSubtitles.follow`); a failure is kept by SubtitleFileSave for the next question. The loop then looks again:
+    /// still writing (Keep Waiting / Cancel), failed (asked with the reason), or saved.
     private func save(_ held: BurnInSubtitles.Held, at place: BurnInSubtitles.Place, deadline: TimeInterval?) async {
         guard let url = held.url else { return }
         let data = SubtitleFileSave.data(held.document, format: held.document.format)
         _ = await SubtitleFileSave.write(data, to: url, replacing: true, deadline: deadline) { [self] landed in
-            switch landed {
-            case .written:
-                failures[place] = nil
-                subtitles.follow(place, written: held)
-            case .failed(let reason): failures[place] = reason
-            case .occupied: failures[place] = NewFileClaim.occupiedReason(url)
-            case .notResponding: break
-            }
+            if landed == .written { subtitles.follow(place, written: held) }
         }
     }
 

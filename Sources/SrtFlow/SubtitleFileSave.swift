@@ -37,6 +37,12 @@ enum SubtitleFileSave {
     private static let queue = DispatchQueue(label: "SrtFlow.subtitleFile", qos: .userInitiated)
     /// Writes asked for and not landed yet, per file (also after "not responding": the write goes on).
     @MainActor private static var writing: [String: Int] = [:]
+    /// Why the last write of each file failed, until a later write of it lands, from whichever saver (review CXM3).
+    @MainActor private static var failed: [String: String] = [:]
+
+    /// Why the last write of `url` failed, when no write of it has landed since: told in the next question about it.
+    @MainActor
+    static func lastFailure(_ url: URL) -> String? { failed[key(url)] }
 
     /// A write to `url` has not landed yet: nothing may read the file into an editor, or drop what it is writing, before it
     /// does (BurnInSubtitleEdits, review CXM1).
@@ -95,6 +101,11 @@ enum SubtitleFileSave {
                     MainActor.assumeIsolated {
                         writing[file, default: 1] -= 1
                         if writing[file] == 0 { writing[file] = nil }
+                        switch answer {
+                        case .written: failed[file] = nil
+                        case .failed(let reason): failed[file] = reason
+                        case .occupied, .notResponding: break
+                        }
                         wait.answer(answer)
                         landed(answer)
                     }

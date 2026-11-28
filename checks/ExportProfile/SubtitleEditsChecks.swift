@@ -363,7 +363,7 @@ import SrtFlowCore
     }
 
     /// ✕ answered Save, the write held past the deadline, "still being saved" answered Cancel; then the write fails. The next
-    /// ✕ shows why.
+    /// ✕ shows why; after a later Save from the panel lands, the next ✕ no longer does.
     private static func failureAfterCancel(_ bench: SubtitleEditsBench, _ videos: [URL], _ require: (Bool, String) -> Void) async {
         let deadline = SubtitleFileSave.deadline
         SubtitleFileSave.deadline = 0.3
@@ -384,6 +384,15 @@ import SrtFlowCore
         await bench.idle(edits)
         require(queue.items.count == 1 && bench.asked.count == 3 && bench.details.last?.contains(bench.failure(a)) == true,
                 "a write that fails after Cancel keeps its reason for the next question about the row: \(bench.details.last ?? "nothing asked")")
+        // A later Save from the editor panel lands: the kept reason goes with it (review CXM3).
+        SubtitleEditorExport(subtitles: BurnInSubtitles(queue: queue, standalone: .shared)).save(boundTo: ids[0])
+        _ = await bench.until { burnIn(queue, ids[0])?.hasUnsavedEdits == false }
+        edit(queue, ids[0], "Edited after the panel's Save")
+        bench.replies = ["Cancel"]
+        edits.remove(ids[0])
+        await bench.idle(edits)
+        require(bench.asked.count == 4 && bench.details.last?.contains(bench.failure(a)) == false,
+                "a later Save that lands, from the panel too, clears the kept reason: \(bench.details.last ?? "nothing asked")")
         SubtitleFileSave.deadline = deadline
     }
 }
