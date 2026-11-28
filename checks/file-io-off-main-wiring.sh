@@ -20,8 +20,10 @@
 # - web-motion recovery's movie checks, Compress / Burn In's names and sizes, compress_videos / burn_subtitles' folder
 #   (2026-11-19, docs/bugfixes/2026-11-19-drive-checks-on-main-thread.md);
 # - the files the AI encode tools name, burn_subtitles' subtitle reads, convert_subtitles' reads and writes
-#   (2026-11-19, docs/bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md).
-# Rules: docs/architecture/export-settings.md §8 and §5 item 8, docs/architecture/video-edit-project-file.md §5,
+#   (2026-11-19, docs/bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md);
+# - a Burn In subtitle's unsaved edits asked about before anything drops them, the question from a run-loop turn
+#   (2026-11-28, docs/bugfixes/2026-11-28-burn-in-subtitle-edits-dropped-unasked.md).
+# Rules: docs/architecture/export-settings.md §8, §5 item 8 and §9, docs/architecture/video-edit-project-file.md §5,
 # docs/architecture/system-file-windows.md, docs/architecture/blocking-media-reads.md "Destination drives".
 # Moved out of checks/project-file-wiring.sh on 2026-11-19 (that file reached the 600-line limit).
 #
@@ -180,9 +182,34 @@ require "a Save As that may not replace never writes at the name: it takes it in
 require "the project's Save As from a window asks before replacing" \
   Sources/SrtFlow/VideoEditProjectSaving.swift 'await saveAs\(chosen: location\)'
 require "the subtitle editor's Save and Export As write with the answer's permission, off the main thread" \
-  Sources/SrtFlow/SubtitleEditPanel.swift 'await SubtitleFileSave\.write\(data, to: location\.url, replacing: location\.mayReplace\)'
-forbid "the subtitle editor writes files only through SubtitleFileSave (a plain Data.write replaces what is there, on the main thread)" \
-  Sources/SrtFlow/SubtitleEditPanel.swift '^[^/]*\.write\(to:'
+  Sources/SrtFlow/SubtitleEditorExport.swift 'await SubtitleFileSave\.write\(data, to: location\.url, replacing: location\.mayReplace\)'
+for f in Sources/SrtFlow/SubtitleEditPanel.swift Sources/SrtFlow/SubtitleEditorExport.swift; do
+  forbid "the subtitle editor writes files only through SubtitleFileSave (a plain Data.write replaces what is there, on the main thread)" \
+    "$f" '^[^/]*\.write\(to:'
+done
+# The editor's Export As writes only the subtitle it was pressed for, unedited (2026-11-28,
+# docs/bugfixes/2026-11-28-subtitle-replace-writes-another-subtitle.md): the panel's buttons only call SubtitleEditorExport,
+# whose every write (the window's answer, the Replace retry) first checks that subtitle is still there, unedited.
+# scripts/check-export-profile.sh (SubtitleExportChecks) checks the behaviour.
+forbid "the subtitle panel opens no save window and writes nothing itself (SubtitleEditorExport does)" \
+  Sources/SrtFlow/SubtitleEditPanel.swift '^[^/]*(FilePicker\.|SubtitleFileSave\.(write|data)\(|FileReplaceQuestion\.)'
+require "the panel's Save goes through SubtitleEditorExport" \
+  Sources/SrtFlow/SubtitleEditPanel.swift 'export\.save\(boundTo: itemID\)'
+require "the panel's Export As goes through SubtitleEditorExport" \
+  Sources/SrtFlow/SubtitleEditPanel.swift 'export\.exportAs\(format, boundTo: itemID\)'
+require "every subtitle editor write first checks the subtitle pressed for is still there, unedited" \
+  Sources/SrtFlow/SubtitleEditorExport.swift 'guard pressed\.held\.sameText\(as: subtitles\.held\(pressed\.place\)\) else \{'
+require "the Replace retry writes the subtitle pressed for (checked again), never what the panel shows then" \
+  Sources/SrtFlow/SubtitleEditorExport.swift 'write\(pressed, format, to: SaveLocation\(url: location\.url, mayReplace: true\)\)'
+# Review CXM1 (2026-11-28): the export's Replace question runs its modal loop from a run-loop turn, never inside the save's
+# task (system-file-windows.md rule 10), and what a save has to say is an app-level alert, seen off the Burn In page too.
+require "the export's Replace question is asked from a run-loop turn" \
+  Sources/SrtFlow/SubtitleEditorExport.swift 'if await FileReplaceQuestion\.askFromRunLoop\(location\.url\) \{'
+forbid "the export never asks Replace inside its task" Sources/SrtFlow/SubtitleEditorExport.swift 'FileReplaceQuestion\.ask\('
+require "what a subtitle save has to say is an app-level alert from a run-loop turn" \
+  Sources/SrtFlow/SubtitleEditorExport.swift 'RunLoopAlert\.tell \{'
+forbid "the subtitle panel shows no save alert of its own (it is off screen once the person leaves the page)" \
+  Sources/SrtFlow/SubtitleEditPanel.swift '\.alert\("Could Not Save"'
 require "a manual screen recording replaces a file only when macOS's own window confirmed it" \
   Sources/SrtFlow/ScreenRecordingCoordinator.swift 'session\.replacesExistingOutput = session\.replacesExistingOutput && options\.replacesExistingOutput'
 require "the recording setup carries the save window's confirmation" \
@@ -198,6 +225,47 @@ require "a saved version takes the project's media records without asking the me
   Sources/SrtFlow/ProjectVersionStore.swift 'motionCaches: \.reference, mediaRecords: \.known\)'
 forbid "a saved version never makes a fresh media record (that stats the media file, maybe on a sleeping drive)" \
   Sources/SrtFlow/ProjectVersionStore.swift '^[^/]*MediaRecord\(url:'
+
+# A Burn In subtitle's unsaved edits (2026-11-28, docs/bugfixes/2026-11-28-burn-in-subtitle-edits-dropped-unasked.md): a
+# row's ✕, Clear Finished and another subtitle file for a video go through BurnInSubtitleEdits, which asks first; Quit asks
+# on ProjectQuit's path; the question comes from a run-loop timer, never from a Swift task (system-file-windows.md rule 10).
+# scripts/check-export-profile.sh (SubtitleEditsChecks) and scripts/check-project-saves.sh (SubtitleQuitChecks) check the
+# behaviour.
+forbid "the Burn In page never drops a row or replaces its subtitle itself (BurnInSubtitleEdits asks first)" \
+  Sources/SrtFlow/BurnInView.swift '^[^/]*queue\.(remove\(id:|clearFinished\(|removeAll\(|updateBurnIn\()'
+require "a row's ✕ asks about its subtitle's unsaved edits first" \
+  Sources/SrtFlow/BurnInView.swift 'BurnInSubtitleEdits\.shared\.remove\(item\.id\)'
+require "Clear Finished asks about each finished row's unsaved edits first" \
+  Sources/SrtFlow/BurnInView.swift 'subtitleEdits\.clearFinished\(\)'
+require "Quit asks about the Burn In subtitles on the projects' path, a Save waiting at most Quit's grace" \
+  Sources/SrtFlow/ProjectQuit.swift 'await BurnInSubtitleEdits\.shared\.settleForQuit\(into: &subtitles, deadline: grace\)'
+require "the alerts' timer also runs while Quit waits for its answer (the modal-panel run-loop mode)" \
+  Sources/SrtFlow/RunLoopAlert.swift 'RunLoop\.main\.add\(timer, forMode: \.modalPanel\)'
+for f in Sources/SrtFlow/RunLoopAlert.swift Sources/SrtFlow/SubtitleEditsQuestion.swift; do
+  forbid "the subtitle alerts are never shown from a Swift task or a dispatch block" \
+    "$f" '^[^/]*(Task \{|Task\.detached|DispatchQueue\.main\.async)'
+done
+require "the question comes through RunLoopAlert" Sources/SrtFlow/SubtitleEditsQuestion.swift 'await RunLoopAlert\.ask\('
+# Review CXM1: while a Save is still being written, only Keep Waiting / Cancel (never Don't Save), and Quit takes over from
+# the page's actions under way (one question, one Cancel).
+require "a subtitle whose Save is still being written is asked Keep Waiting / Cancel, never Don't Save" \
+  Sources/SrtFlow/BurnInSubtitleEdits.swift 'switch await SubtitleEditsQuestion\.askWhileWriting\('
+require "Quit takes over from the page's actions under way" Sources/SrtFlow/BurnInSubtitleEdits.swift '^        epoch \+= 1$'
+# Review CXM1: a time typed in a subtitle cell and not entered yet is a draft (PendingTimecode) that every check that asks
+# writes first: the page's ✕, Clear Finished and attach, both Quit entries, the standalone file's ✕ and its reopen; and
+# (review CXM2) the page action's second look before it acts, once its questions and saves are done.
+require "a cell's time still being typed is a draft the checks can write" \
+  Sources/SrtFlow/TimecodeField.swift 'PendingTimecode\.began\(cell\) \{ commit\(\) \}'
+require "a page action looks again before it acts (a time typed meanwhile, anything changed since the answers)" \
+  Sources/SrtFlow/BurnInSubtitleEdits.swift '\} while places\(\)\.contains \{ !discarded\.allows\(\$0, unsaved\(\$0\)\) \}'
+for pair in 'BurnInSubtitleEdits|4' 'ProjectQuit|2' 'SubtitleEditPanel|2'; do
+  file="Sources/SrtFlow/${pair%%|*}.swift"
+  COMMITS="$(grep -c 'PendingTimecode\.commit()' "${file}" || true)"
+  if [ "${COMMITS}" != "${pair#*|}" ]; then
+    echo "✗ 接线守卫：${file} writes a time still being typed before each check that asks (${pair#*|} places, found ${COMMITS})" >&2
+    WIRING_FAIL=1
+  fi
+done
 
 # Compress / Burn In (2026-11-19, docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md): ffmpeg writes only the
 # job's own claimed file, which is handed over through ExportDelivery as a new file (never replacing); a failed or

@@ -8,6 +8,9 @@
 # Compress / Burn In never overwrite or delete a file that is not the job's own
 # (docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md). The AI encode tools look at the files they are given,
 # and read and write subtitle files, off the main thread (docs/bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md).
+# A Burn In subtitle's unsaved edits are asked about before a video's ✕, Clear Finished or another subtitle file drops them
+# (docs/bugfixes/2026-11-28-burn-in-subtitle-edits-dropped-unasked.md); the editor's Export As writes only the subtitle it
+# was pressed for, unedited (docs/bugfixes/2026-11-28-subtitle-replace-writes-another-subtitle.md).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . scripts/test-app-cleanup.sh
@@ -37,6 +40,8 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/M
   checks/ExportProfile/PanelTargetChecks.swift checks/ExportProfile/SubtitlePanelChecks.swift \
   checks/ExportProfile/EncodeQueueChecks.swift \
   checks/ExportProfile/EncodeOffMainChecks.swift checks/ExportProfile/EncodeInputsOffMainChecks.swift \
+  checks/Shared/SubtitleEditsBench.swift checks/ExportProfile/SubtitleEditsChecks.swift \
+  checks/ExportProfile/SubtitleExportChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/ExportProfileCheck"
 FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"
 "${FFMPEG}" -hide_banner -loglevel error -nostdin -f lavfi -i color=c=blue:s=320x180:r=30 \

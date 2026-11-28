@@ -19,9 +19,12 @@ final class StandaloneSubtitleStore: ObservableObject {
     private init() {}
 
     func open(_ fileURL: URL) {
-        // 手里这份还没保存就别悄悄换掉，那等于把用户的编辑扔了。
-        if hasUnsavedEdits, url != fileURL {
-            notice = String(
+        // 手里这份还没保存就别悄悄换掉，那等于把用户的编辑扔了。The open file itself, opened again (a double-click, a drop),
+        // keeps its unsaved edits too: it is never read again over them (docs/architecture/export-settings.md §9 item 6;
+        // docs/bugfixes/2026-11-28-burn-in-subtitle-edits-dropped-unasked.md). Without edits it is read again.
+        PendingTimecode.commit()
+        if hasUnsavedEdits {
+            notice = url == fileURL ? nil : String(
                 format: L10n("Save or close %@ before opening another subtitle file."),
                 url?.lastPathComponent ?? "?"
             )
@@ -62,10 +65,10 @@ struct SubtitleEditPanel: View {
 
     @State private var selection = Set<UUID>()
     @State private var followsPlayback = true
-    @State private var saveError: String?
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
+        // A save that wrote nothing says so in an app-level alert (SubtitleEditorExport.tell), seen off this page too.
         VStack(spacing: 0) {
             header
             Divider()
@@ -74,14 +77,6 @@ struct SubtitleEditPanel: View {
             } else {
                 cueTable
             }
-        }
-        .alert("Could Not Save", isPresented: Binding(
-            get: { saveError != nil },
-            set: { if !$0 { saveError = nil } }
-        )) {
-            Button("OK") { saveError = nil }
-        } message: {
-            Text(saveError ?? "")
         }
     }
 
@@ -148,6 +143,7 @@ struct SubtitleEditPanel: View {
                 }
                 if isStandalone {
                     Button {
+                        PendingTimecode.commit()   // a time still being typed is an edit too
                         if standalone.hasUnsavedEdits {
                             standalone.notice = L10n("Save the changes first, or export a copy.")
                         } else {
@@ -178,13 +174,13 @@ struct SubtitleEditPanel: View {
 
                     Menu("Export As") {
                         ForEach(SubtitleFormat.allCases, id: \.self) { format in
-                            Button(format.displayName) { exportAs(format) }
+                            Button(format.displayName) { export.exportAs(format, boundTo: itemID) }
                         }
                     }
                     .fixedSize()
                     .controlSize(.small)
 
-                    Button("Save") { save() }
+                    Button("Save") { export.save(boundTo: itemID) }
                         .controlSize(.small)
                         .disabled(!hasUnsavedEdits)
                         .instantHelp("Write the changes back to the subtitle file", shortcut: .command("S"))
@@ -328,59 +324,10 @@ struct SubtitleEditPanel: View {
         selection.removeAll()
     }
 
-    private func save() {
-        guard let document else { return }
-        guard let url = subtitleURL else {
-            exportAs(document.format)
-            return
-        }
-        write(document.format, to: SaveLocation(url: url, mayReplace: true))   // its own file
-    }
-
-    private func exportAs(_ format: SubtitleFormat) {
-        guard let picked = document else { return }
-        let base = subtitleURL?.deletingPathExtension().lastPathComponent ?? picked.title
-        FilePicker.chooseSaveLocation(types: [format.utType], name: "\(base).\(format.fileExtension)") { location in
-            write(format, to: location)
-        }
-    }
-
-    /// Writes what the document holds now (the save window is not modal), off the main thread (SubtitleFileSave). A file
-    /// already there is replaced only when allowed — its own file, or confirmed in macOS's own window — or when the person
-    /// answers Replace to the question asked here (a typed or dropped answer, SaveLocation.swift). The document is marked
-    /// saved when the write lands, even after "not responding", and only if it still is what was written: an edit made
-    /// meanwhile, or another document in the panel, stays unsaved.
-    private func write(_ format: SubtitleFormat, to location: SaveLocation) {
-        guard let document else { return }
-        let item = boundItem?.id
-        let data = SubtitleFileSave.data(document, format: format)
-        Task {
-            let answer = await SubtitleFileSave.write(data, to: location.url, replacing: location.mayReplace) { landed in
-                // 导出成同一个文件（等于就是保存），未保存标记也该消掉。
-                guard landed == .written, location.url == subtitleURL, format == document.format, boundItem?.id == item,
-                      self.document == document else { return }
-                markSaved()
-            }
-            switch answer {
-            case .written: break
-            case .occupied:
-                if FileReplaceQuestion.ask(location.url) { write(format, to: SaveLocation(url: location.url, mayReplace: true)) }
-            case .failed(let reason): saveError = reason
-            case .notResponding:
-                saveError = String(
-                    format: L10n("The drive with “%@” is not responding. It may be asleep or disconnected, or macOS may be asking for permission."),
-                    ProjectSaveText.driveName(of: location.url)
-                )
-            }
-        }
-    }
-
-    private func markSaved() {
-        if let id = boundItem?.id {
-            queue.markBurnInSaved(for: id)
-        } else {
-            standalone.hasUnsavedEdits = false
-        }
+    /// Save and Export As: the subtitle shown when the button is pressed, written only while it is still there unedited
+    /// (SubtitleEditorExport, which also tells the person when nothing was written).
+    private var export: SubtitleEditorExport {
+        SubtitleEditorExport(subtitles: BurnInSubtitles(queue: queue, standalone: standalone))
     }
 }
 
@@ -409,39 +356,4 @@ struct CurrentCueHighlight: ViewModifier {
     }
 }
 
-/// 可编辑的时间码格子：回车或失焦时提交，输入不合法就回退。
-struct TimecodeField: View {
-    @Binding var value: TimeInterval
-    @State private var text: String
-    @FocusState private var focused: Bool
-
-    init(value: Binding<TimeInterval>) {
-        _value = value
-        _text = State(initialValue: Timecode.formatMillis(value.wrappedValue, separator: ","))
-    }
-
-    var body: some View {
-        let _ = PerfCounters.body(Self.self)
-        TextField("", text: $text)
-            .focused($focused)
-            .onSubmit { commit() }
-            .onChange(of: focused) { _, isFocused in if !isFocused { commit() } }
-            .onChange(of: value) { _, newValue in
-                guard !focused else { return }
-                text = Timecode.formatMillis(newValue, separator: ",")
-            }
-            .monospacedDigit()
-    }
-
-    private func commit() {
-        guard let parsed = Timecode.parse(text) else {
-            text = Timecode.formatMillis(value, separator: ",")
-            return
-        }
-        value = parsed
-        // **回读，别显示 parsed。** 绑定有权拒绝（字幕表那边就拒绝 start >= end），
-        // 显示 parsed 会让格子里挂着一个根本没生效的时间：界面说 4 秒、
-        // 存盘和导出还是 1 秒，用户毫不知情（2026-08-12 复审 P2）。
-        text = Timecode.formatMillis(value, separator: ",")
-    }
-}
+// The start / end cells are TimecodeField (TimecodeField.swift).

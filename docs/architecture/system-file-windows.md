@@ -80,18 +80,32 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
    in the branch the person confirmed and commits every other name with one rename that fails when the name is taken,
    journaled first ([recording lifecycle](screen-recording-lifecycle.md) "文件覆盖与命名"). The AI's saves pick unused names
    and never replace a file (only `save_project` back to the project's own file).
+   **The Burn In subtitle editor writes only the subtitle Export As was pressed for** (since 2026-11-28,
+   [case](../bugfixes/2026-11-28-subtitle-replace-writes-another-subtitle.md)): `SubtitleEditorExport` takes the panel's
+   place (its preview row, or the standalone file) and what it holds when Save or Export As is pressed. Before each write,
+   when the save window answers and again when Replace is answered, that place must still hold exactly that subtitle,
+   unedited; otherwise nothing is written and the person is told "Nothing was written: the subtitle changed. Export
+   again." The retry never takes whatever the panel shows by then. "That place" is the row or the standalone file, not
+   the panel: the preview moving to another video's row while the standalone file stays open, unedited, still exports
+   that file. Its Replace question is asked from a run-loop turn (`FileReplaceQuestion.askFromRunLoop`, rule 10), and what
+   a save has to say ("Could Not Save" with the reason) is an app-level alert from a run-loop turn, seen even after the
+   person has left the Burn In page (review CXM1).
 10. **An alert's modal loop runs from the run loop, never inside a Swift task** (since 2026-11-27,
     [case](../bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md)). While `runModal` runs, every event
     goes through AppKit's handlers, and AppKit swallows an Objective-C exception raised there. Raised under a modal loop
     that runs inside a task, the exception unwinds the task and the Swift runtime's `swift_job_run`, which then never puts
     the thread's executor tracking back. The next main-actor isolation check outside a task (`MainActor.assumeIsolated`,
     an event monitor) reads a dead stack frame and crashes. That is how Check for Updates… crashed 0.18.70.
-    - Show a new alert from a run-loop turn: `RunLoop.main.perform { MainActor.assumeIsolated { … } }`, as the update
-      check's answer does ([app updates](app-updates.md) §7). Not `Task { }`. Not `DispatchQueue.main.async` either: an
-      exception escaping a dispatch block terminates the app.
-    - Still inside tasks on 2026-11-27, because they await the answer: the untitled-project save question
+    - Show a new alert from a run-loop turn: `RunLoop.main.perform { MainActor.assumeIsolated { … } }`. Not `Task { }`.
+      Not `DispatchQueue.main.async` either: an exception escaping a dispatch block terminates the app.
+    - Better still, no modal loop at all. Since 2026-11-28 the update check's answer is a non-modal window, opened and
+      answered the same way ([app updates](app-updates.md) §7, the check window).
+    - A caller inside a task that awaits the answer uses `RunLoopAlert` (a run-loop timer, also in the modal-panel mode
+      Quit's wait runs in, never inside another alert): the Burn In subtitle questions and the subtitle editor's Replace
+      (`FileReplaceQuestion.askFromRunLoop`), since 2026-11-28.
+    - Still inside tasks on 2026-11-28, because they await the answer: the untitled-project save question
       (`ProjectCloseQuestions`, from `prepareToClose`), the drive question at quit (`ProjectQuit.waitForDrive`) and
-      `FileReplaceQuestion`. Moving one out of its task is a change of its own.
+      `FileReplaceQuestion.ask` for the project's Save As. Moving one out of its task is a change of its own.
 
 ## Checks
 
@@ -102,8 +116,9 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
 | `scripts/check-export-profile.sh` (`SaveAnswerChecks`) | an answer from macOS's own save window may replace a file that is there, never a free name (a file saved there after the answer keeps its bytes), nothing when the drive doesn't answer the look; a typed folder, a dropped folder and a typed path from the helper may not; a confirmation covers only its URL (rule 9) |
 | `scripts/check-screen-recording-feedback.sh` (`RecordingCommitChecks`) | a recording's commit: a file that appears at a free name or at the sidecar's name after the intent was journaled keeps its bytes, the file takes the next name and the journal names it; a confirmed commit replaces (rule 9) |
 | `scripts/check-project-saves.sh` (`ReplaceChecks`) | a file under the answered name keeps its bytes until the person answers Replace: the project's Save As for each helper answer, closing an untitled project, the AI's saves, the subtitle file write (rule 9) |
-| `checks/file-io-off-main-wiring.sh` | panels only in `SystemFileChooser.swift`, `begin`, no `runModal` in the chooser / shared windows / helper / export panel, the record before AppKit, `FilePicker` through `SystemFileWindows`; the Close It strip only from `offerToCloseOpenWindow` (a second request) and no sleep or timer in `SystemFileWindows` (rule 5); rule 9's wiring (helper answers unconfirmed, the exclusive install, Save As and Export As asking, the recording's confirmation) |
-| `checks/app-update-wiring.sh` (section 10) | rule 10 for the update check's answer window: shown with `RunLoop.main.perform`, never in a `Task` or `DispatchQueue.main.async`. The other alerts are not scanned (they run inside their tasks today, rule 10) |
+| `scripts/check-export-profile.sh` (`SubtitleExportChecks`) | rule 9's Burn In subtitle editor, through the panel's own `exportAs` / `save` with a save window answered late and the real "Replace?" and "Could Not Save" alerts' buttons pressed by title: another subtitle in its place, the subtitle edited, or its video gone by the time Replace is answered writes nothing and says so in an app-level alert; unchanged, Replace writes it; a window answered after another subtitle took its place writes nothing; the preview moving to another row still exports the standalone file; Save marks the subtitle saved; no alert, Replace included, inside a Swift task (rule 10) |
+| `checks/file-io-off-main-wiring.sh` | panels only in `SystemFileChooser.swift`, `begin`, no `runModal` in the chooser / shared windows / helper / export panel, the record before AppKit, `FilePicker` through `SystemFileWindows`; the Close It strip only from `offerToCloseOpenWindow` (a second request) and no sleep or timer in `SystemFileWindows` (rule 5); rule 9's wiring (helper answers unconfirmed, the exclusive install, Save As and Export As asking, the recording's confirmation; the subtitle panel's buttons only through `SubtitleEditorExport`, whose writes check the subtitle pressed for first) |
+| `checks/app-update-wiring.sh` (section 10) | rule 10 for the update check's window (since 2026-11-28 not modal): no `runModal` or `NSAlert` in the updater; opened and answered only by `RunLoop.main.perform` calls, never in a `Task` or `DispatchQueue.main.async`; the window starts no task itself. The other alerts are not scanned (they run inside their tasks today, rule 10) |
 
 ## Manual regression (real windows, before a release)
 
@@ -134,6 +149,13 @@ The real panel service can't be driven from a check (it needs the window server,
    recording lands as "Name 2" and the Finder file is untouched.
    The subtitle editor's Export As onto a USB hard drive that has gone to sleep: SkyCut stays responsive while it spins
    up, and says the drive is not responding if it takes over 15 s.
+   On the Burn In page, with no video, open subtitle A on its own and press Export As. With the save window still open:
+   (a) type into A, or drag another subtitle B from Finder onto the page while A has no edits (B takes A's place: the
+   editor's title becomes B; a double-click in Finder while the page is open only stages B), then choose a name: nothing is
+   written, and an alert says "Nothing was written: the subtitle changed. Export again.", also when you went to another
+   page before choosing; (b) instead add a video with subtitle B, so the preview and the editor move to B's row while A
+   stays open on its own, unedited, then choose a name: A is exported and nothing is said. Answer a typed path to an
+   existing file with Replace: the question is SkyCut's own, and the result follows (a) or (b) in the same way.
 6. Chinese and Spanish UI: the strip, the helper and the replace question are translated (in-process windows with
    `.appLanguage()`; the question is an `NSAlert` with SkyCut's own strings).
 7. Across choosers (review CXC2): leave Open Project…'s window open, then in Export click the folder button. No second

@@ -35,6 +35,38 @@ enum SubtitleFileSave {
     }
     /// One write at a time, in the order asked: two saves of the same file land in order.
     private static let queue = DispatchQueue(label: "SrtFlow.subtitleFile", qos: .userInitiated)
+    /// Writes asked for and not landed yet, per file (also after "not responding": the write goes on).
+    @MainActor private static var writing: [String: Int] = [:]
+    /// Why the last write of each file failed, until a later write of it lands, from whichever saver (review CXM3).
+    @MainActor private static var failed: [String: String] = [:]
+
+    /// Why the last write of `url` failed, when no write of it has landed since: told in the next question about it.
+    @MainActor
+    static func lastFailure(_ url: URL) -> String? { failed[key(url)] }
+
+    /// A write to `url` has not landed yet: nothing may read the file into an editor, or drop what it is writing, before it
+    /// does (BurnInSubtitleEdits, review CXM1).
+    @MainActor
+    static func isWriting(_ url: URL) -> Bool { writing[key(url), default: 0] > 0 }
+
+    /// Waits until no write to `url` is on its way, at most `deadline`. false: one still is.
+    @MainActor
+    static func waitUntilWritten(_ url: URL, deadline: TimeInterval) async -> Bool {
+        let end = ProcessInfo.processInfo.systemUptime + max(0, deadline)
+        while isWriting(url), ProcessInfo.processInfo.systemUptime < end { try? await Task.sleep(nanoseconds: 50_000_000) }
+        return !isWriting(url)
+    }
+
+    private static func key(_ url: URL) -> String { url.standardized.path }
+
+    /// What the person is told when the drive with `url` did not answer within the deadline.
+    @MainActor
+    static func notRespondingText(_ url: URL) -> String {
+        String(
+            format: L10n("The drive with “%@” is not responding. It may be asleep or disconnected, or macOS may be asking for permission."),
+            ProjectSaveText.driveName(of: url)
+        )
+    }
 
     /// The file's bytes.
     static func data(_ document: SubtitleDocumentModel, format: SubtitleFormat) -> Data {
@@ -54,6 +86,8 @@ enum SubtitleFileSave {
         let perform = perform
         let wait = Waiting()
         let seconds = deadline ?? Self.deadline
+        let file = key(url)
+        writing[file, default: 0] += 1
         return await withCheckedContinuation { continuation in
             wait.continuation = continuation
             queue.async {
@@ -65,6 +99,13 @@ enum SubtitleFileSave {
                 }
                 DispatchQueue.main.async {
                     MainActor.assumeIsolated {
+                        writing[file, default: 1] -= 1
+                        if writing[file] == 0 { writing[file] = nil }
+                        switch answer {
+                        case .written: failed[file] = nil
+                        case .failed(let reason): failed[file] = reason
+                        case .occupied, .notResponding: break
+                        }
                         wait.answer(answer)
                         landed(answer)
                     }

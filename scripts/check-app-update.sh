@@ -1,12 +1,13 @@
 #!/bin/bash
 # SkyCut's updater (docs/architecture/app-updates.md): the feed's strict parsing, version order, who updates, the state
-# machine, the retry record and what a restart waits for (pure), then the real flow against scratch folders: a loopback HTTP
-# server (python3's http.server on 127.0.0.1, never the network) serving a feed and a DMG, real read-only images (hdiutil,
-# -nobrowse at scratch mount points), the pipeline with kept downloads, staging with ad-hoc signed fixture bundles, the
-# install at quit, a loop of atomic swaps killed at random instants (the app is never missing or half-written), what a
-# launch reads and cleans, and the relaunch shell (with a recorder for /usr/bin/open). Every request's headers are recorded:
-# nothing beyond the allow-list below (no identifier). Launches no App; never touches the real /Applications, the Trash,
-# Application Support or a running SkyCut. Needs codesign, hdiutil and python3 (CI's macOS runners have them).
+# machine, the retry record, what a restart waits for, and the menu check's window and menu item (pure), then the real
+# flow against scratch folders: a loopback HTTP server (python3's http.server on 127.0.0.1, never the network) serving a
+# feed and a DMG, real read-only images (hdiutil, -nobrowse at scratch mount points), the pipeline with kept downloads,
+# staging with ad-hoc signed fixture bundles, the install at quit, a loop of atomic swaps killed at random instants (the
+# app is never missing or half-written), what a launch reads and cleans, and the relaunch shell (with a recorder for
+# /usr/bin/open). Every request's headers are recorded: nothing beyond the allow-list below (no identifier). Launches no
+# App; never touches the real /Applications, the Trash, Application Support or a running SkyCut. Needs codesign, hdiutil
+# and python3 (CI's macOS runners have them).
 set -euo pipefail
 . "$(dirname "$0")/native-arch.sh"
 cd "$(dirname "$0")/.."
@@ -38,6 +39,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -wmo \
   Sources/SrtFlow/AppUpdate/AppUpdateRetry.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateEligibility.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateState.swift \
+  Sources/SrtFlow/AppUpdate/AppUpdateCheckFlow.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateStatusReport.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateBusy.swift \
   Sources/SrtFlow/AppUpdate/AppUpdateFiles.swift \
@@ -57,6 +59,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -wmo \
   checks/AppUpdate/FeedChecks.swift \
   checks/AppUpdate/EligibilityChecks.swift \
   checks/AppUpdate/StateChecks.swift \
+  checks/AppUpdate/CheckWindowChecks.swift \
   checks/AppUpdate/StatusReportChecks.swift \
   checks/AppUpdate/FlowChecks.swift \
   checks/AppUpdate/PipelineChecks.swift \

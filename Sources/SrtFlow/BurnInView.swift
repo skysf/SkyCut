@@ -13,6 +13,8 @@ struct BurnInView: View {
     @StateObject private var handoff = BurnInHandoff.shared
     /// 没配到视频、单独打开编辑的字幕文件。
     @StateObject private var standalone = StandaloneSubtitleStore.shared
+    /// Anything that would drop a subtitle's unsaved edits asks first: another file for a video, ✕, Clear Finished.
+    private let subtitleEdits = BurnInSubtitleEdits.shared
     /// 拖边距滑块时预览上闪出的参考线。
     @StateObject private var guides = MarginGuideFlash()
     /// 预览播放器。放在这一层而不是预览视图里：放大/还原时预览视图会被重建，
@@ -218,7 +220,7 @@ struct BurnInView: View {
                     .instantHelp("Start encoding everything in the queue", shortcut: .commandReturn)
                 }
 
-                Button("Clear Finished") { queue.clearFinished() }
+                Button("Clear Finished") { subtitleEdits.clearFinished() }
                     .instantHelp("Remove finished items from the list")
                     .disabled(!queue.items.contains(where: \.isDone))
 
@@ -384,15 +386,16 @@ struct BurnInView: View {
         let pairs = SubtitleLoader.match(videos: unpaired, subtitles: subtitles)
         for (video, subtitle) in pairs {
             guard let item = queue.items.first(where: { $0.inputURL == video }) else { continue }
-            attach(subtitle: subtitle, to: item.id)
+            subtitleEdits.attach(subtitle, to: item.id)
         }
 
         // 配不上的字幕也不能扔：还有缺字幕的视频就给第一个，一个视频都没有
         // 就当作独立的字幕文件打开来编辑 —— 双击 .srt 进来走的就是这条路。
+        // A video just paired is not waiting any more, even while its unsaved edits are still being asked about.
         let leftovers = subtitles.filter { !pairs.values.contains($0) }
         if let first = leftovers.first {
-            if let waiting = queue.items.first(where: { ($0.burnIn?.cues.isEmpty ?? true) && !$0.isDone }) {
-                attach(subtitle: first, to: waiting.id)
+            if let waiting = queue.items.first(where: { ($0.burnIn?.cues.isEmpty ?? true) && !$0.isDone && pairs[$0.inputURL] == nil }) {
+                subtitleEdits.attach(first, to: waiting.id)
             } else {
                 standalone.open(first)
             }
@@ -404,39 +407,8 @@ struct BurnInView: View {
         FilePicker.chooseFiles(types: SubtitleFileTypes.readable, allowsMultiple: false) { urls in
             // The window is not modal: the video may have left the queue while it was open.
             guard let url = urls.first, queue.items.contains(where: { $0.id == id }) else { return }
-            attach(subtitle: url, to: id)
+            subtitleEdits.attach(url, to: id)
             requestPreviewSoon()
-        }
-    }
-
-    private func attach(subtitle: URL, to id: EncodeItem.ID) {
-        do {
-            let document: SubtitleDocumentModel
-            if standalone.url == subtitle, let edited = standalone.document, standalone.hasUnsavedEdits {
-                // 这个文件正在字幕列里改着呢，配给视频时要带着没保存的改动走，
-                // 不能从磁盘重读一份把编辑丢了。
-                document = edited
-                queue.updateBurnIn(
-                    BurnInRequest(subtitleURL: subtitle, document: document, hasUnsavedEdits: true),
-                    for: id
-                )
-                standalone.clear()
-            } else {
-                document = try SubtitleLoader.load(subtitle)
-                queue.updateBurnIn(BurnInRequest(subtitleURL: subtitle, document: document), for: id)
-                if standalone.url == subtitle { standalone.clear() }
-            }
-            if document.cues.isEmpty {
-                queue.setError(
-                    String(
-                        format: L10n("No subtitle lines found in %@."),
-                        subtitle.lastPathComponent
-                    ),
-                    for: id
-                )
-            }
-        } catch {
-            queue.setError(error.localizedDescription, for: id)
         }
     }
 
@@ -588,7 +560,8 @@ private struct BurnInRow: View {
                     .instantHelp("Cancel")
             }
             if !item.isActive {
-                Button { queue.remove(id: item.id) } label: { Image(systemName: "xmark") }
+                // A subtitle with unsaved edits is asked about first (BurnInSubtitleEdits).
+                Button { BurnInSubtitleEdits.shared.remove(item.id) } label: { Image(systemName: "xmark") }
                     .buttonStyle(.borderless)
                     .instantHelp("Remove from list")
             }

@@ -3,6 +3,8 @@
 # on the main thread (docs/bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md), on real App objects: a fake drive that
 # is slow, stuck (held until the check lets it go) or failing stands in for the disk; the moved-file and Save As cases write
 # real files. Isolated bundle id (its own preferences) and a temporary folder: never touches the user's SkyCut or projects.
+# Quit also asks about the Burn In page's subtitles with unsaved edits
+# (docs/bugfixes/2026-11-28-burn-in-subtitle-edits-dropped-unasked.md).
 # Links the full App's object files (shard 1 of scripts/check-all.sh). No ffmpeg.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -28,6 +30,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/M
   checks/ProjectSaves/Main.swift checks/ProjectSaves/SaveChecks.swift checks/ProjectSaves/CloseQuitChecks.swift \
   checks/ProjectSaves/EditWhileClosingChecks.swift checks/ProjectSaves/ReplaceChecks.swift \
   checks/ProjectSaves/OffMainWriteChecks.swift checks/ProjectSaves/UntitledContentChecks.swift \
+  checks/Shared/SubtitleEditsBench.swift checks/ProjectSaves/SubtitleQuitChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/ProjectSavesCheck"
 SRTFLOW_PROJECT_SAVES_CHECK_DIR="${ROOT}/work" SRTFLOW_VERSIONS_ROOT="${ROOT}/versions" \
 SRTFLOW_SMOKE_SCRIPT="${ROOT}/isolated" SRTFLOW_SMOKE_MUTE=1 \

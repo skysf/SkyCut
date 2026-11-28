@@ -196,10 +196,10 @@ final class EncodeQueue: ObservableObject {
         items[index].burnIn = request
     }
 
-    /// 字幕写回文件之后清掉未保存标记。
-    func markBurnInSaved(for id: EncodeItem.ID) {
+    /// 字幕写回文件之后清掉未保存标记。`saved` false: the file now holds something else, so the subtitle is unsaved again.
+    func markBurnInSaved(_ saved: Bool = true, for id: EncodeItem.ID) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
-        items[index].burnIn?.hasUnsavedEdits = false
+        items[index].burnIn?.hasUnsavedEdits = !saved
     }
 
     /// 显示一条与执行无关的错误（比如字幕文件读不出来）。

@@ -8,9 +8,10 @@ import Foundation
 // install off, or one that can't update itself) shows New Version; the first launch after an update shows Updated until its
 // notes are viewed. A copy an earlier run staged stays unseen, and never installs, until this launch's first check has
 // confirmed the feed still names it or failed to reach the feed: a pulled release never goes in at a quit that comes first.
-// A DMG that downloaded whole and then failed is held back from automatic checks (AppUpdateRetryRecord). Nothing here ever
-// opens a window: only a check the person started from the menu gets an answer (AppUpdateCheckAnswer). Pure, so the checks
-// drive every transition.
+// A DMG that downloaded whole and then failed is held back from automatic checks (AppUpdateRetryRecord). Only a check the
+// person started from the menu has a window (it opens as the check starts) and gets an answer (AppUpdateCheckAnswer); its
+// Cancel stops the check only if nothing else (the schedule, Settings) asked for it. Pure, so the checks drive every
+// transition.
 // What it doesn't: run the effects (AppUpdater), decide who updates (AppUpdateEligibility), what a restart waits for
 // (AppUpdateBusy).
 // Rules: docs/architecture/app-updates.md "States".
@@ -25,7 +26,7 @@ enum AppUpdateMode: Equatable, Sendable {
 
 /// Who started a check. The schedule's is never answered and never fetches a DMG the retry record holds back; the person's
 /// (Settings' button, answered in its status line; the app menu's, answered with a window) always fetches it.
-enum AppUpdateCheckOrigin: Equatable, Sendable {
+enum AppUpdateCheckOrigin: Hashable, Sendable {
     case schedule, settings, menu
 
     var byPerson: Bool { self != .schedule }
@@ -54,6 +55,8 @@ enum AppUpdateEvent: Equatable, Sendable {
     case checkStarted(AppUpdateCheckOrigin)
     /// `at`: when the check finished (the retry record's clock).
     case checkFinished(AppUpdateCheckResult, at: Date)
+    /// Cancel in the menu check's window: nothing is known about the feed (never a failed check).
+    case checkCancelled
     /// Download and Install (auto install off).
     case downloadAsked
     case downloadProgress(Double?)
@@ -80,13 +83,17 @@ enum AppUpdateEffect: Equatable, Sendable {
     case discardDownloads(keeping: AppUpdateFeed?)
     /// Keep the retry record on disk (nil: remove it).
     case saveRetry(AppUpdateRetryRecord?)
+    /// The person chose Check for Updates…: its window opens (AppUpdateCheckFlow: checking, or straight on a quick answer).
+    case openCheckWindow
+    /// Cancel in that window: stop the check in flight (nothing else shares it).
+    case stopCheck
     case answer(AppUpdateCheckAnswer)
 
     /// Reads or writes the Updates folder: never for a copy that only tells (it may share the folder with one that installs).
     var touchesFiles: Bool {
         switch self {
         case .download, .discardStaged, .discardDownloads, .saveRetry: return true
-        case .cancelDownload, .answer: return false
+        case .cancelDownload, .openCheckWindow, .stopCheck, .answer: return false
         }
     }
 }
@@ -115,6 +122,8 @@ struct AppUpdateState: Equatable, Sendable {
     var personChecking = false
     /// The check in flight was started (or joined) by the person: it fetches a DMG the retry record holds back.
     var personStarted = false
+    /// Who else (the schedule, Settings) started or joined the check in flight: the window's Cancel then leaves it running.
+    var sharedWith: Set<AppUpdateCheckOrigin> = []
     /// The last check failed (offline, a server error, a malformed feed): only Settings' status line says so.
     var lastCheckFailed = false
     /// Download and Install was clicked for `offer` (auto install off): it installs at quit like an automatic one.
@@ -130,9 +139,9 @@ struct AppUpdateState: Equatable, Sendable {
     var unconfirmed: AppUpdateStagedRecord?
     /// The DMG held back from automatic checks (Updates/retry.json).
     var retry: AppUpdateRetryRecord?
-    /// The newest release a check found, for reporting only (get_status's `app_update`, AppUpdateStatusReport): an
-    /// automatic download that failed or a DMG the retry record holds back clears `offer`, but SkyCut still knows the
-    /// version. No transition reads it; a check that finds nothing newer clears it (review FBG1, E1).
+    /// The newest release a check found, for reporting only (get_status's `app_update`, AppUpdateStatusReport; the check
+    /// window's AppUpdateCheckDisplay): an automatic download that failed or a DMG the retry record holds back clears
+    /// `offer`, but SkyCut still knows the version. No transition reads it; a check that finds nothing newer clears it.
     var lastFound: AppUpdateFeed?
 
     var pill: Pill? {
@@ -169,15 +178,27 @@ struct AppUpdateState: Equatable, Sendable {
         case .checkStarted(let origin):
             checking = true
             if origin.byPerson { personStarted = true }
-            if origin == .menu { personChecking = true }
-            return []
+            guard origin == .menu else { sharedWith.insert(origin); return [] }
+            personChecking = true
+            return [.openCheckWindow]
         case .checkFinished(let result, let now):
             checking = false
             let answering = personChecking, byPerson = personStarted
             personChecking = false
             personStarted = false
+            sharedWith = []
             let (effects, answer) = finish(result, mode: mode, byPerson: byPerson, now: now)
             return effects + (answering ? [.answer(answer)] : [])
+        case .checkCancelled:
+            // Only the window's part ends. The request stops only if nobody else asked for it: a check the schedule or
+            // Settings shares goes on, unanswered by the window (Settings' still the person's). Nothing about the feed is
+            // known: no failed check, no settled staged copy, the retry record as it was.
+            guard checking, personChecking else { return [] }
+            personChecking = false
+            personStarted = sharedWith.contains(.settings)
+            guard sharedWith.isEmpty else { return [] }
+            checking = false
+            return [.stopCheck]
         case .downloadAsked:
             guard phase == .available, let offer, case .install = mode else { return [] }
             phase = .downloading

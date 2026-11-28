@@ -504,6 +504,8 @@ a project file can live on a sleeping, slow, read-only or stuck external drive, 
    mark carries the document generation taken right before asking, and another document opened in that project since (an
    Open that waited for the write, the AI's `open_project`) is settled like any other. Whatever Quit remembers about a
    project is compared by document generation, never by object identity alone.
+   Since 2026-11-28 the Burn In page's subtitles with unsaved edits are settled on the same path, after the projects, and
+   are part of that last look ([export settings](export-settings.md) §9): `.terminateNow` also needs none of them.
 7. Behaviour: `scripts/check-project-saves.sh`.
 
 ### What an empty project is (2026-11-27)

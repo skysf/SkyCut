@@ -100,6 +100,7 @@
   Since 2026-11-19 also Compress / Burn In (`EncodeQueueChecks`, real encodes): two inputs with one file name get two names and read back as their own, a new output folder names them apart, a file that appears at a planned name is kept and the encode moves on (also through `compress_videos` and its `get_job`), and a failed, cancelled or quit job leaves the file at its name alone and nothing of its own; the rules are in [导出设置](../architecture/export-settings.md) §5 item 8.
   Their names and folders off the main thread (`EncodeOffMainChecks`, since the same day): a taken name is passed once the folder's names are back (adding, another output folder), a fake drive that never answers leaves adding immediate and the main thread free, `compress_videos` names past a taken file before answering and refuses a stuck or read-only folder with the panel's sentence, nothing queued and no job ([case](../bugfixes/2026-11-19-drive-checks-on-main-thread.md)).
   The files the AI encode tools are given (`EncodeInputsOffMainChecks`, since the same day; a recording fake drive): `compress_videos` and `burn_subtitles` look at them through the probe, `burn_subtitles` reads a slow subtitle file and `convert_subtitles` reads a slow one and writes the new one there, never on the main thread (longest main-thread gap under 0.5 s), and a file on a drive that never answers, or a read that never comes back, is refused at the deadline ([case](../bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md)).
+  Unsaved Burn In subtitle edits (`SubtitleEditsChecks`, since 2026-11-28): the page's own calls (`BurnInSubtitleEdits`) on a real queue and real files, with the production alert's buttons pressed by title. A row's ✕, Clear Finished and another subtitle file (or the same one again) ask Save / Don't Save / Cancel; Cancel keeps, Don't Save lets go, Save writes first, a failed Save asks again with the reason; nothing is asked without edits; an edit typed while a Save is written is asked about again; a finished row edited after its Don't Save stays; a later choice for the same video wins; no question inside a Swift task; the open standalone file opened again keeps its edits; review CXM1: a Save still being written past its deadline is asked Keep Waiting / Cancel only (never Don't Save), nothing is read over the edits and the landing marks the row by the drive, a file being written is read into a video only after its write landed, a time still being typed is asked about at ✕; review CXM2: two Saves with the text put back stay unsaved and ✕ asks, an unedited subtitle still being written makes ✕ ask, a time typed while ✕'s Save is written is asked about, a failure after Cancel is shown next time and cleared by a later Save from the panel ([export settings](../architecture/export-settings.md) §9, [case](../bugfixes/2026-11-28-burn-in-subtitle-edits-dropped-unasked.md)). The editor's Export As (`SubtitleExportChecks`, the same day): through the panel's `exportAs` / `save` with a save window answered late and the real "Replace?" and "Could Not Save" buttons pressed by title, Replace or a late window writes only the subtitle pressed for, unedited; another subtitle in its place, an edit or its video gone writes nothing and says so in an app-level alert; the preview moving to another row still exports the standalone file; another format onto its own file leaves it unsaved; no alert, Replace included, inside a Swift task ([system file windows](../architecture/system-file-windows.md) rules 9 and 10, [case](../bugfixes/2026-11-28-subtitle-replace-writes-another-subtitle.md)). `checks/file-io-off-main-wiring.sh` pins the page's ✕, Clear Finished and attach, Quit's settle and take-over, the alerts' run-loop timer, Keep Waiting while writing, the time-cell draft and the panel's two buttons.
 
 - 公开制作状态：`scripts/check-film-production.sh` / `checks/film-production-wiring.sh`（真实模型的图 / CAS、绑定与审查失效、实际转场 / 画布 / 混音、原生帧角色、目录换 Key；完整工具 / undo / 后台媒体另经 MCP 验收），合同见[官方原创短片](../architecture/official-film.md)。
 
@@ -136,6 +137,7 @@
 
 - A project's own file written off the main thread (2026-11-19): `scripts/check-project-saves.sh` (real App objects in an isolated bundle, temporary projects, shard 1; a fake drive that holds each write until the check lets it go, never longer than 3 s, or fails): the autosave with the main thread free, flush / ⌘S answering "not responding" at the deadline and landing later, an edit during a write keeping the project dirty, saves coalesced while one is held, a failing drive refused, a moved project file followed, switching away / Save As / the AI's save_project with a stuck drive, `closesAtOnce`, and Quit (a quiet wait, one question when asked twice, Don't Quit / Quit Anyway / a write ending while asking). `checks/file-io-off-main-wiring.sh` pins that production code never calls the blocking saves. Rules and reverse verification: [project file](../architecture/video-edit-project-file.md) §5, [case](../bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md).
 - What an empty project is (2026-11-27): `scripts/check-project-file.sh` group 54 (`EmptyProject.swift`: each kind of content alone — ruler markers with or without a note, review reasons and a pinned Sky Studio style version included — is not empty; each setting alone, and a preset's style record, is; files holding only ruler markers or only review reasons read back not empty) and `scripts/check-project-saves.sh` (`UntitledContentChecks`: an untitled project with only a ruler marker and its note does not close at once and is asked about on closing, New Project and Quit; Cancel and a save that fails keep it, Discard lets it go; one left with only a review reason or a pinned version is asked about by New Project). Rule: [project file](../architecture/video-edit-project-file.md) §5 "What an empty project is".
+- Unsaved Burn In subtitles at Quit (2026-11-28): `scripts/check-project-saves.sh` (`SubtitleQuitChecks`: a video's subtitle and the standalone file with unsaved edits keep Quit from quitting at once; Cancel stays and tells Restart and Update; Don't Save goes on with nothing written; a Save whose drive does not answer within Quit's grace asks Keep Waiting / Cancel only, and its late landing still marks it saved; Save writes first; a page ✕ whose Save is still being written when Quit comes gets one question and one Cancel, and the page's action stands down; a time still being typed is written first by `quitsAtOnce` and by `prepareAll` alone; the questions come from a run-loop turn). Rule: [export settings](../architecture/export-settings.md) §9, [case](../bugfixes/2026-11-28-burn-in-subtitle-edits-dropped-unasked.md).
 - Saved project versions around AI rounds (2026-11-17): `scripts/check-project-versions.sh` (real App objects in an isolated bundle, temporary projects / media / versions root, shard 1) and `checks/project-versions-wiring.sh` (scan); what each verifies and the reverse verification are in [saved project versions](../architecture/project-versions.md) section 9. `scripts/render-project-versions.sh <folder>` draws the Versions sheet and the AI banner's version line off screen (graphical session; **not in `check-all.sh`**; without Screen Recording permission set `SRTFLOW_RENDER_DRAW_FALLBACK=1`).
 
 - 构建与打包的 Rosetta / arm64 要求、常用命令、打包和验收（含 DMG Retina 背景 / Finder 布局）、公开下载发布（含 0.18.59–0.18.66 的签名包与下载回读记录）：
@@ -978,7 +980,7 @@
     stay; the menu's check is still answered); launch states (a staged copy, the marker, Updated going away once viewed);
     the popover's content; what a restart waits for, in order, and which cloud kinds don't hold it; the
     Settings status line (today, yesterday, a date, checking, failed, downloading, ready); Settings' check never answered
-    with a window.
+    with a window (the menu's check window: below).
   - **A pulled release** (U2): a copy an earlier run staged is neither shown nor installable until this launch's first check:
     the feed naming it confirms it (Update, nothing downloads; the menu's check at once), a check that can't reach the feed
     too (offline Macs still update), "up to date" removes it and the kept download, another release replaces it unseen;
@@ -994,14 +996,72 @@
     also after a failed check, until a check finds nothing newer; a DMG the retry record holds back is `available` /
     `held_back`, after one failure and after three, while nothing downloads; E2: the hints quote the App's button names,
     zh-Hans sample). The guard's section 9: get_status's one line, and the report never reading the updater or acting.
-  - **The answer window** (2026-11-27, the guard's section 10): the menu check's answer is shown by
-    `RunLoop.main.perform { MainActor.assumeIsolated { AppUpdateAlerts.show(answer) } }` and by nothing else, never in a
-    `Task` or `DispatchQueue.main.async` (a modal loop inside a task crashed 0.18.70 when an exception unwound it:
-    [system file windows](../architecture/system-file-windows.md) rule 10). Executable code only, read across lines with comments
-    and string literals blanked (`checks/Shared/swift-code.pl`): exactly one reference to `AppUpdateAlerts.show` in `Sources`,
-    the run-loop statement right after `case .answer`. Red with the `Task` back, with `DispatchQueue.main.async`, with the
-    right call in a comment while the `Task` runs, with a second call in the same file (review CXC1), and with a second call
-    split over two lines (review CXC2); a call in a block comment or a string doesn't count.
+  - **The check window** (UPD1, 2026-11-28; `CheckWindowChecks`, then the guard's section 10).
+    - **Opening.** Only the menu's check opens it (`.openCheckWindow`), also when it joins the schedule's check and for a
+      copy that only tells.
+    - **Timing.** A quick answer (0.49 s) opens it straight on the answer; the grace tick after that changes nothing.
+      Otherwise it opens checking after 0.5 s; an early tick asks again. An answer 0.1 s later is held until the checking
+      state has shown 0.5 s, then replaces it in place. Try Again shows checking at once.
+    - **Cancel.** It closes the window and stops the check (`[.stopCheck]`), but only when nothing else asked for it. A
+      cancelled check is never a failed one; an earlier run's staged copy and the retry record stay as they were; a check
+      the schedule shares goes on, unanswered; a download goes on. Review CXU1: Settings' check shared by the window's Try
+      Again goes on after Cancel, Settings' still, and its found release starts downloading with no window answer.
+    - **Closing.** The close button hides the window while the check goes on, and the answer never brings it back. Closing
+      a download's window only closes it.
+    - **Reopening.** The menu item brings it back on a running download, also after a hidden check's window; a late answer
+      doesn't replace the download.
+    - **What it draws, from the updater's state alone.** A found release's download from its first byte; progress 0.1,
+      0.2905 and 1; staged; a restart waiting, then cancelled; an automatic download that didn't complete or was rejected;
+      Download and Install and its failure; the switch turned off; a copy that only tells; a newer release followed; a
+      withdrawn one, which is up to date, also with auto install off before any download and for a copy that only tells
+      (review CXU1). Whole percents are floored and clamped. `PipelineChecks` reads the progress when each report comes
+      and when the staging's verification runs. A fresh download's is at 1 by the verification. A kept download's is 1
+      from the start of its check, the file still there, through the verification (review CXU2: it said «Downloading
+      0%» while the whole file was hashed). A same-size damaged one says «Verifying…» while its old bytes are checked,
+      then the new download rises to 1.
+    - **The menu item.** Check; greyed Checking during any check; Downloading n %, also with a check running; Restart and
+      Update, also with a check running; auto install off.
+    - **A quit and the first place** (smoke SMK74). A quit in the grace period closes a window not yet shown: neither the
+      grace tick nor the answer brings it up. The first place is the main window's top-right below its toolbar, 12 pt in;
+      without a main window, the screen's top-right; clamped whole onto the visible screen (top-aligned when taller); never
+      the middle.
+    - **The guard's section 10** (code only, comments and strings blanked):
+      - no `runModal` or `NSAlert` in the updater;
+      - exactly one `RunLoop.main.perform` call each: `open()` right after `case .openCheckWindow`, `show(answer)` right
+        after `case .answer`; exactly one `showDownload()`, the menu's download item;
+      - the window and its content start no task or dispatch block and never reach a download, the network or the state
+        machine;
+      - `open()` goes through the flow, `showDownload` runs no check, the close button only hides, Cancel goes only
+        through `cancelCheck`, the display comes from `updater.state`, and the timers are run-loop timers;
+      - the menu item comes from `AppUpdateMenuEntry`, with its greyed and download titles;
+      - `.stopCheck` cancels only the check's task, `cancelCheck` only sends `.checkCancelled`, a check joins the one in
+        flight, and a cancelled check's task reports nothing;
+      - it never takes the keyboard (review CXU1): `present()` only calls `orderFront`, and there is no
+        `makeKeyAndOrderFront`, `makeKey`, `orderFrontRegardless` or `activate`; Escape is `perform(.dismiss)`;
+      - every button is `secondaryButton` (`.instantHelp`) or `defaultButton` (Return and its key cap), Restart and Update
+        a `defaultButton`; what's new is capped (`maxHeight: Self.notesMaxHeight`) and `AppUpdateNotes` scrolls past it;
+      - a quit's first step is `closeForQuit()`, the first statement of `applicationShouldTerminate` and its only call;
+        Restart and Update closes the window before `requestRestart()`; the first place comes from
+        `AppUpdateCheckPlacement.origin` (SMK74).
+
+      It replaces the 2026-11-27 pin on the answer alert (`AppUpdateAlerts.show`) and keeps that pin's rule
+      ([system file windows](../architecture/system-file-windows.md) rule 10).
+    - **Reverse verification (UPD1).** 25 sabotages, each red: 11 in the check (the menu's check opening no window, no
+      grace period, a quick answer ignored, no minimum for the checking state, the menu not greyed, the download item
+      without its percent, closing that stops the check, Cancel stopping the download or not the check, the progress not
+      the updater's, reopening that shows nothing) and 14 in the guard (`open()` not from the run loop or bypassing the
+      flow, the menu item enabled while checking, a second check while one runs, the close button cancelling, the window
+      reaching `downloadTask`, a cancelled check reporting, the window drawing another state, reopening that starts a
+      check, the answer inside a `Task` or through `DispatchQueue.main.async`, a modal alert or a `Task` in the window,
+      a second `show` call).
+      Round 2 (review CXU1): 9 more, each red. In the check: Cancel stopping a check Settings shares; a kept download
+      reporting no progress; a withdrawn release still offered. In the guard: the first show taking the keyboard; a
+      button without its tooltip; the notes not capped or not scrolling; Escape cancelling while checking; Restart and
+      Update without Return. Round 3 (review CXU2): 3 more in the check, each red: the kept file's «Verifying…» report
+      moved after staging, moved to just after the kept file's check, or removed. Round 4 (smoke SMK74): 6 more, each
+      red. In the guard: Restart and Update leaving the window up; a quit leaving it up, or closing it only after the
+      recording's question; the first place back in the middle. In the check: a window in its grace period coming up over
+      the question; the placement rule back to the middle.
   - **The retry record** (U1, `AppUpdateRetryRecord`): a DMG that came down whole and failed its check or staging is
     counted and kept on disk, silently; automatic checks leave it alone for 24 hours (1 h and 23 h later: nothing; 25 h:
     fetched), never after three failures; Settings' and the menu's checks fetch it and their failures count; a download
