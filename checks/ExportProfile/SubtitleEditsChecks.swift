@@ -14,7 +14,9 @@ import SrtFlowCore
 //   the old one first; the same file again asks too (Don't Save reads it from the drive), and without edits reads it at once;
 // - an edit typed while Save writes is asked about again, never dropped; a later choice for the same video lands after the
 //   earlier Save-then-attach, so it wins;
-// - every question comes from a run-loop turn, never inside a Swift task.
+// - every question comes from a run-loop turn, never inside a Swift task;
+// - the open standalone file opened again keeps its unsaved edits, even after it changed on the drive; without edits it is
+//   read again; another file is refused while it has edits (StandaloneSubtitleStore.open, §9 item 4).
 @MainActor enum SubtitleEditsChecks {
     static func run(root: URL, source: URL, require: (Bool, String) -> Void) async {
         let bench = SubtitleEditsBench(folder: root.appendingPathComponent("subtitle-edits", isDirectory: true))
@@ -26,6 +28,7 @@ import SrtFlowCore
         await clearFinished(bench, videos, require)
         await anotherFile(bench, videos, require)
         await editDuringSave(bench, videos, require)
+        reopen(bench, videos, require)
         require(!bench.askedInTask && bench.missingButtons.isEmpty,
                 "every question came from a run-loop turn with Save / Don't Save / Cancel: inside a task \(bench.askedInTask), missing \(bench.missingButtons)")
         bench.restore()
@@ -187,5 +190,27 @@ import SrtFlowCore
         await bench.idle(edits)
         require(burnIn(queue, ids[0])?.subtitleURL == c && bench.text(a).contains("Edited A"),
                 "a later choice for the same video lands after the earlier Save-then-attach, so it wins: \(burnIn(queue, ids[0])?.subtitleURL?.lastPathComponent ?? "nil")")
+    }
+
+    /// The standalone file opened again (a double-click in Finder, a drop on the page): StandaloneSubtitleStore.open.
+    private static func reopen(_ bench: SubtitleEditsBench, _ videos: [URL], _ require: (Bool, String) -> Void) {
+        _ = page(bench, videos, [])
+        let a = bench.file("A.srt"), b = bench.file("B.srt"), standalone = StandaloneSubtitleStore.shared
+        standalone.open(a)
+        standalone.document?.cues[0].text = "Edited alone"
+        standalone.hasUnsavedEdits = true
+        bench.write(a, "Changed elsewhere")
+        standalone.open(a)
+        require(standalone.url == a && standalone.document?.cues.first?.text == "Edited alone" && standalone.hasUnsavedEdits
+                && standalone.notice == nil,
+                "the open file opened again keeps its unsaved edits, even after it changed on the drive: \(standalone.document?.cues.first?.text ?? "nil")")
+        standalone.open(b)
+        require(standalone.url == a && standalone.document?.cues.first?.text == "Edited alone" && standalone.notice != nil,
+                "another file is refused while the open one has unsaved edits")
+        standalone.hasUnsavedEdits = false
+        standalone.open(a)
+        require(standalone.document?.cues.first?.text == "Changed elsewhere" && !standalone.hasUnsavedEdits,
+                "without unsaved edits the open file is read again (it may have changed elsewhere)")
+        standalone.clear()
     }
 }

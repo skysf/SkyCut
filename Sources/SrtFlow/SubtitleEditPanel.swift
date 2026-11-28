@@ -19,9 +19,11 @@ final class StandaloneSubtitleStore: ObservableObject {
     private init() {}
 
     func open(_ fileURL: URL) {
-        // 手里这份还没保存就别悄悄换掉，那等于把用户的编辑扔了。
-        if hasUnsavedEdits, url != fileURL {
-            notice = String(
+        // 手里这份还没保存就别悄悄换掉，那等于把用户的编辑扔了。The open file itself, opened again (a double-click, a drop),
+        // keeps its unsaved edits too: it is never read again over them (docs/architecture/export-settings.md §9 item 4;
+        // docs/bugfixes/2026-11-28-burn-in-subtitle-edits-dropped-unasked.md). Without edits it is read again.
+        if hasUnsavedEdits {
+            notice = url == fileURL ? nil : String(
                 format: L10n("Save or close %@ before opening another subtitle file."),
                 url?.lastPathComponent ?? "?"
             )
