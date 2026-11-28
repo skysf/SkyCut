@@ -251,6 +251,18 @@ require "the question comes through RunLoopAlert" Sources/SrtFlow/SubtitleEditsQ
 require "a subtitle whose Save is still being written is asked Keep Waiting / Cancel, never Don't Save" \
   Sources/SrtFlow/BurnInSubtitleEdits.swift 'switch await SubtitleEditsQuestion\.askWhileWriting\('
 require "Quit takes over from the page's actions under way" Sources/SrtFlow/BurnInSubtitleEdits.swift '^        epoch \+= 1$'
+# Review CXM1: a time typed in a subtitle cell and not entered yet is a draft (PendingTimecode) that every check that asks
+# writes first: the page's ✕, Clear Finished and attach, both Quit entries, the standalone file's ✕ and its reopen.
+require "a cell's time still being typed is a draft the checks can write" \
+  Sources/SrtFlow/TimecodeField.swift 'PendingTimecode\.began\(cell\) \{ commit\(\) \}'
+for pair in 'BurnInSubtitleEdits|3' 'ProjectQuit|2' 'SubtitleEditPanel|2'; do
+  file="Sources/SrtFlow/${pair%%|*}.swift"
+  COMMITS="$(grep -c 'PendingTimecode\.commit()' "${file}" || true)"
+  if [ "${COMMITS}" != "${pair#*|}" ]; then
+    echo "✗ 接线守卫：${file} writes a time still being typed before each check that asks (${pair#*|} places, found ${COMMITS})" >&2
+    WIRING_FAIL=1
+  fi
+done
 
 # Compress / Burn In (2026-11-19, docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md): ffmpeg writes only the
 # job's own claimed file, which is handed over through ExportDelivery as a new file (never replacing); a failed or

@@ -19,7 +19,8 @@ import SrtFlowCore
 //   read again; another file is refused while it has edits (StandaloneSubtitleStore.open, §9 item 6);
 // - review CXM1: a Save still being written (past its deadline) is asked about with Keep Waiting / Cancel only, never Don't
 //   Save, and nothing is read over the edits; when it lands the row's mark follows the drive; Keep Waiting goes on once it
-//   landed; a file being written is read into a row only once its write landed.
+//   landed; a file being written is read into a row only once its write landed; a time still being typed in a cell, the
+//   only edit, is written before ✕ asks, so it is asked about.
 @MainActor enum SubtitleEditsChecks {
     static func run(root: URL, source: URL, require: (Bool, String) -> Void) async {
         let bench = SubtitleEditsBench(folder: root.appendingPathComponent("subtitle-edits", isDirectory: true))
@@ -34,6 +35,7 @@ import SrtFlowCore
         reopen(bench, videos, require)
         await readsOnlyAfterTheWrite(bench, videos, require)
         await lateWrite(bench, videos, require)
+        await timeStillBeingTyped(bench, videos, require)
         require(!bench.askedInTask && bench.missingButtons.isEmpty,
                 "every question came from a run-loop turn with Save / Don't Save / Cancel: inside a task \(bench.askedInTask), missing \(bench.missingButtons)")
         bench.restore()
@@ -274,5 +276,18 @@ import SrtFlowCore
                 && queue.items.first?.errorMessage == String(format: L10n("No subtitle lines found in %@."), "A.srt"),
                 "Keep Waiting waits for the write, then the file is read again once it landed: asked \(bench.asked.count), \(queue.items.first?.errorMessage ?? "no message")")
         SubtitleFileSave.deadline = deadline
+    }
+
+    /// A row whose only edit is a time still being typed in its cell (the draft registered as TimecodeField does): ✕ writes
+    /// it first, so it is asked about and Cancel keeps it.
+    private static func timeStillBeingTyped(_ bench: SubtitleEditsBench, _ videos: [URL], _ require: (Bool, String) -> Void) async {
+        let (queue, ids, edits) = page(bench, videos, [bench.file("A.srt")])
+        PendingTimecode.began(UUID()) { queue.editBurnInDocument(for: ids[0]) { $0.cues[0].start = 0.75 } }
+        bench.replies = ["Cancel"]
+        edits.remove(ids[0])
+        await bench.idle(edits)
+        require(queue.items.count == 1 && burnIn(queue, ids[0])?.document?.cues.first?.start == 0.75
+                && burnIn(queue, ids[0])?.hasUnsavedEdits == true && bench.asked == [bench.question("A.srt")],
+                "a time still being typed, the only edit, is written before ✕ asks: asked \(bench.asked), \(queue.items.count) rows")
     }
 }

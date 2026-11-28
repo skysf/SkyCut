@@ -47,9 +47,11 @@ enum ProjectQuit {
         return .terminateLater
     }
 
-    /// Nothing to write or ask: every project closes at once and no Burn In subtitle has unsaved edits.
+    /// Nothing to write or ask: every project closes at once and no Burn In subtitle has unsaved edits — a time still being
+    /// typed in a subtitle cell written first (PendingTimecode), as `closesAtOnce` ends a project's pending typing.
     static func quitsAtOnce() -> Bool {
-        OpenProjects.shared.all.allSatisfy({ $0.closesAtOnce() })
+        PendingTimecode.commit()
+        return OpenProjects.shared.all.allSatisfy({ $0.closesAtOnce() })
             && !BurnInSubtitleEdits.shared.needsAsking(after: BurnInSubtitleEdits.Discarded())
     }
 
@@ -84,6 +86,7 @@ enum ProjectQuit {
     /// `grace`, then is asked about again); Cancel stays. Asking them takes time, so the projects are looked at again after
     /// them, and the last look covers both.
     private static func prepareEach() async -> Bool {
+        PendingTimecode.commit()
         var marks: [ObjectIdentifier: QuitMark] = [:]
         var subtitles = BurnInSubtitleEdits.Discarded()
         while true {

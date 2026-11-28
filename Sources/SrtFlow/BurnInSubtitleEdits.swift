@@ -14,7 +14,8 @@ import SrtFlowCore
 // While a Save of a subtitle's file is still on its way (SubtitleFileSave.isWriting), Don't Save is never offered — the
 // write would land after it — only Keep Waiting / Cancel; a file is never read into a row while a write to it is on its way;
 // when a write lands, the place's mark follows the drive. Quit takes over: the page's actions under way stand down, and
-// Quit's question is the only one (review CXM1).
+// Quit's question is the only one (review CXM1). Every action, and Quit, first writes a time still being typed in a cell
+// (PendingTimecode), so it counts as an edit.
 // What it doesn't: the question's alert (SubtitleEditsQuestion); the editor's own Save and Export As (SubtitleEditorExport);
 // the queue (EncodeQueue); the standalone file's ✕, which refuses while it has unsaved edits (SubtitleEditPanel); reopening
 // the open standalone file, which keeps its edits (StandaloneSubtitleStore.open).
@@ -59,6 +60,7 @@ final class BurnInSubtitleEdits {
 
     /// A row's ✕.
     func remove(_ id: EncodeItem.ID) {
+        PendingTimecode.commit()
         let place = BurnInSubtitles.Place.row(id)
         whenSettled({ [place] }) { [self] discarded in
             guard discarded.allows(place, unsaved(place)) else { return }
@@ -68,6 +70,7 @@ final class BurnInSubtitleEdits {
 
     /// Clear Finished: the finished rows go, each asked about first.
     func clearFinished() {
+        PendingTimecode.commit()
         let queue = subtitles.queue
         whenSettled({ queue.items.filter(\.isDone).map { .row($0.id) } }) { [self] discarded in
             for item in queue.items where item.isDone && discarded.allows(.row(item.id), unsaved(.row(item.id))) {
@@ -80,6 +83,7 @@ final class BurnInSubtitleEdits {
     /// `subtitle` is its own file again (Don't Save then reads it from the drive). Never read while a write to that file is
     /// still on its way: it waits for it (the editor's deadline), and says the drive is not responding past that.
     func attach(_ subtitle: URL, to id: EncodeItem.ID) {
+        PendingTimecode.commit()
         let place = BurnInSubtitles.Place.row(id)
         whenSettled({ [place] }, reading: subtitle, stillWriting: { [self] in
             subtitles.queue.setError(SubtitleFileSave.notRespondingText(subtitle), for: id)

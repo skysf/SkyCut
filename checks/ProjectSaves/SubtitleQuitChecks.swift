@@ -13,6 +13,8 @@ import SrtFlowCore
 //   stays), and the write that lands later still marks the subtitle saved; Save writes the other one to its file first;
 // - a page ✕ whose Save is still being written when Quit comes: Quit asks once (Keep Waiting / Cancel); after Cancel the
 //   page's action stands down (nothing more asked, the video stays) and the late write still saves (review CXM1);
+// - a time still being typed in a cell, the only edit, is written first by Quit and asked about, through quitsAtOnce
+//   (applicationShouldTerminate) and through prepareAll alone (after a screen recording);
 // - the questions come from a run-loop turn, never inside a Swift task.
 @MainActor enum SubtitleQuitChecks {
     static func run(_ checks: Checks, root: URL) async {
@@ -66,6 +68,7 @@ import SrtFlowCore
                        && !standalone.hasUnsavedEdits,
                        "Save writes the subtitle still unsaved to its file first, then Quit goes on: asked \(bench.asked), \(bench.text(b))")
         await pageSaveAtQuit(checks, bench, id: id, a: a)
+        await timeStillBeingTypedAtQuit(checks, bench, id: id)
         checks.require(!bench.askedInTask && bench.missingButtons.isEmpty,
                        "the questions came from a run-loop turn with Save / Don't Save / Cancel: inside a task \(bench.askedInTask)")
 
@@ -96,6 +99,23 @@ import SrtFlowCore
                        "Quit during a page's Save asks once, Keep Waiting / Cancel, and Cancel stays: asked at Quit \(atQuit), in all \(bench.asked.count)")
         checks.require(saved && queue.items.contains { $0.id == id } && bench.text(a).contains("Saved by the page"),
                        "after that Cancel the page's ✕ stands down (the video stays) and its late write still saves it")
+    }
+
+    /// The row saved; a time typed in its cell and not entered yet (the draft registered as TimecodeField does).
+    private static func timeStillBeingTypedAtQuit(_ checks: Checks, _ bench: SubtitleEditsBench, id: EncodeItem.ID) async {
+        let queue = EncodeQueue.burnIn
+        func start() -> Double? { queue.items.first { $0.id == id }?.burnIn?.document?.cues.first?.start }
+        queue.markBurnInSaved(for: id)
+        bench.forget()
+        PendingTimecode.began(UUID()) { queue.editBurnInDocument(for: id) { $0.cues[0].start = 0.25 } }
+        checks.require(!ProjectQuit.quitsAtOnce() && start() == 0.25,
+                       "a time still being typed is written before Quit decides it can quit at once: \(start() ?? -1)")
+        queue.markBurnInSaved(for: id)
+        PendingTimecode.began(UUID()) { queue.editBurnInDocument(for: id) { $0.cues[0].start = 0.5 } }
+        bench.replies = ["Cancel"]
+        let quit = await ProjectQuit.prepareAll()
+        checks.require(!quit && start() == 0.5 && bench.asked == [bench.question("A.srt")],
+                       "Quit through prepareAll alone writes it first too, and asks: asked \(bench.asked)")
     }
 
     private static func stillSaving(_ file: String) -> String { String(format: L10n("“%@” is still being saved"), file) }

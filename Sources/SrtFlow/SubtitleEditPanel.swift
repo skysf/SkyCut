@@ -22,6 +22,7 @@ final class StandaloneSubtitleStore: ObservableObject {
         // 手里这份还没保存就别悄悄换掉，那等于把用户的编辑扔了。The open file itself, opened again (a double-click, a drop),
         // keeps its unsaved edits too: it is never read again over them (docs/architecture/export-settings.md §9 item 6;
         // docs/bugfixes/2026-11-28-burn-in-subtitle-edits-dropped-unasked.md). Without edits it is read again.
+        PendingTimecode.commit()
         if hasUnsavedEdits {
             notice = url == fileURL ? nil : String(
                 format: L10n("Save or close %@ before opening another subtitle file."),
@@ -142,6 +143,7 @@ struct SubtitleEditPanel: View {
                 }
                 if isStandalone {
                     Button {
+                        PendingTimecode.commit()   // a time still being typed is an edit too
                         if standalone.hasUnsavedEdits {
                             standalone.notice = L10n("Save the changes first, or export a copy.")
                         } else {
@@ -354,39 +356,4 @@ struct CurrentCueHighlight: ViewModifier {
     }
 }
 
-/// 可编辑的时间码格子：回车或失焦时提交，输入不合法就回退。
-struct TimecodeField: View {
-    @Binding var value: TimeInterval
-    @State private var text: String
-    @FocusState private var focused: Bool
-
-    init(value: Binding<TimeInterval>) {
-        _value = value
-        _text = State(initialValue: Timecode.formatMillis(value.wrappedValue, separator: ","))
-    }
-
-    var body: some View {
-        let _ = PerfCounters.body(Self.self)
-        TextField("", text: $text)
-            .focused($focused)
-            .onSubmit { commit() }
-            .onChange(of: focused) { _, isFocused in if !isFocused { commit() } }
-            .onChange(of: value) { _, newValue in
-                guard !focused else { return }
-                text = Timecode.formatMillis(newValue, separator: ",")
-            }
-            .monospacedDigit()
-    }
-
-    private func commit() {
-        guard let parsed = Timecode.parse(text) else {
-            text = Timecode.formatMillis(value, separator: ",")
-            return
-        }
-        value = parsed
-        // **回读，别显示 parsed。** 绑定有权拒绝（字幕表那边就拒绝 start >= end），
-        // 显示 parsed 会让格子里挂着一个根本没生效的时间：界面说 4 秒、
-        // 存盘和导出还是 1 秒，用户毫不知情（2026-08-12 复审 P2）。
-        text = Timecode.formatMillis(value, separator: ",")
-    }
-}
+// The start / end cells are TimecodeField (TimecodeField.swift).
