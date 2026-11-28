@@ -37,6 +37,13 @@ struct SaveLocation: Equatable {
 enum FileReplaceQuestion {
     static var ask: @MainActor (URL) -> Bool = { askInAlert($0) }
 
+    /// The same question asked from a run-loop turn (RunLoopAlert), for a caller inside a Swift task: its modal loop never
+    /// runs inside the task (docs/architecture/system-file-windows.md rule 10). The Burn In subtitle editor's Export As asks
+    /// here (2026-11-28); the project's Save As still asks `ask` inside its task.
+    static func askFromRunLoop(_ url: URL) async -> Bool {
+        await RunLoopAlert.onFreeTurn { ask(url) }
+    }
+
     private static func askInAlert(_ url: URL) -> Bool {
         let alert = NSAlert()
         alert.alertStyle = .warning
@@ -47,6 +54,6 @@ enum FileReplaceQuestion {
         )
         alert.addButton(withTitle: L10n("Cancel"))
         alert.addButton(withTitle: L10n("Replace")).hasDestructiveAction = true
-        return alert.runModal() == .alertSecondButtonReturn
+        return RunLoopAlert.run(alert) == .alertSecondButtonReturn
     }
 }

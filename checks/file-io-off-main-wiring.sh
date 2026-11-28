@@ -201,6 +201,15 @@ require "every subtitle editor write first checks the subtitle pressed for is st
   Sources/SrtFlow/SubtitleEditorExport.swift 'guard pressed\.held\.sameText\(as: subtitles\.held\(pressed\.place\)\) else \{'
 require "the Replace retry writes the subtitle pressed for (checked again), never what the panel shows then" \
   Sources/SrtFlow/SubtitleEditorExport.swift 'write\(pressed, format, to: SaveLocation\(url: location\.url, mayReplace: true\)\)'
+# Review CXM1 (2026-11-28): the export's Replace question runs its modal loop from a run-loop turn, never inside the save's
+# task (system-file-windows.md rule 10), and what a save has to say is an app-level alert, seen off the Burn In page too.
+require "the export's Replace question is asked from a run-loop turn" \
+  Sources/SrtFlow/SubtitleEditorExport.swift 'if await FileReplaceQuestion\.askFromRunLoop\(location\.url\) \{'
+forbid "the export never asks Replace inside its task" Sources/SrtFlow/SubtitleEditorExport.swift 'FileReplaceQuestion\.ask\('
+require "what a subtitle save has to say is an app-level alert from a run-loop turn" \
+  Sources/SrtFlow/SubtitleEditorExport.swift 'RunLoopAlert\.tell \{'
+forbid "the subtitle panel shows no save alert of its own (it is off screen once the person leaves the page)" \
+  Sources/SrtFlow/SubtitleEditPanel.swift '\.alert\("Could Not Save"'
 require "a manual screen recording replaces a file only when macOS's own window confirmed it" \
   Sources/SrtFlow/ScreenRecordingCoordinator.swift 'session\.replacesExistingOutput = session\.replacesExistingOutput && options\.replacesExistingOutput'
 require "the recording setup carries the save window's confirmation" \
@@ -230,10 +239,13 @@ require "Clear Finished asks about each finished row's unsaved edits first" \
   Sources/SrtFlow/BurnInView.swift 'subtitleEdits\.clearFinished\(\)'
 require "Quit asks about the Burn In subtitles on the projects' path, a Save waiting at most Quit's grace" \
   Sources/SrtFlow/ProjectQuit.swift 'await BurnInSubtitleEdits\.shared\.settleForQuit\(into: &subtitles, deadline: grace\)'
-require "the question's timer also runs while Quit waits for its answer (the modal-panel run-loop mode)" \
-  Sources/SrtFlow/SubtitleEditsQuestion.swift 'RunLoop\.main\.add\(timer, forMode: \.modalPanel\)'
-forbid "the question is never shown from a Swift task or a dispatch block" \
-  Sources/SrtFlow/SubtitleEditsQuestion.swift '^[^/]*(Task \{|Task\.detached|DispatchQueue\.main\.async)'
+require "the alerts' timer also runs while Quit waits for its answer (the modal-panel run-loop mode)" \
+  Sources/SrtFlow/RunLoopAlert.swift 'RunLoop\.main\.add\(timer, forMode: \.modalPanel\)'
+for f in Sources/SrtFlow/RunLoopAlert.swift Sources/SrtFlow/SubtitleEditsQuestion.swift; do
+  forbid "the subtitle alerts are never shown from a Swift task or a dispatch block" \
+    "$f" '^[^/]*(Task \{|Task\.detached|DispatchQueue\.main\.async)'
+done
+require "the question comes through RunLoopAlert" Sources/SrtFlow/SubtitleEditsQuestion.swift 'await RunLoopAlert\.ask\('
 
 # Compress / Burn In (2026-11-19, docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md): ffmpeg writes only the
 # job's own claimed file, which is handed over through ExportDelivery as a new file (never replacing); a failed or

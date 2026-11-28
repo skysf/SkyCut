@@ -64,10 +64,10 @@ struct SubtitleEditPanel: View {
 
     @State private var selection = Set<UUID>()
     @State private var followsPlayback = true
-    @State private var saveError: String?
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
+        // A save that wrote nothing says so in an app-level alert (SubtitleEditorExport.tell), seen off this page too.
         VStack(spacing: 0) {
             header
             Divider()
@@ -76,14 +76,6 @@ struct SubtitleEditPanel: View {
             } else {
                 cueTable
             }
-        }
-        .alert("Could Not Save", isPresented: Binding(
-            get: { saveError != nil },
-            set: { if !$0 { saveError = nil } }
-        )) {
-            Button("OK") { saveError = nil }
-        } message: {
-            Text(saveError ?? "")
         }
     }
 
@@ -331,9 +323,9 @@ struct SubtitleEditPanel: View {
     }
 
     /// Save and Export As: the subtitle shown when the button is pressed, written only while it is still there unedited
-    /// (SubtitleEditorExport); what it has to say goes to the "Could Not Save" alert.
+    /// (SubtitleEditorExport, which also tells the person when nothing was written).
     private var export: SubtitleEditorExport {
-        SubtitleEditorExport(subtitles: BurnInSubtitles(queue: queue, standalone: standalone)) { saveError = $0 }
+        SubtitleEditorExport(subtitles: BurnInSubtitles(queue: queue, standalone: standalone))
     }
 }
 

@@ -4,9 +4,10 @@ import SrtFlowCore
 @testable import SrtFlow
 
 // The bench for the Burn In subtitle checks (export-profile's SubtitleEditsChecks and SubtitleExportChecks, project-saves'
-// SubtitleQuitChecks): subtitle files in a folder of their own; SubtitleEditsQuestion answered by pressing the production
-// alert's own buttons, found by title (`replies` in order, Cancel when none are left), each question written down with
-// whether it was asked inside a Swift task; every subtitle write passing a gate that can hold it.
+// SubtitleQuitChecks): subtitle files in a folder of their own; every alert shown through RunLoopAlert (the questions,
+// "Replace?", "Could Not Save") answered by pressing the production alert's own buttons, found by title (`replies` in
+// order, Cancel when none are left), each written down with its buttons and whether it ran inside a Swift task; every
+// subtitle write passing a gate that can hold it or make it fail.
 @MainActor final class SubtitleEditsBench {
     let folder: URL
     let gate = SubtitleWriteGate()
@@ -14,25 +15,35 @@ import SrtFlowCore
     private(set) var asked: [String] = []
     /// Their informative texts (after a failed Save: why, first).
     private(set) var details: [String] = []
+    /// Their buttons' titles, in order.
+    private(set) var buttons: [[String]] = []
     /// A question was asked inside a Swift task (it must come from a run-loop turn: system-file-windows.md rule 10).
     private(set) var askedInTask = false
     /// Button titles a reply named that the alert does not have.
     private(set) var missingButtons: [String] = []
     /// The buttons to press, in order, by their English titles.
     var replies: [String] = []
-    private let run = SubtitleEditsQuestion.run
+    /// Runs when the next alert comes up, before it is answered (something changing while it is up).
+    var whileAsked: (() -> Void)?
+    private let run = RunLoopAlert.run
     private let perform = SubtitleFileSave.perform
 
     init(folder: URL) {
         self.folder = folder
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        SubtitleEditsQuestion.run = { [unowned self] alert in
+        RunLoopAlert.run = { [unowned self] alert in
             if withUnsafeCurrentTask(body: { $0 != nil }) { askedInTask = true }
             asked.append(alert.messageText)
             details.append(alert.informativeText)
-            let title = replies.isEmpty ? "Cancel" : replies.removeFirst()
-            guard let index = alert.buttons.firstIndex(where: { $0.title == L10n(title) }) else {
-                missingButtons.append(title)
+            buttons.append(alert.buttons.map(\.title))
+            let change = whileAsked
+            whileAsked = nil
+            change?()
+            // No reply left: Cancel when the alert has it, otherwise its only button (a message's OK).
+            let title = replies.isEmpty ? (alert.buttons.contains { $0.title == L10n("Cancel") } ? "Cancel" : nil) : replies.removeFirst()
+            let index: Int? = title.map { title in alert.buttons.firstIndex { $0.title == L10n(title) } } ?? 0
+            guard let index else {
+                missingButtons.append(title ?? "?")
                 return .cancel
             }
             return NSApplication.ModalResponse(rawValue: NSApplication.ModalResponse.alertFirstButtonReturn.rawValue + index)
@@ -52,7 +63,7 @@ import SrtFlowCore
 
     /// The seams as they were.
     func restore() {
-        SubtitleEditsQuestion.run = run
+        RunLoopAlert.run = run
         SubtitleFileSave.perform = perform
         gate.reset()
     }
@@ -64,7 +75,9 @@ import SrtFlowCore
     func forget() {
         asked = []
         details = []
+        buttons = []
         replies = []
+        whileAsked = nil
         gate.reset()
     }
 

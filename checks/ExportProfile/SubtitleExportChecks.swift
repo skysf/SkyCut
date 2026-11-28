@@ -5,13 +5,16 @@ import SrtFlowCore
 // The Burn In subtitle editor's Export As writes only the subtitle it was pressed for, unedited
 // (docs/architecture/system-file-windows.md rule 9; docs/bugfixes/2026-11-28-subtitle-replace-writes-another-subtitle.md),
 // through the panel's own calls (SubtitleEditorExport.exportAs / save) on real files, with a save window the check answers
-// late and the Replace question answered by the check (FileReplaceQuestion.ask):
-// - the review's sequence: Export As for A, a file already at the typed name, the panel showing B by the time Replace is
-//   answered: nothing is written and the person is told (before, B's text went into the file chosen for A);
+// late; the production "Replace?" and "Could Not Save" alerts are answered by pressing their own buttons (SubtitleEditsBench):
+// - the review's sequence: Export As for A, a file already at the typed name, A replaced by B in its place by the time
+//   Replace is answered: nothing is written and the person is told (before, B's text went into the file chosen for A);
 // - A edited while Replace is asked: nothing written; A unchanged: Replace writes A;
-// - the save window answering after the panel switched to B: nothing written, the free name stays free;
+// - the save window answering after A was replaced in its place: nothing written, the free name stays free, and the person
+//   is told in an app-level alert (seen even off the Burn In page); the preview moving to a video's row while A stays open
+//   on its own exports A, nothing told;
 // - the video's row gone while Replace is asked: nothing written (before, the standalone file's text went there);
-// - Save writes its own file and marks the subtitle saved.
+// - Save writes its own file and marks the subtitle saved;
+// - every alert, "Replace?" included, comes from a run-loop turn, never inside a Swift task (review CXM1).
 @MainActor enum SubtitleExportChecks {
     static func run(root: URL, source: URL, require: (Bool, String) -> Void) async {
         let lab = ExportLab(root: root, source: source)
@@ -19,33 +22,36 @@ import SrtFlowCore
         await editedWhileAsked(lab, require)
         await unchanged(lab, require)
         await windowAfterSwitch(lab, require)
+        await previewMovedToARow(lab, require)
         await rowGone(lab, require)
         await save(lab, require)
+        require(!lab.bench.askedInTask && lab.bench.missingButtons.isEmpty,
+                "every alert, Replace included, came from a run-loop turn, never inside a Swift task: inside a task \(lab.bench.askedInTask), missing \(lab.bench.missingButtons)")
         lab.restore()
     }
 
     private static let nothingWritten = L10n("Nothing was written: the subtitle changed. Export again.")
 
-    /// Export As for A; a file is at the typed name (the helper's answer: nobody asked "Replace?"); the standalone file
-    /// becomes B while the question is up; Replace.
+    /// Export As for A; a file is at the typed name (the helper's answer: nobody asked "Replace?"); A is replaced by B in its
+    /// place while the question is up; Replace.
     private static func reviewSequence(_ lab: ExportLab, _ require: (Bool, String) -> Void) async {
         lab.reset()
         lab.standalone.open(lab.a)
         lab.export.exportAs(.srt, boundTo: nil)
-        lab.whileAsked = { lab.standalone.clear(); lab.standalone.open(lab.b) }
-        lab.replies = [true]
+        lab.bench.whileAsked = { lab.standalone.clear(); lab.standalone.open(lab.b) }
+        lab.bench.replies = ["Replace"]
         lab.answer(SaveLocation(url: lab.taken, mayReplace: false))
         _ = await lab.bench.until { !lab.told.isEmpty }
-        require(lab.untouched(lab.taken) && lab.asked == [lab.taken] && lab.told == [nothingWritten],
-                "Replace answered after the panel switched to another subtitle writes nothing and says so: \(lab.shown(lab.taken)), told \(lab.told)")
+        require(lab.untouched(lab.taken) && lab.replaceAsked == 1 && lab.told == [nothingWritten],
+                "Replace answered after another subtitle took A's place writes nothing and says so: \(lab.shown(lab.taken)), told \(lab.told)")
     }
 
     private static func editedWhileAsked(_ lab: ExportLab, _ require: (Bool, String) -> Void) async {
         lab.reset()
         lab.standalone.open(lab.a)
         lab.export.exportAs(.srt, boundTo: nil)
-        lab.whileAsked = { lab.standalone.document?.cues[0].text = "Edited while asked"; lab.standalone.hasUnsavedEdits = true }
-        lab.replies = [true]
+        lab.bench.whileAsked = { lab.standalone.document?.cues[0].text = "Edited while asked"; lab.standalone.hasUnsavedEdits = true }
+        lab.bench.replies = ["Replace"]
         lab.answer(SaveLocation(url: lab.taken, mayReplace: false))
         _ = await lab.bench.until { !lab.told.isEmpty }
         require(lab.untouched(lab.taken) && lab.told == [nothingWritten],
@@ -56,14 +62,15 @@ import SrtFlowCore
         lab.reset()
         lab.standalone.open(lab.a)
         lab.export.exportAs(.srt, boundTo: nil)
-        lab.replies = [true]
+        lab.bench.replies = ["Replace"]
         lab.answer(SaveLocation(url: lab.taken, mayReplace: false))
         let written = await lab.bench.until { lab.bench.text(lab.taken).contains("Line from A") }
-        require(written && lab.asked == [lab.taken] && lab.told.isEmpty,
-                "Replace for the subtitle still shown, unedited, writes it: \(lab.shown(lab.taken)), told \(lab.told)")
+        require(written && lab.replaceAsked == 1 && lab.told.isEmpty,
+                "Replace for the subtitle still there, unedited, writes it: \(lab.shown(lab.taken)), told \(lab.told)")
     }
 
-    /// Export As for A; while the save window is open the standalone file becomes B; the window answers a free name.
+    /// Export As for A; while the save window is open, B takes A's place (the person may have left the Burn In page by then);
+    /// the window answers a free name.
     private static func windowAfterSwitch(_ lab: ExportLab, _ require: (Bool, String) -> Void) async {
         lab.reset()
         lab.standalone.open(lab.a)
@@ -74,7 +81,21 @@ import SrtFlowCore
         lab.answer(SaveLocation(url: free, mayReplace: false))
         _ = await lab.bench.until { !lab.told.isEmpty }
         require(!FileManager.default.fileExists(atPath: free.path) && lab.told == [nothingWritten],
-                "a save window answered after the panel switched to another subtitle writes nothing there: told \(lab.told)")
+                "a save window answered after another subtitle took A's place writes nothing there, and says so in an app-level alert: told \(lab.told)")
+    }
+
+    /// Export As for A open on its own; while the save window is open a video with B joins the queue, so the preview shows
+    /// B's row; A is still open on its own, unedited.
+    private static func previewMovedToARow(_ lab: ExportLab, _ require: (Bool, String) -> Void) async {
+        lab.reset()
+        lab.standalone.open(lab.a)
+        lab.export.exportAs(.srt, boundTo: nil)
+        lab.queue.add(urls: [lab.video], burnIn: BurnInRequest(subtitleURL: lab.b, document: lab.bench.load(lab.b)))
+        let free = lab.bench.file("Free.srt")
+        lab.answer(SaveLocation(url: free, mayReplace: false))
+        let written = await lab.bench.until { lab.bench.text(free).contains("Line from A") }
+        require(written && lab.told.isEmpty,
+                "the preview moving to a video's row while A stays open on its own still exports A, nothing told: \(lab.shown(free))")
     }
 
     /// Export As for a video's subtitle A, the standalone file B open behind it; the video leaves the queue while Replace is
@@ -85,8 +106,8 @@ import SrtFlowCore
         guard let id = lab.queue.items.first?.id else { return require(false, "the video is queued") }
         lab.standalone.open(lab.b)
         lab.export.exportAs(.srt, boundTo: id)
-        lab.whileAsked = { lab.queue.remove(id: id) }
-        lab.replies = [true]
+        lab.bench.whileAsked = { lab.queue.remove(id: id) }
+        lab.bench.replies = ["Replace"]
         lab.answer(SaveLocation(url: lab.taken, mayReplace: false))
         _ = await lab.bench.until { !lab.told.isEmpty }
         require(lab.untouched(lab.taken) && lab.told == [nothingWritten],
@@ -106,19 +127,14 @@ import SrtFlowCore
 }
 
 /// The export checks' bench: files A, B and a taken name; the panel's calls over a queue and the standalone file; a save
-/// window the check answers; the Replace question answered from `replies` (Cancel when empty), `whileAsked` run first.
+/// window the check answers; the alerts answered through SubtitleEditsBench.
 @MainActor private final class ExportLab {
     let bench: SubtitleEditsBench
     let video: URL
     let a: URL, b: URL, taken: URL
     let standalone = StandaloneSubtitleStore.shared
     private(set) var queue = EncodeQueue(outputSuffix: "_subtitled", requiresSubtitles: true)
-    private(set) var told: [String] = []
-    private(set) var asked: [URL] = []
-    var replies: [Bool] = []
-    var whileAsked: (() -> Void)?
     private var window: ((SaveLocation) -> Void)?
-    private let question = FileReplaceQuestion.ask
     private let chooser = SubtitleEditorExport.chooseSaveLocation
     private let sentinel = "the file that was already there"
 
@@ -130,32 +146,28 @@ import SrtFlowCore
         video = bench.file("video.mp4")
         if !FileManager.default.fileExists(atPath: video.path) { try? FileManager.default.copyItem(at: source, to: video) }
         SubtitleEditorExport.chooseSaveLocation = { [unowned self] _, _, then in window = then }
-        FileReplaceQuestion.ask = { [unowned self] url in
-            asked.append(url)
-            let change = whileAsked
-            whileAsked = nil
-            change?()
-            return replies.isEmpty ? false : replies.removeFirst()
-        }
     }
 
     /// The panel's Save and Export As over this bench's queue and the standalone file.
-    var export: SubtitleEditorExport {
-        SubtitleEditorExport(subtitles: BurnInSubtitles(queue: queue, standalone: standalone)) { [unowned self] in told.append($0) }
+    var export: SubtitleEditorExport { SubtitleEditorExport(subtitles: BurnInSubtitles(queue: queue, standalone: standalone)) }
+
+    /// What the app-level "Could Not Save" alerts said, in order.
+    var told: [String] {
+        zip(bench.asked, bench.details).filter { $0.0 == L10n("Could Not Save") }.map(\.1)
     }
+
+    /// How many times "Replace?" was asked about the taken file.
+    var replaceAsked: Int { bench.asked.filter { $0 == String(format: L10n("Replace “%@”?"), taken.lastPathComponent) }.count }
 
     /// Fresh files, an empty queue, nothing open, asked or told.
     func reset() {
         standalone.clear()
         queue = EncodeQueue(outputSuffix: "_subtitled", requiresSubtitles: true)
+        bench.forget()
         bench.write(a, "Line from A")
         bench.write(b, "Line from B")
         try? Data(sentinel.utf8).write(to: taken)
         try? FileManager.default.removeItem(at: bench.file("Free.srt"))
-        told = []
-        asked = []
-        replies = []
-        whileAsked = nil
         window = nil
     }
 
@@ -172,7 +184,6 @@ import SrtFlowCore
 
     func restore() {
         standalone.clear()
-        FileReplaceQuestion.ask = question
         SubtitleEditorExport.chooseSaveLocation = chooser
         bench.restore()
     }

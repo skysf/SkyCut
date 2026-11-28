@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SrtFlowCore
 import UniformTypeIdentifiers
@@ -10,14 +11,16 @@ import UniformTypeIdentifiers
 // hold exactly that subtitle, unedited: otherwise nothing is written and the person is told "Nothing was written: the
 // subtitle changed. Export again." The bytes are written off the main thread (SubtitleFileSave), replacing a file already
 // there only when allowed: its own file, a file confirmed in macOS's own window, or Replace answered to
-// FileReplaceQuestion. The subtitle is marked saved when a write of it in its own format lands on its own file and it still
-// holds exactly that.
-// What it doesn't: the Replace alert (FileReplaceQuestion); the write itself (SubtitleFileSave); what drops a subtitle with
+// FileReplaceQuestion, which is asked from a run-loop turn, never inside the save's task. What the person is told comes as
+// an app-level alert from a run-loop turn ("Could Not Save"), seen even when they have left the Burn In page. The subtitle
+// is marked saved when a write of it in its own format lands on its own file and it still holds exactly that.
+// What it doesn't: the alerts' run-loop turn (RunLoopAlert); the write itself (SubtitleFileSave); what drops a subtitle with
 // unsaved edits (BurnInSubtitleEdits).
 //
 // Why (2026-11-28, docs/bugfixes/2026-11-28-subtitle-replace-writes-another-subtitle.md): the Replace retry wrote whatever
 // subtitle the panel held when Replace was answered, so another subtitle could land in the file chosen for the first one.
-// Rule: docs/architecture/system-file-windows.md rule 9.
+// Review CXM1: the Replace question ran its modal loop inside the save's task, and the message went to the panel even when
+// the panel was off screen. Rule: docs/architecture/system-file-windows.md rule 9.
 
 @MainActor
 struct SubtitleEditorExport {
@@ -33,8 +36,6 @@ struct SubtitleEditorExport {
     }
 
     let subtitles: BurnInSubtitles
-    /// Tells the person why nothing was written (the panel's "Could Not Save" alert).
-    let report: @MainActor (String) -> Void
 
     /// Save: the subtitle to its own file (Export As when it has none).
     func save(boundTo item: EncodeItem.ID?) {
@@ -52,6 +53,18 @@ struct SubtitleEditorExport {
         }
     }
 
+    /// Tells the person why a save wrote nothing: "Could Not Save" with OK, an app-level alert from a run-loop turn.
+    static func tell(_ message: String) {
+        RunLoopAlert.tell {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = L10n("Could Not Save")
+            alert.informativeText = message
+            alert.addButton(withTitle: L10n("OK"))
+            return alert
+        }
+    }
+
     /// What the panel edits for its preview row `item`, now.
     private func pressed(boundTo item: EncodeItem.ID?) -> Pressed? {
         let place = subtitles.panelPlace(boundTo: item)
@@ -63,7 +76,7 @@ struct SubtitleEditorExport {
     /// same check runs again before the second write.
     private func write(_ pressed: Pressed, _ format: SubtitleFormat, to location: SaveLocation) {
         guard pressed.held.sameText(as: subtitles.held(pressed.place)) else {
-            return report(L10n("Nothing was written: the subtitle changed. Export again."))
+            return Self.tell(L10n("Nothing was written: the subtitle changed. Export again."))
         }
         let data = SubtitleFileSave.data(pressed.held.document, format: format)
         Task {
@@ -76,9 +89,11 @@ struct SubtitleEditorExport {
             switch answer {
             case .written: break
             case .occupied:
-                if FileReplaceQuestion.ask(location.url) { write(pressed, format, to: SaveLocation(url: location.url, mayReplace: true)) }
-            case .failed(let reason): report(reason)
-            case .notResponding: report(SubtitleFileSave.notRespondingText(location.url))
+                if await FileReplaceQuestion.askFromRunLoop(location.url) {
+                    write(pressed, format, to: SaveLocation(url: location.url, mayReplace: true))
+                }
+            case .failed(let reason): Self.tell(reason)
+            case .notResponding: Self.tell(SubtitleFileSave.notRespondingText(location.url))
             }
         }
     }
