@@ -57,6 +57,20 @@ import SwiftUI
         return AppUpdateFeed.parse(try! JSONSerialization.data(withJSONObject: object), from: .production)!
     }()
 
+    /// The longest notes a feed may hold: 8 lines of 300 characters (what's new then scrolls in the check window).
+    static let longFeed: AppUpdateFeed = {
+        func line(_ text: String) -> String { String(String(repeating: text, count: 300).prefix(300)) }
+        let notes = ["zh-Hans": Array(repeating: line("新版本会在后台下载好，退出时自动装上。"), count: 8),
+                     "en": Array(repeating: line("New versions download in the background and install when you quit. "), count: 8),
+                     "es": Array(repeating: line("Las versiones nuevas se descargan en segundo plano y se instalan al salir. "), count: 8)]
+        let object: [String: Any] = [
+            "schema": 1, "bundle_id": "com.srtflow.SrtFlow", "version": "0.19.0", "build": "1", "minimum_macos": "15.0",
+            "dmg_url": "https://downloads.skylu.ai/skycut/SkyCut-0.19.0-abababababab-arm64.dmg", "dmg_size": 42_431_367,
+            "dmg_sha256": String(repeating: "ab", count: 32), "notes": notes,
+        ]
+        return AppUpdateFeed.parse(try! JSONSerialization.data(withJSONObject: object), from: .production)!
+    }()
+
     @MainActor
     private static func show(_ phase: AppUpdateState.Phase, decision: AppUpdateEligibility.Decision = .updates, automatic: Bool = true,
                              progress: Double? = nil, failed: Bool = false, asked: Bool = false, checking: Bool = false,
@@ -110,6 +124,10 @@ import SwiftUI
             let host = NSHostingView(rootView: AppUpdateCheckContent(display: display, running: running.description) { _ in }.appLanguage())
             try await Snapshot.takeWindow(behindEverything(AppUpdateCheckWindow.panel(around: host)), to: file("check-window-\(name)"))
         }
+        // The longest notes a feed allows: what's new scrolls, the buttons stay in the window.
+        let longHost = NSHostingView(rootView: AppUpdateCheckContent(display: .downloading(longFeed, fraction: 0.2905),
+                                                                     running: running.description) { _ in }.appLanguage())
+        try await Snapshot.takeWindow(behindEverything(AppUpdateCheckWindow.panel(around: longHost)), to: file("check-window-long-notes"))
         if code == "en" {
             try await probeResize()
             // Classic, in the system's light and dark: the window is new, so both appearances get a look. Classic follows the

@@ -21,9 +21,11 @@ enum PipelineChecks {
                                 from: source)!
         }
         let files = AppUpdateFiles(root: root.appendingPathComponent("Updates"))
+        let reported = ProgressLog()
         func fetch(_ feed: AppUpdateFeed, verify extra: @escaping (URL) throws -> Void = { _ in }) async -> AppUpdateFetchOutcome {
-            await AppUpdatePipeline.run(feed, files: files, stager: FlowChecks.stager(files, running: running, verify: extra),
-                                        appName: "SkyCut.app", asked: false) { _ in }
+            reported.clear()
+            return await AppUpdatePipeline.run(feed, files: files, stager: FlowChecks.stager(files, running: running, verify: extra),
+                                               appName: "SkyCut.app", asked: false) { reported.add($0) }
         }
         let good = feed()
         let kept = files.dmg(for: good)
@@ -31,6 +33,7 @@ enum PipelineChecks {
         let other = files.downloads.appendingPathComponent("SkyCut-1.0.5-abababababab.dmg")
         try Data("another release".utf8).write(to: other)
         check(await fetch(good) == .staged && files.readStaged()?.feed.isSameRelease(as: good) == true, "a release downloads, verifies and stages")
+        check(reported.values.last == 1 && reported.values.count >= 2, "its progress rises to 1 before staging (got \(reported.values))")
         check(UpdateFixture.sha256(kept) == sha, "its DMG is kept until the update is installed")
         check(!FileManager.default.fileExists(atPath: other.path), "a download of another DMG is removed")
         check(await fetch(good) == .staged, "the same release again: its staged copy is taken as it is")
@@ -39,6 +42,8 @@ enum PipelineChecks {
         try FileManager.default.removeItem(at: server.folder.appendingPathComponent("pipeline/SkyCut-1.1.0.dmg"))
         check(await fetch(good) == .staged && files.readStaged() != nil,
               "a finished download kept from an earlier run is staged without downloading it again")
+        // Review CXU1 §4: with no bytes to report, the check window said «Downloading 0%» all through the staging.
+        check(reported.values == [1], "…its progress is 1 for the staging, never a download's (got \(reported.values))")
         // A kept download that no longer matches the feed: removed, downloaded again.
         try server.copy(dmg, to: "pipeline/SkyCut-1.1.0.dmg")
         files.removeStaged(except: nil)
@@ -56,6 +61,15 @@ enum PipelineChecks {
         check(await fetch(feed("pipeline/missing.dmg")) == .notDownloaded && files.readStaged() == nil,
               "a DMG the server doesn't have didn't download (not counted)")
         try verifierSteps(root: root, old: old, running: running, check: check)
+    }
+
+    /// The progress values a run reported (the callback may come from any thread).
+    final class ProgressLog: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored: [Double] = []
+        var values: [Double] { lock.withLock { stored } }
+        func add(_ value: Double) { lock.withLock { stored.append(value) } }
+        func clear() { lock.withLock { stored.removeAll() } }
     }
 
     /// The verifier's steps (AppUpdateVerifier.Steps), each on its own: Gatekeeper alone refuses a copy when staging and is

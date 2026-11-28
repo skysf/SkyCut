@@ -91,9 +91,10 @@ With auto install on (or after Download and Install), in the background (`AppUpd
    removed. Downloads of other DMGs are removed.
 2. Else the DMG goes to `Application Support/SrtFlow/Updates/downloads/` (identity-class name,
    [产品名与代码名](product-name.md)). Never more bytes than the feed says; then the size and SHA-256 must match.
-3. The image is attached read-only with `-nobrowse` at a private mount point (Finder doesn't show it), the app at its top
-   (the running app's bundle id) copied into a folder of its own under `staged.noindex/` (`.noindex`: Spotlight never lists
-   the staged copy), the download quarantine cleared.
+3. Every byte is in (a kept download's too): the progress is 1 from here on. The image is attached read-only with
+   `-nobrowse` at a private mount point (Finder doesn't show it), the app at its top (the running app's bundle id) copied
+   into a folder of its own under `staged.noindex/` (`.noindex`: Spotlight never lists the staged copy), the download
+   quarantine cleared.
 4. The copy is verified (`AppUpdateVerifier`): its Info.plist names the running app's bundle id and exactly the feed's
    version (newer than the running one) and build; its signature passes strictly against the **running** app's designated
    requirement with `notarized` in the same requirement (`AppBundleSignature.notarizedRequirement`); and Gatekeeper accepts
@@ -200,21 +201,30 @@ the replaced app going to the Trash. Every deletion, the download's own file inc
   - **What it says** (`AppUpdateCheckContent`): up to date (OK); couldn't check (Cancel / Try Again); a newer version with
     what's new, then followed live from the updater's state (`AppUpdateCheckDisplay`). The progress is
     `AppUpdateState.progress`, the same value as the pill, Settings and get_status; the window never asks the network.
-    - Downloading: «Downloading 29%», «12.3 MB / 42.4 MB», a bar. Then «Verifying…» once every byte is in.
-    - Ready: the pill popover's own ready content (Later / Restart and Update), then its waiting list while a restart waits.
+    - Downloading: «Downloading 29%», «12.3 MB / 42.4 MB», a bar. Then «Verifying…» once every byte is in. The pipeline
+      reports 1 before it stages (§4), so a kept download shows «Verifying…» too, never «Downloading 0%».
+    - Ready: the pill popover's ready text (Later / Restart and Update, the filled one). If the restart waits for running
+      work, the popover's waiting list and Cancel Restart.
     - The download didn't finish (Later / Try Again). Try Again downloads again after Download and Install's download, and
       checks again after the automatic one.
     - Auto install off: Later / Download and Install, which keeps the window on the download.
     - A copy that can't update itself: Later / Open Download Page.
+    - Up to date, once a later check withdraws the release (the newest found is gone: `AppUpdateState.lastFound`), also
+      with auto install off and nothing downloaded.
+    - What's new scrolls past 200 pt (a feed may hold 8 notes of 300 characters), so the buttons always stay on screen.
+    - Every button has an instant tooltip; the filled one shows its Return key cap.
   - **Its words** are the old alerts' and the popovers' keys. The failed download has its own note («The download didn't
     finish.»): the popover's «… Try again later.» would contradict the Try Again button below it.
-  - **Cancel** (while checking) stops the check (`AppUpdater.cancelCheck`). A check the schedule shares goes on, unanswered.
-    A cancelled check is never a failed one and settles nothing (§1).
+  - **Cancel** (while checking) closes the window. It stops the request (`AppUpdater.cancelCheck`) only when the window's
+    own check is its only requester. A check the schedule or Settings also asked for goes on, unanswered by the window:
+    Settings still gets its answer and a newer version still downloads. A cancelled check is never a failed one and
+    settles nothing (§1).
   - **Closing.** The close button, OK, Later and Escape only close or hide the window. A check goes on and its answer never
     brings the window back. **A download is never stopped by the window**; while one runs, the menu item brings the window
     back on it.
-  - **The keyboard.** It takes the keyboard when it opens: Return clicks the filled button, Escape the other one. When the
-    answer arrives or the download moves on, it never comes forward or takes focus.
+  - **The keyboard.** It never takes the keyboard: it only comes on screen (`orderFront`), and becomes key when the person
+    clicks it. Then Return clicks the filled button, and Escape is the close button in every state (it hides, never cancels).
+    When the answer arrives or the download moves on, it never comes forward.
   - **Its size.** A taller state grows it downward. A window moved low on the screen is lifted just enough to stay whole on
     it.
   - **No modal loop anywhere.** AppUpdater's `.openCheckWindow` and `.answer` effects reach the window through
@@ -236,7 +246,7 @@ Settings' status line, and a connected AI through get_status's `app_update` (`Ap
 `AppUpdateStatusReport`, pure; the fields and states: [AI 接口（MCP）](ai-control-mcp.md) section 4 item 69). get_status reads the state as it is on the main actor and
 says what the pill and Settings say (a copy an earlier run staged stays unseen until this launch's first check, there too),
 and one thing more: a newer release a check found stays `available` after its automatic download failed or the retry record
-held its DMG back (`AppUpdateState.lastFound`, read by nothing but the report). The hints quote the App's buttons in its
+held its DMG back (`AppUpdateState.lastFound`, read by nothing but the report and the check window). The hints quote the App's buttons in its
 language.
 Reading it never starts a check, a download or an install, and nothing lets the AI install, restart or quit SkyCut: it
 passes on the hint, the user's own steps. Its guide topic tells it to mention updates only when the user asks or a newer
@@ -269,11 +279,14 @@ than the running one stays; the rest goes.
   menu check's window (`CheckWindowChecks`, UPD1):
   - only the menu's check opens it, at once;
   - the 0.5 s fast path and the 0.5 s minimum, Try Again;
-  - Cancel stops only the check: never a download, never a failed check, nothing settled, the schedule's share going on;
+  - Cancel stops only the check, and only when nothing else asked for it: never a download, never a failed check,
+    nothing settled; a check the schedule or Settings shares goes on (Settings gets its answer, the download starts);
   - closing only hides, and an answer never brings the window back;
   - reopening on a running download;
   - what it draws, from the updater's state alone (the progress, verifying, ready, a restart waiting, both failed
-    downloads, the switch turned off, a newer release, a withdrawn one), and the whole percents;
+    downloads, the switch turned off, a newer release, a withdrawn one: up to date, also before any download and for a
+    copy that only tells), and the whole percents;
+  - the pipeline's progress rising to 1 before staging, a kept download's being just 1 (`PipelineChecks`);
   - the menu item (greyed while any check runs, the percent while a download runs).
 
   Then, against a loopback server and scratch folders: fetch, download (wrong SHA-256, wrong size either way, redirect,
@@ -310,6 +323,11 @@ than the running one stays; the rest goes.
     and its ticks are run-loop timers.
   - **The menu item is `AppUpdateMenuEntry`'s,** with its greyed and download titles. One check at a time: a check started
     while one runs joins it.
+  - **It never takes the keyboard.** `present()` only calls `orderFront`, and the window has no `makeKeyAndOrderFront`,
+    `makeKey`, `orderFrontRegardless` or `activate`. Escape is `perform(.dismiss)`, the close button.
+  - **Tooltips and Return.** Every button is a `secondaryButton` (`.instantHelp`) or a `defaultButton` (Return,
+    `.instantHelp(…, shortcut: .defaultAction)`). Restart and Update is a `defaultButton`.
+  - **What's new is capped.** The window passes `maxHeight: Self.notesMaxHeight`, and `AppUpdateNotes` scrolls past it.
 - Reverse-verified on 2026-11-27 (#565): replacing the swap with two renames turns the kill loop red (the destination missing
   after kills); removing the cancellation check or the incoming staging folder turns their cases red; each wiring line
   removed turns the guard red. Again for the fixes before the first release (U1b, two rounds): each new case and guard line
@@ -329,6 +347,11 @@ than the running one stays; the rest goes.
   - **Reopening.** Reopening that starts a check, or shows nothing.
   - **The run loop.** The answer shown inside a `Task` or through `DispatchQueue.main.async`; a modal alert or a `Task` in
     the window; a second `show` call.
+- Again for review CXU1's fixes (round 2): 9 sabotages, each red, 3 in the check and 6 in the guard:
+  - in the check: Cancel stopping a check Settings shares; a kept download reporting no progress; a withdrawn release
+    still offered;
+  - in the guard: the first show taking the keyboard; a button without its tooltip; the window's notes not capped, or
+    `AppUpdateNotes` not scrolling; Escape cancelling while checking; Restart and Update without Return.
 - `scripts/render-app-updates.sh <folder>` (graphical session, not in check-all): the pill states, popovers, the check
   window in each state (the production panel, Classic in light and dark too), the menu item's titles and the Settings
   section in zh-Hans / en / es. It also prints how the check window's frame changes when it grows: its top edge kept in the
@@ -394,9 +417,12 @@ No check reaches a real notarized pair of builds, Gatekeeper on a real download,
     - Settings › General › Software Update shows a spinner in front of its status line.
     Cancel closes the window, and choosing the item again starts a new check. Do it once more and close the window with its
     close button instead: when the answer arrives no window comes back, and with B offered the pill still appears.
+    With the window on «Couldn't check», click Settings' Check for Updates, then the window's Try Again, then Cancel:
+    Settings still shows its answer, and with B offered the Update pill appears.
 21. Moving it aside (UPD1). With the slow feed, drag the window by its title bar to a corner of the screen and keep working:
     - click the timeline and play with Space, select clips, open Settings;
-    - the window stays above SkyCut's windows and never takes the keyboard again;
+    - choosing the item leaves the keyboard in the editor (Space plays at once), and so does everything after;
+    - the window stays above SkyCut's windows; click it, and Escape hides it (the check goes on);
     - when the answer arrives it changes in place;
     - switch to another app: the window hides; come back: it is there;
     - moved near the bottom of the screen, it stays whole when a taller answer arrives.
@@ -407,7 +433,12 @@ No check reaches a real notarized pair of builds, Gatekeeper on a real download,
     - meanwhile the menu item reads «Downloading Update (n%)…», and choosing it brings the window back on the download
       with no new feed request in the test server's log;
     - with a wrong SHA-256 in the test feed: «The download didn't finish.» with Try Again, which checks and downloads
-      again.
+      again;
+    - quit during the staging (as in step 18), open A and choose Check for Updates…: the kept download shows
+      «Verifying…», never «Downloading 0%», then ready;
+    - with auto install off, roll the feed back to A's version while the window offers B (nothing downloaded), and let a
+      check run (Settings' button): the window turns to up to date;
+    - B's feed with 8 notes of 300 characters: what's new scrolls, the buttons stay on screen.
 23. Clean up: `defaults delete com.srtflow.SrtFlow SrtFlow.update.feedURL`; the replaced build is in the Trash.
 
 Last run on 2026-11-27, 0.18.69 → 0.18.70 (the release record: [构建与打包](../build/build-and-packaging.md)「公开下载发布」).

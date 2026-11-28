@@ -278,7 +278,7 @@ while (my $text = <>) {
     print "ANSWER $file\n"
         if $code =~ /\bcase\s+\.answer\s*\(\s*let\s+answer\s*\)\s*:\s*RunLoop\.main\.perform \{ MainActor\.assumeIsolated \{ AppUpdateCheckWindow\.shared\.show\(answer\) \} \}/;
     if ($file =~ m{/AppUpdateCheck(Window|Content)\.swift$}) {
-        while ($code =~ /\b(Task|DispatchQueue|asyncAfter|await|URLSession|URLRequest|AppUpdateHTTP|AppUpdatePipeline|cancelDownload|downloadTask|automaticChanged)\b|\b(send)\s*\(/g) {
+        while ($code =~ /\b(Task|DispatchQueue|asyncAfter|await|URLSession|URLRequest|AppUpdateHTTP|AppUpdatePipeline|cancelDownload|downloadTask|automaticChanged|makeKeyAndOrderFront|makeKey|orderFrontRegardless|activate)\b|\b(send)\s*\(/g) {
             print "FORBIDDEN " . ($1 // $2) . " $file:" . at($code, $-[0]) . "\n";
         }
     }
@@ -294,6 +294,21 @@ while (my $text = <>) {
             if $code =~ /case\s+\.cancel\s*:\s*apply\(flow\.cancelled\(\)\)/ && $code =~ /if\s+step\.stopsCheck\s*\{\s*AppUpdater\.shared\.cancelCheck\(\)\s*\}/;
         print "DISPLAY $file\n" if $code =~ /AppUpdateCheckDisplay\.make\(window\.content,\s*state:\s*updater\.state,\s*mode:\s*updater\.mode\)/;
         print "TIMER $file\n" if $code =~ /RunLoop\.main\.add\(timer,\s*forMode:\s*\.common\)/;
+        print "PRESENT $file\n" if $code =~ /private\s+func\s+present\(\)\s*\{[^{}]*\{[^{}]*\}[^{}]*panel\.orderFront\(nil\)\s*\}/;
+        print "ESCAPE $file\n" if $code =~ /func\s+escape\(\)\s*\{\s*perform\(\.dismiss\)\s*\}/;
+    }
+    if ($file =~ m{/AppUpdateCheckContent\.swift$}) {
+        my $buttons = () = $code =~ /\bButton\s*\(/g;
+        print "BUTTONS $buttons $file\n";
+        print "TIPS $file\n"
+            if $code =~ /func\s+secondaryButton\([^)]*help:\s*LocalizedStringKey\)\s*->\s*some\s+View\s*\{\s*Button\(title\)\s*\{\s*perform\(action\)\s*\}\s*\.instantHelp\(help\)\s*\}/
+            && $code =~ /func\s+defaultButton\([^)]*help:\s*LocalizedStringKey\)\s*->\s*some\s+View\s*\{\s*Button\(title\)\s*\{\s*perform\(action\)\s*\}[^}]*\.keyboardShortcut\(\.defaultAction\)\s*\.instantHelp\(help,\s*shortcut:\s*\.defaultAction\)\s*\}/;
+        print "RETURN $file\n" if $code =~ /defaultButton\(\s*,\s*\.restart,/;
+        print "NOTESCAP $file\n" if $code =~ /AppUpdateNotes\(heading:\s*,\s*lines:[^\n]*\n?\s*maxHeight:\s*Self\.notesMaxHeight\)/;
+    }
+    if ($file =~ m{/AppUpdatePopoverParts\.swift$}) {
+        print "SCROLL $file\n"
+            if $code =~ /ScrollView\(\.vertical\)\s*\{\s*list\s*\}\s*\.frame\(maxHeight:\s*maxHeight\)\s*\.fixedSize\(horizontal:\s*false,\s*vertical:\s*true\)/;
     }
     if ($file =~ m{/AppUpdateMenu\.swift$}) {
         print "MENU $file\n"
@@ -341,6 +356,14 @@ if WINDOW_OUT="$(find Sources -name '*.swift' -type f -print0 | xargs -0 perl -0
   has CANCEL "${WINDOW}" || fail "${WINDOW}: Cancel goes through the flow and stops the check only through AppUpdater.cancelCheck()"
   has DISPLAY "${WINDOW}" || fail "${WINDOW}: the window draws AppUpdateCheckDisplay.make(window.content, state: updater.state, mode: updater.mode): the progress is the updater's own"
   has TIMER "${WINDOW}" || fail "${WINDOW}: its ticks are run-loop timers (RunLoop.main.add(timer, forMode: .common))"
+  has PRESENT "${WINDOW}" || fail "${WINDOW}: present() only orders the panel in (panel.orderFront(nil)): it never takes the keyboard (review CXU1)"
+  has ESCAPE "${WINDOW}" || fail "${WINDOW}: Escape is the close button in every state (func escape() { perform(.dismiss) }): it hides, never cancels (review CXU1)"
+  CONTENT="${DIR}/AppUpdateCheckContent.swift"
+  [ "$(sed -n "s|^BUTTONS \([0-9]*\) ${CONTENT}\$|\1|p" <<<"${WINDOW_OUT}")" = 2 ] && has TIPS "${CONTENT}" \
+    || fail "${CONTENT}: every button is secondaryButton (.instantHelp(help)) or defaultButton (Return, .instantHelp(help, shortcut: .defaultAction)): instant tooltips on all of them (review CXU1)"
+  has RETURN "${CONTENT}" || fail "${CONTENT}: Restart and Update is the window's filled button: Return clicks it (review CXU1)"
+  has NOTESCAP "${CONTENT}" && has SCROLL "${DIR}/AppUpdatePopoverParts.swift" \
+    || fail "the check window caps what's new (maxHeight: Self.notesMaxHeight) and AppUpdateNotes scrolls past it: 8 notes of 300 characters never push the buttons off screen (review CXU1)"
   has MENU "${MENU}" \
     || fail "${MENU}: the item is AppUpdateMenuEntry.make(updater.state): greyed while checking, the download's percent opening the window, the check from the menu"
   [ "$(count 'Button("Checking for Updates…") {}' "${MENU}")" = 1 ] && [ "$(count 'L10n("Downloading Update (%d%%)…")' "${MENU}")" = 1 ] \

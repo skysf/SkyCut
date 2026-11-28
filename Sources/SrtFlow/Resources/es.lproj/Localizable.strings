@@ -1791,6 +1791,14 @@
 "Downloading Update (%d%%)…" = "Descargando actualización (%d%%)…";
 "Verifying…" = "Verificando…";
 "The download didn’t finish." = "La descarga no terminó.";
+"Stop checking and close this window" = "Dejar de buscar y cerrar esta ventana";
+"Close this window; the download goes on" = "Cerrar esta ventana; la descarga continúa";
+"Check for updates again" = "Volver a buscar actualizaciones";
+"Download the new version again" = "Volver a descargar la versión nueva";
+"Download the new version now; it installs when you quit" = "Descargar ahora la versión nueva; se instala al salir";
+"Open the SkyCut download page in your browser" = "Abrir la página de descarga de SkyCut en el navegador";
+"Quit SkyCut, install the new version and open SkyCut again" = "Salir de SkyCut, instalar la versión nueva y volver a abrirlo";
+"Don’t restart; the new version installs when you quit" = "No reiniciar; la versión nueva se instala al salir";
 "Restart and Update to %@…" = "Reiniciar y actualizar a %@…";
 "SkyCut is up to date" = "SkyCut está actualizado";
 "%@ is the latest version." = "La versión %@ es la más reciente.";

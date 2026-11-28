@@ -1791,6 +1791,14 @@
 "Downloading Update (%d%%)…" = "正在下载更新（%d%%）…";
 "Verifying…" = "正在验证…";
 "The download didn’t finish." = "下载没完成。";
+"Stop checking and close this window" = "停止检查并关闭这个窗口";
+"Close this window; the download goes on" = "关闭这个窗口，下载会继续";
+"Check for updates again" = "再检查一次更新";
+"Download the new version again" = "重新下载新版本";
+"Download the new version now; it installs when you quit" = "现在下载新版本，退出时自动装上";
+"Open the SkyCut download page in your browser" = "在浏览器里打开 SkyCut 的下载页";
+"Quit SkyCut, install the new version and open SkyCut again" = "退出 SkyCut，装上新版本后重新打开";
+"Don’t restart; the new version installs when you quit" = "先不重启，退出时会自动装上新版本";
 "Restart and Update to %@…" = "重启并更新到 %@…";
 "SkyCut is up to date" = "SkyCut 已是最新版本";
 "%@ is the latest version." = "%@ 就是现在最新的版本。";

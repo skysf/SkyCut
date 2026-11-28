@@ -163,7 +163,8 @@ final class AppUpdater: ObservableObject {
     /// Download and Install (auto install off).
     func downloadAndInstall() { send(.downloadAsked) }
 
-    /// Cancel in the menu check's window: the check stops, unless the schedule's check shares it (it then goes on, unanswered).
+    /// Cancel in the menu check's window: the check stops, unless the schedule or Settings also asked for it (it then goes
+    /// on, unanswered by the window).
     func cancelCheck() { send(.checkCancelled) }
 
     func notesViewed() { send(.notesViewed) }

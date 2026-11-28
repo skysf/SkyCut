@@ -1791,6 +1791,14 @@
 "Downloading Update (%d%%)…" = "Downloading Update (%d%%)…";
 "Verifying…" = "Verifying…";
 "The download didn’t finish." = "The download didn’t finish.";
+"Stop checking and close this window" = "Stop checking and close this window";
+"Close this window; the download goes on" = "Close this window; the download goes on";
+"Check for updates again" = "Check for updates again";
+"Download the new version again" = "Download the new version again";
+"Download the new version now; it installs when you quit" = "Download the new version now; it installs when you quit";
+"Open the SkyCut download page in your browser" = "Open the SkyCut download page in your browser";
+"Quit SkyCut, install the new version and open SkyCut again" = "Quit SkyCut, install the new version and open SkyCut again";
+"Don’t restart; the new version installs when you quit" = "Don’t restart; the new version installs when you quit";
 "Restart and Update to %@…" = "Restart and Update to %@…";
 "SkyCut is up to date" = "SkyCut is up to date";
 "%@ is the latest version." = "%@ is the latest version.";

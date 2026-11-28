@@ -160,6 +160,8 @@ struct AppUpdateHeader: View {
 struct AppUpdateNotes: View {
     let heading: LocalizedStringKey
     let lines: [String]
+    /// The check window's cap: longer lines scroll (a feed may hold 8 notes of 300 characters). nil: as tall as they are.
+    var maxHeight: CGFloat?
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
@@ -169,16 +171,30 @@ struct AppUpdateNotes: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 2)
-                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                    HStack(alignment: .firstTextBaseline, spacing: 7) {
-                        Text(verbatim: "•")
-                        Text(verbatim: line).fixedSize(horizontal: false, vertical: true)
-                    }
-                    .font(.system(size: 13))
+                if let maxHeight {
+                    // As tall as the lines up to the cap (fixedSize asks for the ideal height), then it scrolls.
+                    ScrollView(.vertical) { list }
+                        .frame(maxHeight: maxHeight)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    list
                 }
             }
             .padding(.top, 16)
         }
+    }
+
+    private var list: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Text(verbatim: "•")
+                    Text(verbatim: line).fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.system(size: 13))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

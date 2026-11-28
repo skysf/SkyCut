@@ -8,9 +8,9 @@ import os
 // 2. downloads of other DMGs go; a finished download of this one kept from an earlier run (a quit during staging, say) is
 //    used if its size and SHA-256 still match the feed, else removed;
 // 3. otherwise the DMG is downloaded (AppUpdateHTTP: never more bytes than the feed says, then its size and SHA-256);
-// 4. it is staged (AppUpdateStager: read-only image, copy, verification). The DMG stays until the update is installed or
-//    the feed names another DMG or nothing newer (AppUpdateFiles, AppUpdateLaunchFiles); a DMG that fails its check or its
-//    staging is removed.
+// 4. it is staged (AppUpdateStager: read-only image, copy, verification), with the progress at 1 first (a kept download
+//    reports nothing before). The DMG stays until the update is installed or the feed names another DMG or nothing newer
+//    (AppUpdateFiles, AppUpdateLaunchFiles); a DMG that fails its check or its staging is removed.
 // The outcome tells a download that didn't complete (offline, a server error, stopped: not counted) from one that completed
 // and then failed (counted in the retry record, AppUpdateRetryRecord). Cancelling the task stops a download; staging, once
 // begun, runs to its end, and a quit during it leaves the DMG for the next launch.
@@ -77,6 +77,9 @@ enum AppUpdatePipeline {
             }
         }
         if Task.isCancelled { return .notDownloaded }
+        // Every byte is in, a kept download's too: what follows is the check and the staging (the check window says
+        // «Verifying…», never «Downloading 0%»).
+        progress(1)
         let staged = await AppUpdateWork.run { () -> Result<AppUpdateStagedRecord, Error> in
             Result { try stager.stage(dmg, feed: feed, appName: appName, asked: asked) }
         }

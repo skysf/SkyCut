@@ -6,8 +6,8 @@ import SwiftUI
 // What it does: the small window a check started from the app menu opens. A utility panel: it floats above SkyCut's own
 // windows, is off screen while SkyCut isn't active (never above other apps), moves aside by its title bar or background,
 // and is never modal, so SkyCut keeps working while a slow check waits. It shows checking (a spinner, Cancel) or the
-// answer, as AppUpdateCheckFlow decides: straight on a quick answer, else the answer in place of the checking state, never
-// brought forward or made key again. A newer version is then followed live (AppUpdateCheckDisplay: its download, verified
+// answer, as AppUpdateCheckFlow decides: straight on a quick answer, else the answer in place of the checking state. It
+// never takes the keyboard (it becomes key only when clicked) and is never brought forward by an update. A newer version is then followed live (AppUpdateCheckDisplay: its download, verified
 // and ready, a download that didn't finish), in place. Cancel stops the check; the close button only hides the window: the
 // check goes on, and a download is never stopped by the window. While a download runs, the app menu's item brings the
 // window back on it (`showDownload`, no check). Every call comes from a run-loop turn (AppUpdater's effects through
@@ -62,12 +62,15 @@ final class AppUpdateCheckWindow: NSObject, ObservableObject, NSWindowDelegate {
         case .openDownloadPage:
             apply(flow.closed())
             NSWorkspace.shared.open(AppUpdateFeed.downloadPageURL)
+        // As the pill's popover: now if nothing runs, else the window shows what the restart waits for.
+        case .restart: AppUpdater.shared.requestRestart()
+        case .cancelRestart: AppUpdater.shared.cancelRestart()
         }
     }
 
-    /// Escape: the button that isn't filled (Cancel while checking, which stops the check like the button; else Later,
-    /// Cancel or OK).
-    func escape() { perform(content == .checking ? .cancel : .dismiss) }
+    /// Escape (once the person has clicked the window): the close button, in every state. It hides the window and never
+    /// cancels a check, a download or a restart that waits.
+    func escape() { perform(.dismiss) }
 
     /// The close button only hides the window: a check in flight goes on (hiding is not cancelling).
     func windowShouldClose(_ sender: NSWindow) -> Bool {
@@ -96,13 +99,13 @@ final class AppUpdateCheckWindow: NSObject, ObservableObject, NSWindowDelegate {
         self.timer = timer
     }
 
-    /// On screen and key: the person just chose the menu item, so Return and Escape reach its buttons. While SkyCut isn't
-    /// active it waits for SkyCut to come back, and then never takes the keyboard.
+    /// On screen, never key: the keyboard stays where the person is working. The panel becomes key only when the person
+    /// clicks it (then Return and Escape reach it). While SkyCut isn't active it waits for SkyCut to come back.
     private func present() {
         guard NSApp.isActive else { return waitForActivation() }
         let panel = makePanel()
         place(panel)
-        panel.makeKeyAndOrderFront(nil)
+        panel.orderFront(nil)
     }
 
     private func waitForActivation() {

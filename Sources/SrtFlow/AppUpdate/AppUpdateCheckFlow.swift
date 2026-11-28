@@ -157,21 +157,21 @@ enum AppUpdateCheckDisplay: Equatable, Sendable {
     case cannotUpdate(AppUpdateFeed)
 
     static func make(_ shows: AppUpdateCheckFlow.Shows, state: AppUpdateState, mode: AppUpdateMode?) -> AppUpdateCheckDisplay {
-        let found: AppUpdateFeed
         switch shows {
         case .checking: return .checking
         case .answer(.upToDate): return .upToDate
         case .answer(.failed): return .couldNotCheck
-        case .answer(.downloading(let feed)), .answer(.askToDownload(let feed)), .answer(.cannotUpdate(let feed)): found = feed
+        case .answer(.downloading), .answer(.askToDownload), .answer(.cannotUpdate): break
         }
-        if case .notifyOnly = mode { return .cannotUpdate(state.offer ?? found) }
-        // No release held any more: an automatic download that didn't stage lets it go (or a later check withdrew it).
-        guard let offer = state.offer else { return .downloadFailed(found, asked: false) }
+        // No release held any more: an automatic download that didn't stage let it go (the newest found is still known:
+        // it didn't finish), or a later check found nothing newer (withdrawn: up to date).
+        guard let offer = state.offer else { return state.lastFound.map { .downloadFailed($0, asked: false) } ?? .upToDate }
+        if case .notifyOnly = mode { return .cannotUpdate(offer) }
         switch state.phase {
         case .downloading: return .downloading(offer, fraction: state.progress)
         case .ready: return state.restartPending ? .waitingToRestart(offer) : .ready(offer)
         case .available: return state.downloadFailed ? .downloadFailed(offer, asked: true) : .askToDownload(offer)
-        case .idle: return .downloadFailed(found, asked: false)
+        case .idle: return .downloadFailed(offer, asked: false)
         }
     }
 

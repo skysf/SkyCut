@@ -135,6 +135,16 @@ enum CheckWindowChecks {
         _ = first.apply(.checkStarted(.schedule), mode: auto)
         _ = first.apply(.checkStarted(.menu), mode: auto)
         check(first.apply(.checkCancelled, mode: auto).isEmpty && first.checking, "the menu joining the schedule's check: the same")
+        // Review CXU1 §1: Settings' check, then the window's Try Again joining it, then Cancel.
+        var settings = AppUpdateState()
+        _ = settings.apply(.checkStarted(.settings), mode: auto)
+        _ = settings.apply(.checkStarted(.menu), mode: auto)
+        let kept = settings.apply(.checkCancelled, mode: auto)
+        check(kept.isEmpty && settings.checking && settings.personStarted && !settings.personChecking,
+              "Settings' check shared by the window: Cancel stops nothing, the check stays Settings' (got \(kept))")
+        let answered = settings.apply(done(.offer(feed)), mode: auto)
+        check(answered == [.discardDownloads(keeping: feed), .download(feed)] && settings.phase == .downloading && !settings.lastCheckFailed,
+              "…Settings gets its answer and the download starts, with no window answer (got \(answered))")
         var idle = AppUpdateState()
         check(idle.apply(.checkCancelled, mode: auto).isEmpty, "Cancel with no check running does nothing")
         var downloading = found(feed, auto)
@@ -188,7 +198,16 @@ enum CheckWindowChecks {
         var withdrawn = found(feed, auto)
         _ = withdrawn.apply(.checkStarted(.schedule), mode: auto)
         _ = withdrawn.apply(done(.upToDate), mode: auto)
-        check(make(shows, withdrawn, auto) == .downloadFailed(feed, asked: false), "a release withdrawn during its download: Try Again checks again")
+        check(make(shows, withdrawn, auto) == .upToDate, "a release withdrawn during its download: up to date")
+        // Review CXU1 §4: auto install off, nothing downloaded, a later check finds nothing newer.
+        var offered = found(feed, manualMode)
+        _ = offered.apply(.checkStarted(.schedule), mode: manualMode)
+        _ = offered.apply(done(.upToDate), mode: manualMode)
+        check(make(asked, offered, manualMode) == .upToDate, "auto install off, a release withdrawn before any download: up to date")
+        var told = found(feed, tells)
+        _ = told.apply(.checkStarted(.schedule), mode: tells)
+        _ = told.apply(done(.upToDate), mode: tells)
+        check(make(.answer(.cannotUpdate(feed)), told, tells) == .upToDate, "a copy that can't update itself, the release withdrawn: up to date")
         let percent = AppUpdateCheckDisplay.percent
         check(percent(nil) == 0 && percent(0.2905) == 29 && percent(0.999) == 99 && percent(1) == 100 && percent(1.5) == 100
               && percent(-0.2) == 0, "whole percents, floored and clamped")
