@@ -1,10 +1,10 @@
 import Foundation
 
 // scripts/check-app-update.sh: SkyCut's updater. The pure rules (versions, the feed, who updates, the state machine, the
-// retry record, what a restart waits for), then the real flow against scratch folders: a loopback feed and DMG, real
-// images, the pipeline, the install at quit with fixture bundles, a loop of swaps killed at random instants, what a launch
-// reads and cleans, and the relaunch shell. Never the network, the real /Applications, the person's Trash or a running
-// SkyCut: every destination, Trash, opener and running probe is injected.
+// retry record, what a restart waits for, the menu check's window and menu item), then the real flow against scratch
+// folders: a loopback feed and DMG, real images, the pipeline, the install at quit with fixture bundles, a loop of swaps
+// killed at random instants, what a launch reads and cleans, and the relaunch shell. Never the network, the real
+// /Applications, the person's Trash or a running SkyCut: every destination, Trash, opener and running probe is injected.
 // Usage: check-app-update <scratch folder> <loopback base URL> <the server's folder>
 //        check-app-update --swap-loop <a> <b> <count>   (the kill test's child)
 
@@ -25,6 +25,7 @@ struct AppUpdateChecks {
         FeedChecks.run(check: check)
         EligibilityChecks.run(check: check)
         StateChecks.run(check: check)
+        CheckWindowChecks.run(check: check)
         StatusReportChecks.run(check: check)
         do {
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

@@ -96,9 +96,10 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
     that runs inside a task, the exception unwinds the task and the Swift runtime's `swift_job_run`, which then never puts
     the thread's executor tracking back. The next main-actor isolation check outside a task (`MainActor.assumeIsolated`,
     an event monitor) reads a dead stack frame and crashes. That is how Check for Updates… crashed 0.18.70.
-    - Show a new alert from a run-loop turn: `RunLoop.main.perform { MainActor.assumeIsolated { … } }`, as the update
-      check's answer does ([app updates](app-updates.md) §7). Not `Task { }`. Not `DispatchQueue.main.async` either: an
-      exception escaping a dispatch block terminates the app.
+    - Show a new alert from a run-loop turn: `RunLoop.main.perform { MainActor.assumeIsolated { … } }`. Not `Task { }`.
+      Not `DispatchQueue.main.async` either: an exception escaping a dispatch block terminates the app.
+    - Better still, no modal loop at all. Since 2026-11-28 the update check's answer is a non-modal window, opened and
+      answered the same way ([app updates](app-updates.md) §7, the check window).
     - A caller inside a task that awaits the answer uses `RunLoopAlert` (a run-loop timer, also in the modal-panel mode
       Quit's wait runs in, never inside another alert): the Burn In subtitle questions and the subtitle editor's Replace
       (`FileReplaceQuestion.askFromRunLoop`), since 2026-11-28.
@@ -117,7 +118,7 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
 | `scripts/check-project-saves.sh` (`ReplaceChecks`) | a file under the answered name keeps its bytes until the person answers Replace: the project's Save As for each helper answer, closing an untitled project, the AI's saves, the subtitle file write (rule 9) |
 | `scripts/check-export-profile.sh` (`SubtitleExportChecks`) | rule 9's Burn In subtitle editor, through the panel's own `exportAs` / `save` with a save window answered late and the real "Replace?" and "Could Not Save" alerts' buttons pressed by title: another subtitle in its place, the subtitle edited, or its video gone by the time Replace is answered writes nothing and says so in an app-level alert; unchanged, Replace writes it; a window answered after another subtitle took its place writes nothing; the preview moving to another row still exports the standalone file; Save marks the subtitle saved; no alert, Replace included, inside a Swift task (rule 10) |
 | `checks/file-io-off-main-wiring.sh` | panels only in `SystemFileChooser.swift`, `begin`, no `runModal` in the chooser / shared windows / helper / export panel, the record before AppKit, `FilePicker` through `SystemFileWindows`; the Close It strip only from `offerToCloseOpenWindow` (a second request) and no sleep or timer in `SystemFileWindows` (rule 5); rule 9's wiring (helper answers unconfirmed, the exclusive install, Save As and Export As asking, the recording's confirmation; the subtitle panel's buttons only through `SubtitleEditorExport`, whose writes check the subtitle pressed for first) |
-| `checks/app-update-wiring.sh` (section 10) | rule 10 for the update check's answer window: shown with `RunLoop.main.perform`, never in a `Task` or `DispatchQueue.main.async`. The other alerts are not scanned (they run inside their tasks today, rule 10) |
+| `checks/app-update-wiring.sh` (section 10) | rule 10 for the update check's window (since 2026-11-28 not modal): no `runModal` or `NSAlert` in the updater; opened and answered only by `RunLoop.main.perform` calls, never in a `Task` or `DispatchQueue.main.async`; the window starts no task itself. The other alerts are not scanned (they run inside their tasks today, rule 10) |
 
 ## Manual regression (real windows, before a release)
 

@@ -1786,6 +1786,11 @@
 "What’s new in this version" = "Novedades";
 "AI chats started before this update, in ChatGPT for example, may need a restart to use the new tools." = "Los chats de IA que empezaron antes de esta actualización, en ChatGPT por ejemplo, pueden necesitar un reinicio para usar las herramientas nuevas.";
 "Check for Updates…" = "Buscar actualizaciones…";
+"Checking for Updates…" = "Buscando actualizaciones…";
+"Checking for updates…" = "Buscando actualizaciones…";
+"Downloading Update (%d%%)…" = "Descargando actualización (%d%%)…";
+"Verifying…" = "Verificando…";
+"The download didn’t finish." = "La descarga no terminó.";
 "Restart and Update to %@…" = "Reiniciar y actualizar a %@…";
 "SkyCut is up to date" = "SkyCut está actualizado";
 "%@ is the latest version." = "La versión %@ es la más reciente.";

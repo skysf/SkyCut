@@ -180,23 +180,60 @@ the replaced app going to the Trash. Every deletion, the download's own file inc
   (`https://skylu.ai/download/skycut`).
 - First launch after an update: **Updated**; clicking shows the notes and, only when Connect AI has a client set up, the AI
   line. It goes away once looked at, or at the next launch.
-- App menu: SkyCut › Check for Updates… (after About); once ready, Restart and Update to %@…, which opens the pill's popover
-  in the active window. The answer to a check started there is the **only** window the updater ever opens. It runs its
-  modal loop from the run loop (`RunLoop.main.perform`), never inside a Swift task: an exception under it there crashed
-  0.18.70 ([case](../bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md),
-  [system file windows](system-file-windows.md) rule 10).
-- Settings › General › Software Update: the version, the status line, Check for Updates (answers in the status line), the
-  switch «Download and install updates automatically» (default on, `SrtFlow.update.automatic.v1`) and its caption, which
-  follows the switch. Turning it off stops a background download; a copy already staged then no longer installs by itself
-  (Download and Install takes it at once). While the test hook is set, one more line under the status line: «Test update
-  feed: <address>» (§1).
+- App menu (`AppUpdateMenuEntry`):
+  - SkyCut › Check for Updates… (after About): it checks and opens the check window (below);
+  - greyed «Checking for Updates…» while any check runs: a second choice never starts a second check;
+  - «Downloading Update (29%)…» while a download runs: it shows the check window on that download, without a check;
+  - once ready, Restart and Update to %@…, which opens the pill's popover in the active window.
+- **The check window** (UPD1, 2026-11-28). The user found the menu's check silent for seconds, 「好像卡死一样」. They chose a
+  small window that never blocks, then asked to watch the download in it. Only the menu's check has a window, and it is the
+  **only** window the updater opens.
+  - **What it is** (`AppUpdateCheckWindow`): a utility panel, never modal.
+    - It floats above SkyCut's own windows and is off screen while SkyCut isn't active, so it is never above other apps.
+    - It moves aside by its title bar or background, and opens where the person left it, for the run.
+    - SkyCut keeps working while it waits.
+  - **When** (`AppUpdateCheckFlow`, pure):
+    - an answer within 0.5 s opens the window straight on it;
+    - otherwise it opens checking after 0.5 s: a spinner, «Checking for updates…», the running version, Cancel;
+    - the checking state stays at least 0.5 s before the answer replaces it, in place;
+    - Try Again shows checking at once.
+  - **What it says** (`AppUpdateCheckContent`): up to date (OK); couldn't check (Cancel / Try Again); a newer version with
+    what's new, then followed live from the updater's state (`AppUpdateCheckDisplay`). The progress is
+    `AppUpdateState.progress`, the same value as the pill, Settings and get_status; the window never asks the network.
+    - Downloading: «Downloading 29%», «12.3 MB / 42.4 MB», a bar. Then «Verifying…» once every byte is in.
+    - Ready: the pill popover's own ready content (Later / Restart and Update), then its waiting list while a restart waits.
+    - The download didn't finish (Later / Try Again). Try Again downloads again after Download and Install's download, and
+      checks again after the automatic one.
+    - Auto install off: Later / Download and Install, which keeps the window on the download.
+    - A copy that can't update itself: Later / Open Download Page.
+  - **Its words** are the old alerts' and the popovers' keys. The failed download has its own note («The download didn't
+    finish.»): the popover's «… Try again later.» would contradict the Try Again button below it.
+  - **Cancel** (while checking) stops the check (`AppUpdater.cancelCheck`). A check the schedule shares goes on, unanswered.
+    A cancelled check is never a failed one and settles nothing (§1).
+  - **Closing.** The close button, OK, Later and Escape only close or hide the window. A check goes on and its answer never
+    brings the window back. **A download is never stopped by the window**; while one runs, the menu item brings the window
+    back on it.
+  - **The keyboard.** It takes the keyboard when it opens: Return clicks the filled button, Escape the other one. When the
+    answer arrives or the download moves on, it never comes forward or takes focus.
+  - **Its size.** A taller state grows it downward. A window moved low on the screen is lifted just enough to stay whole on
+    it.
+  - **No modal loop anywhere.** AppUpdater's `.openCheckWindow` and `.answer` effects reach the window through
+    `RunLoop.main.perform`, its timers are run-loop timers, and it starts no task. An exception under a modal loop inside a
+    task crashed 0.18.70 ([case](../bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md),
+    [system file windows](system-file-windows.md) rule 10).
+- Settings › General › Software Update: the version, the status line (with a small spinner in front while any check runs),
+  Check for Updates (answers in the status line; disabled while a check or a download runs), the switch «Download and
+  install updates automatically» (default on, `SrtFlow.update.automatic.v1`) and its caption, which follows the switch.
+  Turning it off stops a background download; a copy already staged then no longer installs by itself (Download and
+  Install takes it at once). While the test hook is set, one more line under the status line: «Test update feed:
+  <address>» (§1).
 
-Views subscribe to `AppUpdater` only (never a project or the player clock); every popover has `.appLanguage()`; tooltips are
-`instantHelp`; colours are `AppThemePalette`'s.
+Views subscribe to `AppUpdater` only (never a project or the player clock), the check window's root too; every popover and
+the window's hosting view have `.appLanguage()`; tooltips are `instantHelp`; colours are `AppThemePalette`'s.
 
-**Who reads the state** (since 2026-11-27, MCP-85): the toolbar pill and its popovers, the app menu, Settings' status line, and
-a connected AI through get_status's `app_update` (`AppUpdater.statusReport` → `AppUpdateStatusReport`, pure; the fields and
-states: [AI 接口（MCP）](ai-control-mcp.md) section 4 item 69). get_status reads the state as it is on the main actor and
+**Who reads the state** (since 2026-11-27, MCP-85): the toolbar pill and its popovers, the app menu, the check window,
+Settings' status line, and a connected AI through get_status's `app_update` (`AppUpdater.statusReport` →
+`AppUpdateStatusReport`, pure; the fields and states: [AI 接口（MCP）](ai-control-mcp.md) section 4 item 69). get_status reads the state as it is on the main actor and
 says what the pill and Settings say (a copy an earlier run staged stays unseen until this launch's first check, there too),
 and one thing more: a newer release a check found stays `available` after its automatic download failed or the retry record
 held its DMG back (`AppUpdateState.lastFound`, read by nothing but the report). The hints quote the App's buttons in its
@@ -228,13 +265,23 @@ than the running one stays; the rest goes.
 ## 9. Checks and guards
 
 - `scripts/check-app-update.sh` (check-all): the feed's parser (every field wrong on its own), versions, who updates, the
-  state machine (with the retry record and the unconfirmed staged copy), what a restart waits for, the status line; then
-  against a loopback server and scratch folders: fetch, download (wrong SHA-256, wrong size either way, redirect, cancelled,
-  and which of them count), staging from real images, the pipeline (kept downloads, staged copies, what counts), the
-  verifier's steps on their own (Gatekeeper alone, the running app unreadable), get_status's `app_update` (every state
-  against hand-written JSON, which wins when two hold, notes and hints only where they belong, then through the state
-  machine's own transitions), a killed run's image, the install (order,
-  refusals, the stager's own copy only, no downgrade, cross-volume), 24 loops of atomic swaps killed with SIGKILL at random
+  state machine (with the retry record and the unconfirmed staged copy), what a restart waits for, the status line; the
+  menu check's window (`CheckWindowChecks`, UPD1):
+  - only the menu's check opens it, at once;
+  - the 0.5 s fast path and the 0.5 s minimum, Try Again;
+  - Cancel stops only the check: never a download, never a failed check, nothing settled, the schedule's share going on;
+  - closing only hides, and an answer never brings the window back;
+  - reopening on a running download;
+  - what it draws, from the updater's state alone (the progress, verifying, ready, a restart waiting, both failed
+    downloads, the switch turned off, a newer release, a withdrawn one), and the whole percents;
+  - the menu item (greyed while any check runs, the percent while a download runs).
+
+  Then, against a loopback server and scratch folders: fetch, download (wrong SHA-256, wrong size either way, redirect,
+  cancelled, and which of them count), staging from real images, the pipeline (kept downloads, staged copies, what
+  counts), the verifier's steps on their own (Gatekeeper alone, the running app unreadable), get_status's `app_update`
+  (every state against hand-written JSON, which wins when two hold, notes and hints only where they belong, then through
+  the state machine's own transitions), a killed run's image, the install (order, refusals, the stager's own copy only,
+  no downgrade, cross-volume), 24 loops of atomic swaps killed with SIGKILL at random
   instants (after every kill both paths hold a whole, valid app), what a launch reads and cleans, and the relaunch shell
   (with a recorder for `/usr/bin/open`); the Updates folder's own rules (a link at its root never followed, deletions in
   one step, the Data volume's spelling, a sibling folder). Every request's headers against the allow-list, `Accept: */*`
@@ -249,10 +296,20 @@ than the running one stays; the rest goes.
   the folder, the relaunch shell (this pid, `/usr/bin/open`, never `-n`), the test hook line in Settings; file effects only
   for a copy that installs; the schedule's origin, the retry record at launch, the real home folder, the cadence, a
   cancelled download's silence, the record matched to the offer (review FBU2); get_status's one `app_update` line, and the
-  report only mapping a state it is given (Foundation only, no check, download, install or restart). Deletion calls (`removeItem`, `unlink`,
-  `rmdir`, `recycle`) only in `AppUpdateFiles.swift`. Since 2026-11-27 (section 10): the menu check's answer window from the run
-  loop, never in a `Task` or `DispatchQueue.main.async`, and nothing else shows it: one executable call, right after
-  `case .answer`, read across lines with comments and string literals not counted.
+  report only mapping a state it is given (Foundation only, no check, download, install or restart). Deletion calls
+  (`removeItem`, `unlink`, `rmdir`, `recycle`) only in `AppUpdateFiles.swift`. Section 10, the check window (UPD1, code only,
+  read across lines with comments and string literals not counted):
+  - **Never modal.** No `runModal` or `NSAlert` in the updater.
+  - **Opened and answered only from the run loop.** `.openCheckWindow` and `.answer` are each one
+    `RunLoop.main.perform { MainActor.assumeIsolated { … } }` call right after their `case`, never a `Task` or a dispatch
+    block. The menu's download item is the only `showDownload`, and it starts no check.
+  - **Nothing in the window reaches further.** It starts no task or dispatch block, and never touches a download, the
+    network or the state machine. Closing only hides; Cancel goes through `AppUpdater.cancelCheck`, which only sends
+    `.checkCancelled`, and `.stopCheck` cancels only the check's own task. A cancelled check's task reports nothing.
+  - **It draws the updater's state.** `AppUpdateCheckDisplay.make` reads `updater.state`. `open()` goes through the flow,
+    and its ticks are run-loop timers.
+  - **The menu item is `AppUpdateMenuEntry`'s,** with its greyed and download titles. One check at a time: a check started
+    while one runs joins it.
 - Reverse-verified on 2026-11-27 (#565): replacing the swap with two renames turns the kill loop red (the destination missing
   after kills); removing the cancellation check or the incoming staging folder turns their cases red; each wiring line
   removed turns the guard red. Again for the fixes before the first release (U1b, two rounds): each new case and guard line
@@ -260,8 +317,22 @@ than the running one stays; the rest goes.
   of `just_updated`, the restart flag dropped, notes while downloading, the switch reported for every copy and the moving
   hint dropped each turn the status cases red; removing get_status's line, or a check started from the report or from
   `statusReport`, turns the guard red.
-- `scripts/render-app-updates.sh <folder>` (graphical session, not in check-all): the pill states, popovers, menu answers and
-  Settings section in zh-Hans / en / es.
+- Reverse-verified for the check window (UPD1, 2026-11-28): 25 sabotages, each red, 11 in the check and 14 in the guard.
+  - **Opening.** The menu's check opening no window; `open()` not run from the run loop, or bypassing the flow.
+  - **Timing.** No grace period; a quick answer ignored; no minimum for the checking state.
+  - **The menu item.** Not greyed (in the pure entry, and enabled in the view); the download item without its percent; a
+    second check started while one runs.
+  - **Closing and Cancel.** Closing that stops the check (in the flow, and the close button cancelling); Cancel stopping
+    the download too (in the state machine, and the window reaching `downloadTask`); Cancel not stopping the check; a
+    cancelled check reporting.
+  - **The display.** The progress not the updater's (pure, and the window drawing another state).
+  - **Reopening.** Reopening that starts a check, or shows nothing.
+  - **The run loop.** The answer shown inside a `Task` or through `DispatchQueue.main.async`; a modal alert or a `Task` in
+    the window; a second `show` call.
+- `scripts/render-app-updates.sh <folder>` (graphical session, not in check-all): the pill states, popovers, the check
+  window in each state (the production panel, Classic in light and dark too), the menu item's titles and the Settings
+  section in zh-Hans / en / es. It also prints how the check window's frame changes when it grows: its top edge kept in the
+  middle of the screen, the window lifted when it was moved low.
 
 ## 10. Manual regression (before a release that changes the updater)
 
@@ -306,13 +377,38 @@ No check reaches a real notarized pair of builds, Gatekeeper on a real download,
     shows (the feed can't be reached), and quitting installs B.
 18. Quit A right after B finished downloading (while it is being staged): at the next launch B is staged from the kept DMG,
     with no second download in the test server's log.
-19. SkyCut › Check for Updates… with B offered (added 2026-11-27, after it crashed 0.18.70 and 0.18.71:
-    [case](../bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md)). The answer window says B is
-    downloading. While it is up, move the pointer between it, the main window and a project window several times, then
-    click its button with the mouse. SkyCut keeps running, and the Update pill appears once B is staged. Do the same with
-    auto install off (Download and Install / Later) and with the feed rolled back to A's version (up to date). Then
-    `log show --last 15m --predicate 'process == "SkyCut" AND eventMessage CONTAINS "PointerWatcher"'` prints nothing.
-20. Clean up: `defaults delete com.srtflow.SrtFlow SrtFlow.update.feedURL`; the replaced build is in the Trash.
+19. SkyCut › Check for Updates… with B offered. Added 2026-11-27, after it crashed 0.18.70 and 0.18.71
+    ([case](../bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md)); a non-modal window since UPD1.
+    - The check window opens: straight on the answer, or checking first. It says B is available and follows its download.
+    - While it is up, move the pointer between it, the main window and a project window several times, then click its button
+      with the mouse. SkyCut keeps running, and the Update pill appears once B is staged.
+    - Do the same with auto install off: Later, then again with Download and Install (the same window then shows the
+      download). Then with the feed rolled back to A's version: up to date.
+    - Then `log show --last 15m --predicate 'process == "SkyCut" AND eventMessage CONTAINS "PointerWatcher"'` prints nothing.
+20. A slow network (UPD1). In the test feed's folder, serve it from a loopback server that answers after 5 s, instead of
+    step 2's server:
+    `python3 -c 'import http.server as h,time;h.ThreadingHTTPServer(("127.0.0.1",8123),type("S",(h.SimpleHTTPRequestHandler,),{"do_GET":lambda s:(time.sleep(5),h.SimpleHTTPRequestHandler.do_GET(s))})).serve_forever()'`
+    Choose Check for Updates…:
+    - within about half a second the window shows «Checking for updates…» with a spinner and Cancel;
+    - the menu item reads «Checking for Updates…», greyed;
+    - Settings › General › Software Update shows a spinner in front of its status line.
+    Cancel closes the window, and choosing the item again starts a new check. Do it once more and close the window with its
+    close button instead: when the answer arrives no window comes back, and with B offered the pill still appears.
+21. Moving it aside (UPD1). With the slow feed, drag the window by its title bar to a corner of the screen and keep working:
+    - click the timeline and play with Space, select clips, open Settings;
+    - the window stays above SkyCut's windows and never takes the keyboard again;
+    - when the answer arrives it changes in place;
+    - switch to another app: the window hides; come back: it is there;
+    - moved near the bottom of the screen, it stays whole when a taller answer arrives.
+22. A download watched to the end (UPD1). With B offered and auto install on, choose Check for Updates…:
+    - the window shows «Downloading n%» and «x MB / y MB» rising with the bar, then «Verifying…», then «SkyCut B is ready»
+      with Later / Restart and Update;
+    - again from A, close the window mid-download: the download finishes and the Update pill appears;
+    - meanwhile the menu item reads «Downloading Update (n%)…», and choosing it brings the window back on the download
+      with no new feed request in the test server's log;
+    - with a wrong SHA-256 in the test feed: «The download didn't finish.» with Try Again, which checks and downloads
+      again.
+23. Clean up: `defaults delete com.srtflow.SrtFlow SrtFlow.update.feedURL`; the replaced build is in the Trash.
 
 Last run on 2026-11-27, 0.18.69 → 0.18.70 (the release record: [构建与打包](../build/build-and-packaging.md)「公开下载发布」).
 Every step a script could observe passed (files, the test server's log, SkyCut's log, the process list, the window

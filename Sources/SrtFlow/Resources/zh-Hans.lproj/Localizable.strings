@@ -1786,6 +1786,11 @@
 "What’s new in this version" = "新功能";
 "AI chats started before this update, in ChatGPT for example, may need a restart to use the new tools." = "旧的 AI 会话，例如 ChatGPT，可能需要重启一下，才能用到新工具。";
 "Check for Updates…" = "检查更新…";
+"Checking for Updates…" = "正在检查更新…";
+"Checking for updates…" = "正在检查更新…";
+"Downloading Update (%d%%)…" = "正在下载更新（%d%%）…";
+"Verifying…" = "正在验证…";
+"The download didn’t finish." = "下载没完成。";
 "Restart and Update to %@…" = "重启并更新到 %@…";
 "SkyCut is up to date" = "SkyCut 已是最新版本";
 "%@ is the latest version." = "%@ 就是现在最新的版本。";

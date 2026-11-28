@@ -128,18 +128,25 @@ struct AppUpdateUpdatedContent: View {
 
 /// The icon tile, the title and the line under it.
 struct AppUpdateHeader: View {
-    let icon: String
+    /// The tile's symbol; nil: a spinner on a light tile (the check window while it checks).
+    let icon: String?
     let title: String
     let subtitle: String
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 38, height: 38)
-                .background(RoundedRectangle(cornerRadius: 10).fill(AppThemePalette.current.accent))
+            Group {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                } else {
+                    ProgressView().controlSize(.small)
+                }
+            }
+            .frame(width: 38, height: 38)
+            .background(RoundedRectangle(cornerRadius: 10).fill(icon == nil ? AppThemePalette.current.onChip : AppThemePalette.current.accent))
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: title).font(.system(size: 15, weight: .semibold))
                 Text(verbatim: subtitle).font(.system(size: 12)).foregroundStyle(.secondary)

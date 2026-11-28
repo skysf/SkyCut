@@ -8,9 +8,9 @@ import Foundation
 // install off, or one that can't update itself) shows New Version; the first launch after an update shows Updated until its
 // notes are viewed. A copy an earlier run staged stays unseen, and never installs, until this launch's first check has
 // confirmed the feed still names it or failed to reach the feed: a pulled release never goes in at a quit that comes first.
-// A DMG that downloaded whole and then failed is held back from automatic checks (AppUpdateRetryRecord). Nothing here ever
-// opens a window: only a check the person started from the menu gets an answer (AppUpdateCheckAnswer). Pure, so the checks
-// drive every transition.
+// A DMG that downloaded whole and then failed is held back from automatic checks (AppUpdateRetryRecord). Only a check the
+// person started from the menu has a window (it opens as the check starts) and gets an answer (AppUpdateCheckAnswer); its
+// Cancel stops the check unless an automatic check shares it. Pure, so the checks drive every transition.
 // What it doesn't: run the effects (AppUpdater), decide who updates (AppUpdateEligibility), what a restart waits for
 // (AppUpdateBusy).
 // Rules: docs/architecture/app-updates.md "States".
@@ -54,6 +54,8 @@ enum AppUpdateEvent: Equatable, Sendable {
     case checkStarted(AppUpdateCheckOrigin)
     /// `at`: when the check finished (the retry record's clock).
     case checkFinished(AppUpdateCheckResult, at: Date)
+    /// Cancel in the menu check's window: nothing is known about the feed (never a failed check).
+    case checkCancelled
     /// Download and Install (auto install off).
     case downloadAsked
     case downloadProgress(Double?)
@@ -80,13 +82,17 @@ enum AppUpdateEffect: Equatable, Sendable {
     case discardDownloads(keeping: AppUpdateFeed?)
     /// Keep the retry record on disk (nil: remove it).
     case saveRetry(AppUpdateRetryRecord?)
+    /// The person chose Check for Updates…: its window opens (AppUpdateCheckFlow: checking, or straight on a quick answer).
+    case openCheckWindow
+    /// Cancel in that window: stop the check in flight (nothing else shares it).
+    case stopCheck
     case answer(AppUpdateCheckAnswer)
 
     /// Reads or writes the Updates folder: never for a copy that only tells (it may share the folder with one that installs).
     var touchesFiles: Bool {
         switch self {
         case .download, .discardStaged, .discardDownloads, .saveRetry: return true
-        case .cancelDownload, .answer: return false
+        case .cancelDownload, .openCheckWindow, .stopCheck, .answer: return false
         }
     }
 }
@@ -115,6 +121,8 @@ struct AppUpdateState: Equatable, Sendable {
     var personChecking = false
     /// The check in flight was started (or joined) by the person: it fetches a DMG the retry record holds back.
     var personStarted = false
+    /// The schedule's check started or joined the check in flight: the person's Cancel leaves it running, unanswered.
+    var automaticWaiting = false
     /// The last check failed (offline, a server error, a malformed feed): only Settings' status line says so.
     var lastCheckFailed = false
     /// Download and Install was clicked for `offer` (auto install off): it installs at quit like an automatic one.
@@ -169,15 +177,26 @@ struct AppUpdateState: Equatable, Sendable {
         case .checkStarted(let origin):
             checking = true
             if origin.byPerson { personStarted = true }
-            if origin == .menu { personChecking = true }
-            return []
+            if origin == .schedule { automaticWaiting = true }
+            guard origin == .menu else { return [] }
+            personChecking = true
+            return [.openCheckWindow]
         case .checkFinished(let result, let now):
             checking = false
             let answering = personChecking, byPerson = personStarted
             personChecking = false
             personStarted = false
+            automaticWaiting = false
             let (effects, answer) = finish(result, mode: mode, byPerson: byPerson, now: now)
             return effects + (answering ? [.answer(answer)] : [])
+        case .checkCancelled:
+            // Nothing about the feed is known: no failed check, no settled staged copy, the retry record as it was.
+            guard checking, personChecking else { return [] }
+            personChecking = false
+            personStarted = false
+            guard !automaticWaiting else { return [] }
+            checking = false
+            return [.stopCheck]
         case .downloadAsked:
             guard phase == .available, let offer, case .install = mode else { return [] }
             phase = .downloading

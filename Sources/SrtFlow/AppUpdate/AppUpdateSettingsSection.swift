@@ -3,7 +3,8 @@ import SwiftUI
 // MARK: - Settings › General › Software Update
 //
 // What it does: SkyCut's version, a status line (checked today / yesterday / on a date and up to date, checking,
-// downloading, ready, a new version), Check for Updates (the answer shows in the status line: no window), and the switch
+// downloading, ready, a new version; a small spinner in front while any check runs), Check for Updates (disabled while one
+// runs; the answer shows in the status line: no window), and the switch
 // "Download and install updates automatically" (default on, AppUpdater.automatic) with a caption that follows it. A copy
 // that can't update itself shows the switch disabled and says so. While the test hook is set (`SrtFlow.update.feedURL`,
 // to an address SkyCut uses), one line shows its address: a hook left behind after a test never turns updates off
@@ -22,10 +23,13 @@ struct AppUpdateSettingsSection: View {
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(verbatim: "SkyCut \(updater.running?.description ?? "")")
-                        Text(verbatim: status)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                        HStack(alignment: .center, spacing: 5) {
+                            if updater.state.checking { ProgressView().controlSize(.mini) }
+                            Text(verbatim: status)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         if let feed = updater.testFeedURL {
                             Text(verbatim: String(format: L10n("Test update feed: %@"), feed.absoluteString))
                                 .font(.caption)

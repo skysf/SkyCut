@@ -10,8 +10,9 @@ import os
 // check at once), downloads, verifies and stages a newer release in the background (auto install on, or after Download and
 // Install), and installs the staged copy at every quit (applicationWillTerminate, after the quit flow). It publishes the
 // state the toolbar pill, its popovers, the app menu and Settings show, and the test hook's address while one is set.
-// Nothing pops up by itself: the only window is the answer to a check the person started from the menu. Offline or any
-// failure: nothing is said; the next check tries again (a DMG that keeps failing is held back: AppUpdateRetryRecord).
+// Nothing pops up by itself: the only window is the one of a check the person started from the menu (AppUpdateCheckWindow,
+// shown from run-loop turns, never inside a Swift task); its Cancel stops that check. Offline or any failure: nothing is
+// said; the next check tries again (a DMG that keeps failing is held back: AppUpdateRetryRecord).
 // The transitions are AppUpdateState's (pure, checked); this file runs their effects.
 // What it doesn't: the rules (AppUpdateEligibility, AppUpdateState), transfers (AppUpdatePipeline, AppUpdateHTTP,
 // AppUpdateStager), the swap (AppUpdateInstaller), the restart's waiting and relaunch (AppUpdateRestart), the views.
@@ -48,6 +49,8 @@ final class AppUpdater: ObservableObject {
     private let defaults = UserDefaults.standard
     private let files = AppUpdateFiles.standard()
     private var started = false
+    /// The check in flight (its window's Cancel stops it).
+    private var checkTask: Task<Void, Never>?
     private var downloadTask: Task<Void, Never>?
     private var scheduleTask: Task<Void, Never>?
     private var restartTimer: Timer?
@@ -113,16 +116,18 @@ final class AppUpdater: ObservableObject {
         }
     }
 
-    /// Checks now. The menu's check gets an answer window; Settings' and the schedule's don't. The person's (menu, Settings)
-    /// also fetches a DMG an automatic check holds back.
+    /// Checks now. The menu's check has a window (it opens at once, then shows the answer); Settings' and the schedule's
+    /// don't. The person's (menu, Settings) also fetches a DMG an automatic check holds back.
     func check(from origin: AppUpdateCheckOrigin) {
         guard mode != nil, let running else { return }
         let alreadyChecking = state.checking
         send(.checkStarted(origin))
         guard !alreadyChecking else { return }   // the check in flight answers
         let source = currentSource()
-        Task { @MainActor in
+        checkTask = Task { @MainActor in
             let result = await AppUpdateHTTP.check(source, running: running)
+            // Cancelled from its window: checkCancelled has ended it (a newer check may already run). Nothing is reported.
+            guard !Task.isCancelled else { return }
             if result == .upToDate {
                 let now = Date()
                 lastUpToDate = now
@@ -157,6 +162,9 @@ final class AppUpdater: ObservableObject {
 
     /// Download and Install (auto install off).
     func downloadAndInstall() { send(.downloadAsked) }
+
+    /// Cancel in the menu check's window: the check stops, unless the schedule's check shares it (it then goes on, unanswered).
+    func cancelCheck() { send(.checkCancelled) }
 
     func notesViewed() { send(.notesViewed) }
 
@@ -252,13 +260,18 @@ final class AppUpdater: ObservableObject {
             AppUpdateWork.queue.addOperation { files.removeDownloads(except: kept.map(files.dmg(for:))) }
         case .saveRetry(let record):
             AppUpdateWork.queue.addOperation { files.writeRetry(record) }
+        case .stopCheck:
+            checkTask?.cancel()
+            checkTask = nil
+        // The window is shown from run-loop turns after this one, never inside a transition and never inside a Swift task
+        // (the answer comes from the check's task): an Objective-C exception raised there would unwind the task and leave
+        // the runtime's executor tracking dangling, and the next isolation check crashed SkyCut. Not DispatchQueue.main.async
+        // either: an exception escaping a dispatch block ends the app. The window is not modal: no runModal anywhere
+        // (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md, system-file-windows.md rule 10).
+        case .openCheckWindow:
+            RunLoop.main.perform { MainActor.assumeIsolated { AppUpdateCheckWindow.shared.open() } }
         case .answer(let answer):
-            // After this turn: the answer window must not run its modal loop inside a transition. And from the run loop,
-            // never inside a Swift task: an Objective-C exception raised by any event during the modal loop would unwind the
-            // task and leave the runtime's executor tracking dangling; the next isolation check crashed SkyCut. Not
-            // DispatchQueue.main.async either: an exception escaping a dispatch block ends the app
-            // (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md, system-file-windows.md rule 10).
-            RunLoop.main.perform { MainActor.assumeIsolated { AppUpdateAlerts.show(answer) } }
+            RunLoop.main.perform { MainActor.assumeIsolated { AppUpdateCheckWindow.shared.show(answer) } }
         }
     }
 

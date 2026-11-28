@@ -1786,6 +1786,11 @@
 "What’s new in this version" = "What’s new";
 "AI chats started before this update, in ChatGPT for example, may need a restart to use the new tools." = "AI chats started before this update, in ChatGPT for example, may need a restart to use the new tools.";
 "Check for Updates…" = "Check for Updates…";
+"Checking for Updates…" = "Checking for Updates…";
+"Checking for updates…" = "Checking for updates…";
+"Downloading Update (%d%%)…" = "Downloading Update (%d%%)…";
+"Verifying…" = "Verifying…";
+"The download didn’t finish." = "The download didn’t finish.";
 "Restart and Update to %@…" = "Restart and Update to %@…";
 "SkyCut is up to date" = "SkyCut is up to date";
 "%@ is the latest version." = "%@ is the latest version.";

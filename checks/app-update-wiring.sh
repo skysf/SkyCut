@@ -26,9 +26,15 @@
 #      cancelled download's silence and the record matched to the offer.
 #   9. get_status's app_update (MCP-85) reads, never acts: one line in AIProjectTools.status takes AppUpdater.statusReport,
 #      which only builds AppUpdateStatusReport (pure, Foundation only: no check, download, install, restart or quit).
-#  10. The menu check's answer window runs its modal loop from the run loop (RunLoop.main.perform), never inside a Swift
-#      task or a dispatch block, and nothing else shows it: exactly one executable call, comments not counted
-#      (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md).
+#  10. The menu check's window (UPD1, 2026-11-28; code only, comments and strings blanked): never modal (no runModal or
+#      NSAlert in the updater); shown only from run-loop turns, AppUpdater's `.openCheckWindow` and `.answer` effects being
+#      the one RunLoop.main.perform call each and the menu's download item the one showDownload, never inside a Swift task
+#      or a dispatch block (docs/bugfixes/2026-11-27-check-for-updates-crash-tracking-owner-selectors.md); the window file
+#      starts no task, dispatches nothing, and with its content never reaches a download, the network or the state machine
+#      (closing only hides; Cancel only asks AppUpdater.cancelCheck, which stops nothing but the check's own task); it draws
+#      what AppUpdateCheckDisplay reads from the updater's state, opens through the flow, ticks on a run-loop timer, and
+#      showDownload starts no check; the menu item is AppUpdateMenuEntry's (one check at a time: greyed while checking);
+#      a cancelled check's task reports nothing.
 # Usage: checks/app-update-wiring.sh
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -251,37 +257,101 @@ if [ -z "${REPORT_LINE}" ] || [ -z "${MAKE_LINE}" ] || [ $((MAKE_LINE - REPORT_L
   fail "${UPDATER}: statusReport only builds AppUpdateStatusReport from the published state"
 fi
 
-# 10. The answer window's modal loop runs from the run loop, outside any Swift task. Executable code only: whole files
-#     with comments and string literals blanked out (checks/Shared/swift-code.pl), so a call may wrap and a comment never
-#     counts (review CXC1: a count of raw text let the right call sit in a comment while the old Task ran, and a list of
-#     file names let a second call through; review CXC2: a second call split over two lines got through, and a call in a
-#     block comment counted). Exactly one reference to AppUpdateAlerts.show in Sources, and it is the run-loop statement
-#     right after `case .answer(let answer):`.
-read -r -d '' ANSWER_SCAN <<'PERL' || true
+# 10. The menu check's window (UPD1). Executable code only: whole files with comments and string literals blanked out
+#     (checks/Shared/swift-code.pl), so a call may wrap and a comment never counts (reviews CXC1, CXC2 on the alert this
+#     window replaced). Lines that hold a title are pinned twice: their code shape here, their words by a raw count below.
+read -r -d '' WINDOW_SCAN <<'PERL' || true
 require "./checks/Shared/swift-code.pl";
+sub at { my ($code, $offset) = @_; return 1 + (substr($code, 0, $offset) =~ tr/\n//); }
 while (my $text = <>) {
     my $code = swift_code($text);
-    while ($code =~ /\bAppUpdateAlerts\s*\.\s*show\b/g) {
-        my $line = 1 + (substr($code, 0, $-[0]) =~ tr/\n//);
-        print "CALL $ARGV:$line\n";
+    my $file = $ARGV;
+    print "SCANNED $file\n";
+    while ($code =~ /\bAppUpdateCheckWindow\s*\.\s*shared\s*\.\s*(open|show|showDownload)\s*\(/g) {
+        print "CALL $1 $file:" . at($code, $-[0]) . "\n";
     }
-    print "ANSWER $ARGV\n"
-        if $code =~ /\bcase\s+\.answer\s*\(\s*let\s+answer\s*\)\s*:\s*RunLoop\.main\.perform \{ MainActor\.assumeIsolated \{ AppUpdateAlerts\.show\(answer\) \} \}/;
-    print "SCANNED $ARGV\n";
+    if ($file =~ m{/AppUpdate/}) {
+        while ($code =~ /\b(runModal|NSAlert)\b/g) { print "MODAL $1 $file:" . at($code, $-[0]) . "\n"; }
+    }
+    print "OPEN $file\n"
+        if $code =~ /\bcase\s+\.openCheckWindow\s*:\s*RunLoop\.main\.perform \{ MainActor\.assumeIsolated \{ AppUpdateCheckWindow\.shared\.open\(\) \} \}/;
+    print "ANSWER $file\n"
+        if $code =~ /\bcase\s+\.answer\s*\(\s*let\s+answer\s*\)\s*:\s*RunLoop\.main\.perform \{ MainActor\.assumeIsolated \{ AppUpdateCheckWindow\.shared\.show\(answer\) \} \}/;
+    if ($file =~ m{/AppUpdateCheck(Window|Content)\.swift$}) {
+        while ($code =~ /\b(Task|DispatchQueue|asyncAfter|await|URLSession|URLRequest|AppUpdateHTTP|AppUpdatePipeline|cancelDownload|downloadTask|automaticChanged)\b|\b(send)\s*\(/g) {
+            print "FORBIDDEN " . ($1 // $2) . " $file:" . at($code, $-[0]) . "\n";
+        }
+    }
+    if ($file =~ m{/AppUpdateCheckWindow\.swift$}) {
+        print "OPENFLOW $file\n" if $code =~ /func\s+open\s*\(\s*\)\s*\{[^{}]*apply\(flow\.chosen\(at:\s*Self\.now\)\)\s*\}/;
+        if ($code =~ /func\s+showDownload\s*\(\s*\)\s*\{(.*?)\n    \}/s) {
+            my $body = $1;
+            print "SHOWDOWNLOAD $file\n" if $body =~ /apply\(flow\.showing\(\.downloading\(offer\)\)\)/ && $body !~ /\bcheck\s*\(/;
+        }
+        print "CLOSE $file\n"
+            if $code =~ /func\s+windowShouldClose\s*\(\s*_\s+sender\s*:\s*NSWindow\s*\)\s*->\s*Bool\s*\{\s*apply\(flow\.closed\(\)\)\s*return\s+false\s*\}/;
+        print "CANCEL $file\n"
+            if $code =~ /case\s+\.cancel\s*:\s*apply\(flow\.cancelled\(\)\)/ && $code =~ /if\s+step\.stopsCheck\s*\{\s*AppUpdater\.shared\.cancelCheck\(\)\s*\}/;
+        print "DISPLAY $file\n" if $code =~ /AppUpdateCheckDisplay\.make\(window\.content,\s*state:\s*updater\.state,\s*mode:\s*updater\.mode\)/;
+        print "TIMER $file\n" if $code =~ /RunLoop\.main\.add\(timer,\s*forMode:\s*\.common\)/;
+    }
+    if ($file =~ m{/AppUpdateMenu\.swift$}) {
+        print "MENU $file\n"
+            if $code =~ /switch\s+AppUpdateMenuEntry\.make\(updater\.state\)/
+            && $code =~ /case\s+\.checking\s*:\s*Button\(\s*\)\s*\{\s*\}\s*\.disabled\(true\)/
+            && $code =~ /case\s+\.downloading\(let\s+percent\)\s*:\s*Button\(String\(format:\s*L10n\(\s*\),\s*percent\)\)\s*\{\s*AppUpdateCheckWindow\.shared\.showDownload\(\)\s*\}/
+            && $code =~ /case\s+\.check\s*:\s*Button\(\s*\)\s*\{\s*updater\.check\(from:\s*\.menu\)\s*\}/;
+    }
+    if ($file =~ m{/AppUpdater\.swift$}) {
+        print "STOP $file\n" if $code =~ /case\s+\.stopCheck\s*:\s*checkTask\?\.cancel\(\)\s*checkTask\s*=\s*nil/;
+        print "CANCELCHECK $file\n" if $code =~ /func\s+cancelCheck\(\)\s*\{\s*send\(\.checkCancelled\)\s*\}/;
+        print "JOIN $file\n" if $code =~ /send\(\.checkStarted\(origin\)\)\s*guard\s+!alreadyChecking\s+else\s*\{\s*return\s*\}/;
+        print "QUIET $file\n"
+            if $code =~ /let\s+result\s*=\s*await\s+AppUpdateHTTP\.check\(source,\s*running:\s*running\)\s*guard\s+!Task\.isCancelled\s+else\s*\{\s*return\s*\}/;
+    }
 }
 PERL
 SWIFT_FILES="$(find Sources -name '*.swift' -type f | wc -l | tr -d ' ')"
-if ANSWER_OUT="$(find Sources -name '*.swift' -type f -print0 | xargs -0 perl -0777 -e "${ANSWER_SCAN}")"; then
-  SHOW_CALLS="$(sed -n 's/^CALL //p' <<<"${ANSWER_OUT}")"
-  [ "$(grep -c '^SCANNED ' <<<"${ANSWER_OUT}" || true)" = "${SWIFT_FILES}" ] \
-    || fail "the answer-window scan read fewer than the ${SWIFT_FILES} Swift files under Sources (a partial scan is a false green)"
-  if [ "$(grep -c . <<<"${SHOW_CALLS}" || true)" != 1 ] || [ "${SHOW_CALLS%%:*}" != "${UPDATER}" ] \
-    || [ "$(sed -n 's/^ANSWER //p' <<<"${ANSWER_OUT}")" != "${UPDATER}" ]; then
-    fail "${UPDATER}: the menu check's answer is shown by exactly one call, RunLoop.main.perform { MainActor.assumeIsolated { AppUpdateAlerts.show(answer) } }, right after case .answer (code only: comments and strings don't count), never in a Task or DispatchQueue.main.async: an exception under its modal loop unwinds a task and crashes SkyCut at the next isolation check, and one escaping a dispatch block ends the app (found: ${SHOW_CALLS:-no call})"
-  fi
+WINDOW="${DIR}/AppUpdateCheckWindow.swift"
+MENU="${DIR}/AppUpdateMenu.swift"
+if WINDOW_OUT="$(find Sources -name '*.swift' -type f -print0 | xargs -0 perl -0777 -e "${WINDOW_SCAN}")"; then
+  [ "$(grep -c '^SCANNED ' <<<"${WINDOW_OUT}" || true)" = "${SWIFT_FILES}" ] \
+    || fail "the check-window scan read fewer than the ${SWIFT_FILES} Swift files under Sources (a partial scan is a false green)"
+  calls() { sed -n "s/^CALL $1 //p" <<<"${WINDOW_OUT}"; }
+  only_call() { # only_call <name> <file>: exactly one executable reference to AppUpdateCheckWindow.shared.<name>(, in <file>
+    local found
+    found="$(calls "$1")"
+    [ "$(grep -c . <<<"${found}" || true)" = 1 ] && [ "${found%%:*}" = "$2" ]
+  }
+  has() { grep -qx "$1 $2" <<<"${WINDOW_OUT}"; }
+  only_call open "${UPDATER}" && has OPEN "${UPDATER}" \
+    || fail "${UPDATER}: the check window opens by exactly one call, RunLoop.main.perform { MainActor.assumeIsolated { AppUpdateCheckWindow.shared.open() } } right after case .openCheckWindow: (a run-loop turn, never a Task or a dispatch block; found: $(calls open | tr '\n' ' '))"
+  only_call show "${UPDATER}" && has ANSWER "${UPDATER}" \
+    || fail "${UPDATER}: the check's answer reaches the window by exactly one call, RunLoop.main.perform { MainActor.assumeIsolated { AppUpdateCheckWindow.shared.show(answer) } } right after case .answer (found: $(calls show | tr '\n' ' '))"
+  only_call showDownload "${MENU}" \
+    || fail "only the app menu's download item shows the window on a download (found: $(calls showDownload | tr '\n' ' '))"
+  MODALS="$(sed -n 's/^MODAL //p' <<<"${WINDOW_OUT}")"
+  [ -z "${MODALS}" ] || fail "the updater opens no modal window (runModal, NSAlert): the check window is never modal (found: $(tr '\n' ' ' <<<"${MODALS}"))"
+  FORBIDDEN="$(sed -n 's/^FORBIDDEN //p' <<<"${WINDOW_OUT}")"
+  [ -z "${FORBIDDEN}" ] \
+    || fail "the check window starts no task or dispatch block and never reaches a download, the network or the state machine itself (found: $(tr '\n' ' ' <<<"${FORBIDDEN}"))"
+  has OPENFLOW "${WINDOW}" || fail "${WINDOW}: open() goes through the flow (apply(flow.chosen(at: Self.now))): at once, or straight on a quick answer"
+  has SHOWDOWNLOAD "${WINDOW}" || fail "${WINDOW}: showDownload shows the download (apply(flow.showing(.downloading(offer)))) and starts no check"
+  has CLOSE "${WINDOW}" || fail "${WINDOW}: the close button only hides the window (apply(flow.closed()), return false): a check or a download goes on"
+  has CANCEL "${WINDOW}" || fail "${WINDOW}: Cancel goes through the flow and stops the check only through AppUpdater.cancelCheck()"
+  has DISPLAY "${WINDOW}" || fail "${WINDOW}: the window draws AppUpdateCheckDisplay.make(window.content, state: updater.state, mode: updater.mode): the progress is the updater's own"
+  has TIMER "${WINDOW}" || fail "${WINDOW}: its ticks are run-loop timers (RunLoop.main.add(timer, forMode: .common))"
+  has MENU "${MENU}" \
+    || fail "${MENU}: the item is AppUpdateMenuEntry.make(updater.state): greyed while checking, the download's percent opening the window, the check from the menu"
+  [ "$(count 'Button("Checking for Updates…") {}' "${MENU}")" = 1 ] && [ "$(count 'L10n("Downloading Update (%d%%)…")' "${MENU}")" = 1 ] \
+    || fail "${MENU}: the greyed «Checking for Updates…» and «Downloading Update (%d%%)…» titles"
+  has STOP "${UPDATER}" || fail "${UPDATER}: .stopCheck cancels the check's own task (checkTask) and nothing else"
+  has CANCELCHECK "${UPDATER}" || fail "${UPDATER}: cancelCheck() only sends .checkCancelled"
+  has JOIN "${UPDATER}" || fail "${UPDATER}: one check at a time: a check started while one runs joins it (guard !alreadyChecking)"
+  has QUIET "${UPDATER}" || fail "${UPDATER}: a cancelled check's task reports nothing (guard !Task.isCancelled right after AppUpdateHTTP.check)"
 else
-  fail "the answer-window scan itself failed (find or perl exited non-zero): a scan that doesn't run is a false green"
+  fail "the check-window scan itself failed (find or perl exited non-zero): a scan that doesn't run is a false green"
 fi
 
 if [ "${FAILED}" -ne 0 ]; then exit 1; fi
-echo "✓ app-update-wiring: one feed address, the atomic swap only, deletes inside Updates only, wired at start / quit / menu / Settings / toolbars, the coordinator pinned, get_status read only, no admin rights, no network in the check"
+echo "✓ app-update-wiring: one feed address, the atomic swap only, deletes inside Updates only, wired at start / quit / menu / Settings / toolbars, the coordinator pinned, get_status read only, no admin rights, no network in the check, the check window never modal and shown from the run loop"
