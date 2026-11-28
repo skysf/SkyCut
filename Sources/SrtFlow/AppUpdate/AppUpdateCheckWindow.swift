@@ -7,12 +7,15 @@ import SwiftUI
 // windows, is off screen while SkyCut isn't active (never above other apps), moves aside by its title bar or background,
 // and is never modal, so SkyCut keeps working while a slow check waits. It shows checking (a spinner, Cancel) or the
 // answer, as AppUpdateCheckFlow decides: straight on a quick answer, else the answer in place of the checking state. It
-// never takes the keyboard (it becomes key only when clicked) and is never brought forward by an update. A newer version is then followed live (AppUpdateCheckDisplay: its download, verified
-// and ready, a download that didn't finish), in place. Cancel stops the check; the close button only hides the window: the
-// check goes on, and a download is never stopped by the window. While a download runs, the app menu's item brings the
-// window back on it (`showDownload`, no check). Every call comes from a run-loop turn (AppUpdater's effects through
-// RunLoop.main.perform, the buttons and the menu, a run-loop timer, SkyCut becoming active), never from inside a Swift
-// task. The panel is made when it is first needed and kept for the run, so it opens where the person last left it.
+// never takes the keyboard (it becomes key only when clicked) and is never brought forward by an update. A newer version
+// is then followed live (AppUpdateCheckDisplay: its download, verified and ready, a download that didn't finish), in
+// place. Cancel stops the check; the close button only hides the window: the check goes on, and a download is never
+// stopped by the window. While a download runs, the app menu's item brings the window back on it (`showDownload`, no
+// check). Every call comes from a run-loop turn (AppUpdater's effects through RunLoop.main.perform, the buttons and the
+// menu, a run-loop timer, SkyCut becoming active), never from inside a Swift task. The panel is made when it is first
+// needed and kept for the run: it first opens at the side of SkyCut's main window (AppUpdateCheckPlacement), then where
+// the person last left it. A quit, and Restart and Update, take it off screen first (`closeForQuit`), so no question of
+// the quit ever lies under it (SMK74).
 // What it doesn't: check (AppUpdater), decide what shows when (AppUpdateCheckFlow), the words (AppUpdateCheckContent).
 // Rules: docs/architecture/app-updates.md "What the person sees".
 
@@ -63,7 +66,9 @@ final class AppUpdateCheckWindow: NSObject, ObservableObject, NSWindowDelegate {
             apply(flow.closed())
             NSWorkspace.shared.open(AppUpdateFeed.downloadPageURL)
         // As the pill's popover: now if nothing runs, else the window shows what the restart waits for.
-        case .restart: AppUpdater.shared.requestRestart()
+        case .restart:
+            apply(flow.closed())   // off screen before the quit's questions: they would lie under it (SMK74)
+            AppUpdater.shared.requestRestart()
         case .cancelRestart: AppUpdater.shared.cancelRestart()
         }
     }
@@ -71,6 +76,10 @@ final class AppUpdateCheckWindow: NSObject, ObservableObject, NSWindowDelegate {
     /// Escape (once the person has clicked the window): the close button, in every state. It hides the window and never
     /// cancels a check, a download or a restart that waits.
     func escape() { perform(.dismiss) }
+
+    /// A quit's first step (applicationShouldTerminate): off screen before any of its questions, which a floating panel
+    /// would cover. A check goes on, unanswered; if the quit is cancelled the window stays closed (the menu brings it back).
+    func closeForQuit() { apply(flow.closed()) }
 
     /// The close button only hides the window: a check in flight goes on (hiding is not cancelling).
     func windowShouldClose(_ sender: NSWindow) -> Bool {
@@ -152,15 +161,16 @@ final class AppUpdateCheckWindow: NSObject, ObservableObject, NSWindowDelegate {
         return panel
     }
 
-    /// The title in the in-app language; the first time, centred a little above the middle of the screen SkyCut is on.
+    /// The title in the in-app language; the first time, at the side (AppUpdateCheckPlacement): the top-right of SkyCut's
+    /// main window below its toolbar, never the middle of the screen where SkyCut's questions come up.
     private func place(_ panel: NSPanel) {
         panel.title = L10n("Software Update")
         guard !placed else { return }
         placed = true
-        let screen = (NSApp.keyWindow ?? NSApp.mainWindow)?.screen ?? NSScreen.main
-        guard let visible = screen?.visibleFrame else { return panel.center() }
-        let size = panel.frame.size
-        panel.setFrameOrigin(NSPoint(x: visible.midX - size.width / 2, y: visible.minY + (visible.height - size.height) * 0.62))
+        let main = NSApp.mainWindow
+        guard let visible = (main?.screen ?? NSScreen.main)?.visibleFrame else { return panel.center() }
+        let content = main.map { $0.convertToScreen($0.contentLayoutRect) }
+        panel.setFrameOrigin(AppUpdateCheckPlacement.origin(size: panel.frame.size, content: content, visible: visible))
     }
 }
 

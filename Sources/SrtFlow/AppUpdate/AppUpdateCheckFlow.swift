@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 // MARK: - The window of SkyCut › Check for Updates…: what it shows and when (pure)
@@ -14,6 +15,7 @@ import Foundation
 // AppUpdateCheckDisplay: what the window draws now. A release the check found is followed live from the updater's state
 // (its download and progress, verified and ready, a restart waiting, a download that didn't finish), never from the network.
 // AppUpdateMenuEntry: the app menu's item, from the same state (greyed while checking, the percent while downloading).
+// AppUpdateCheckPlacement: where the window first opens, at the side of SkyCut's main window.
 // What it doesn't: check, or stop a check (AppUpdater); draw (AppUpdateCheckContent); the window (AppUpdateCheckWindow).
 // Rules: docs/architecture/app-updates.md "What the person sees".
 
@@ -115,11 +117,12 @@ struct AppUpdateCheckFlow: Equatable, Sendable {
         return Step(opens: true)
     }
 
-    /// The close button, or a button that only dismisses an answer. While the check runs the window only hides: the check
-    /// goes on (hiding is not cancelling). Neither ever stops a download.
+    /// The close button, a button that only dismisses an answer, or a quit beginning (SkyCut's questions must not lie
+    /// under the window). While the check runs the window only hides: the check goes on (hiding is not cancelling), and
+    /// one chosen but not yet on screen never comes up. None of them ever stops a download.
     mutating func closed() -> Step {
-        guard shows != nil else { return Step() }
-        let checkRuns = shows == .checking && held == nil
+        guard shows != nil || waitingSince != nil else { return Step() }
+        let checkRuns = (shows == .checking && held == nil) || waitingSince != nil
         self = AppUpdateCheckFlow()
         hidden = checkRuns
         return Step(closes: true)
@@ -178,6 +181,20 @@ enum AppUpdateCheckDisplay: Equatable, Sendable {
     /// Whole percents of the updater's progress, floored as Settings' status line and the popover show it.
     static func percent(_ fraction: Double?) -> Int {
         Int((min(1, max(0, fraction ?? 0)) * 100).rounded(.down))
+    }
+}
+
+/// Where the check window opens the first time in a run: at the side, its top-right corner `margin` inside the top-right
+/// of SkyCut's main window just below the toolbar (near the Update pill), else of the visible screen; always whole on the
+/// visible screen. `content`: the main window's area below its toolbar, in screen coordinates. Pure.
+enum AppUpdateCheckPlacement {
+    static let margin: CGFloat = 12
+
+    static func origin(size: CGSize, content: CGRect?, visible: CGRect) -> CGPoint {
+        let corner = content.map { CGPoint(x: $0.maxX, y: $0.maxY) } ?? CGPoint(x: visible.maxX, y: visible.maxY)
+        let x = min(max(corner.x - margin - size.width, visible.minX), visible.maxX - size.width)
+        let y = min(max(corner.y - margin - size.height, visible.minY), visible.maxY - size.height)
+        return CGPoint(x: x, y: y)
     }
 }
 

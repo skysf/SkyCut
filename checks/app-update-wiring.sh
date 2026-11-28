@@ -34,7 +34,8 @@
 #      (closing only hides; Cancel only asks AppUpdater.cancelCheck, which stops nothing but the check's own task); it draws
 #      what AppUpdateCheckDisplay reads from the updater's state, opens through the flow, ticks on a run-loop timer, and
 #      showDownload starts no check; the menu item is AppUpdateMenuEntry's (one check at a time: greyed while checking);
-#      a cancelled check's task reports nothing.
+#      a cancelled check's task reports nothing. A quit's first step closes the window and Restart and Update closes it
+#      before restarting, so no question of the quit lies under it; it first opens at the side (SMK74).
 # Usage: checks/app-update-wiring.sh
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -267,7 +268,7 @@ while (my $text = <>) {
     my $code = swift_code($text);
     my $file = $ARGV;
     print "SCANNED $file\n";
-    while ($code =~ /\bAppUpdateCheckWindow\s*\.\s*shared\s*\.\s*(open|show|showDownload)\s*\(/g) {
+    while ($code =~ /\bAppUpdateCheckWindow\s*\.\s*shared\s*\.\s*(open|show|showDownload|closeForQuit)\s*\(/g) {
         print "CALL $1 $file:" . at($code, $-[0]) . "\n";
     }
     if ($file =~ m{/AppUpdate/}) {
@@ -296,6 +297,15 @@ while (my $text = <>) {
         print "TIMER $file\n" if $code =~ /RunLoop\.main\.add\(timer,\s*forMode:\s*\.common\)/;
         print "PRESENT $file\n" if $code =~ /private\s+func\s+present\(\)\s*\{[^{}]*\{[^{}]*\}[^{}]*panel\.orderFront\(nil\)\s*\}/;
         print "ESCAPE $file\n" if $code =~ /func\s+escape\(\)\s*\{\s*perform\(\.dismiss\)\s*\}/;
+        print "CLOSEFORQUIT $file\n" if $code =~ /func\s+closeForQuit\(\)\s*\{\s*apply\(flow\.closed\(\)\)\s*\}/;
+        print "RESTARTCLOSE $file\n"
+            if $code =~ /case\s+\.restart\s*:\s*apply\(flow\.closed\(\)\)\s*AppUpdater\.shared\.requestRestart\(\)/;
+        print "PLACEMENT $file\n"
+            if $code =~ /panel\.setFrameOrigin\(AppUpdateCheckPlacement\.origin\(size:\s*panel\.frame\.size,\s*content:\s*content,\s*visible:\s*visible\)\)/;
+    }
+    if ($file =~ m{/SrtFlowApp\.swift$}) {
+        print "QUITFIRST $file\n"
+            if $code =~ /func\s+applicationShouldTerminate\(_\s+sender:\s*NSApplication\)\s*->\s*NSApplication\.TerminateReply\s*\{\s*MainActor\.assumeIsolated\s*\{\s*AppUpdateCheckWindow\.shared\.closeForQuit\(\)/;
     }
     if ($file =~ m{/AppUpdateCheckContent\.swift$}) {
         my $buttons = () = $code =~ /\bButton\s*\(/g;
@@ -358,6 +368,10 @@ if WINDOW_OUT="$(find Sources -name '*.swift' -type f -print0 | xargs -0 perl -0
   has TIMER "${WINDOW}" || fail "${WINDOW}: its ticks are run-loop timers (RunLoop.main.add(timer, forMode: .common))"
   has PRESENT "${WINDOW}" || fail "${WINDOW}: present() only orders the panel in (panel.orderFront(nil)): it never takes the keyboard (review CXU1)"
   has ESCAPE "${WINDOW}" || fail "${WINDOW}: Escape is the close button in every state (func escape() { perform(.dismiss) }): it hides, never cancels (review CXU1)"
+  only_call closeForQuit "${APP}" && has QUITFIRST "${APP}" && has CLOSEFORQUIT "${WINDOW}" \
+    || fail "${APP}: a quit's first step is AppUpdateCheckWindow.shared.closeForQuit() (apply(flow.closed())), before the screen recording or any project's question: a floating window covered the questions' buttons (SMK74; found: $(calls closeForQuit | tr '\n' ' '))"
+  has RESTARTCLOSE "${WINDOW}" || fail "${WINDOW}: Restart and Update closes the window (apply(flow.closed())) before AppUpdater.shared.requestRestart() (SMK74)"
+  has PLACEMENT "${WINDOW}" || fail "${WINDOW}: the window first opens where AppUpdateCheckPlacement.origin puts it: at the side of the main window, never the middle of the screen (SMK74)"
   CONTENT="${DIR}/AppUpdateCheckContent.swift"
   [ "$(sed -n "s|^BUTTONS \([0-9]*\) ${CONTENT}\$|\1|p" <<<"${WINDOW_OUT}")" = 2 ] && has TIPS "${CONTENT}" \
     || fail "${CONTENT}: every button is secondaryButton (.instantHelp(help)) or defaultButton (Return, .instantHelp(help, shortcut: .defaultAction)): instant tooltips on all of them (review CXU1)"

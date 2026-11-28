@@ -22,6 +22,7 @@ enum CheckWindowChecks {
         display(feed, newer, check)
         menu(feed, check)
         reopening(feed, check)
+        placement(check)
     }
 
     private static let auto = AppUpdateMode.install(automatic: true)
@@ -104,6 +105,14 @@ enum CheckWindowChecks {
               "closing a download's window (OK, Later, the close button) only closes it")
         var nothing = Flow()
         check(nothing.closed() == Flow.Step(), "closing nothing does nothing")
+        // SMK74: a quit (or Restart and Update) closes the window before its questions, also one chosen but not yet shown.
+        var quitting = Flow()
+        _ = quitting.chosen(at: 0)
+        check(quitting.closed() == Flow.Step(closes: true) && quitting.hidden && quitting.shows == nil,
+              "a quit in the grace period: the window, not yet shown, is closed and its check goes on")
+        check(quitting.tick(at: 0.5) == Flow.Step() && quitting.shows == nil, "…the grace tick never brings it up over the quit's questions")
+        check(quitting.answered(.upToDate, at: 0.6) == Flow.Step() && quitting.shows == nil && !quitting.hidden,
+              "…nor does the answer")
     }
 
     private static func cancel(_ feed: AppUpdateFeed, _ check: (Bool, String) -> Void) {
@@ -234,6 +243,23 @@ enum CheckWindowChecks {
         check(make(available) == .check, "auto install off, not downloading: Check for Updates…")
         _ = available.apply(.checkStarted(.schedule), mode: manualMode)
         check(make(available) == .checking, "…greyed while a check runs")
+    }
+
+    /// SMK74: the first place is at the side, the top-right of the main window below its toolbar (an alert comes up in the
+    /// middle of the screen, where the window used to open, and a floating window covered its buttons).
+    private static func placement(_ check: (Bool, String) -> Void) {
+        let origin = AppUpdateCheckPlacement.origin
+        let visible = CGRect(x: 0, y: 0, width: 1440, height: 875), size = CGSize(width: 360, height: 138)
+        let content = CGRect(x: 100, y: 50, width: 1200, height: 700)
+        check(AppUpdateCheckPlacement.margin == 12, "a 12 pt margin")
+        check(origin(size, content, visible) == CGPoint(x: 928, y: 600), "the top-right of the main window, below its toolbar, 12 pt in")
+        check(origin(size, nil, visible) == CGPoint(x: 1068, y: 725), "no main window: the top-right of the visible screen")
+        check(origin(size, CGRect(x: 1000, y: 600, width: 600, height: 400), visible) == CGPoint(x: 1080, y: 737),
+              "a main window past the screen's top-right: clamped whole onto the visible screen")
+        check(origin(CGSize(width: 360, height: 900), content, visible) == CGPoint(x: 928, y: -25),
+              "taller than the screen: its top at the screen's top, so its title bar stays reachable")
+        check(origin(size, content, visible) != CGPoint(x: (1440 - 360) / 2, y: (875 - 138) * 0.62),
+              "never the middle of the screen, where SkyCut's questions come up")
     }
 
     private static func reopening(_ feed: AppUpdateFeed, _ check: (Bool, String) -> Void) {

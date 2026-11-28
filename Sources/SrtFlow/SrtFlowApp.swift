@@ -196,6 +196,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// a stuck drive gets an alert that waits by itself or quits anyway, never a hang.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         MainActor.assumeIsolated {
+            // Before any question of the quit: the floating check window would cover its buttons (SMK74).
+            AppUpdateCheckWindow.shared.closeForQuit()
             // 有录制在跑时先停录、等 finalize 和导入决策 —— 那是异步的，
             // 所以返回 .terminateLater，由 coordinator 唯一一次 reply
             // （计划 §12.2；反复按 Quit 靠 finishTerminationWait 幂等）。

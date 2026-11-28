@@ -193,7 +193,10 @@ the replaced app going to the Trash. Every deletion, the download's own file inc
   **only** window the updater opens.
   - **What it is** (`AppUpdateCheckWindow`): a utility panel, never modal.
     - It floats above SkyCut's own windows and is off screen while SkyCut isn't active, so it is never above other apps.
-    - It moves aside by its title bar or background, and opens where the person left it, for the run.
+    - It moves aside by its title bar or background. The first time in a run it opens at the side
+      (`AppUpdateCheckPlacement`): its top-right corner 12 pt inside the top-right of SkyCut's main window, just below
+      the toolbar near the Update pill, whole on the visible screen (no main window: the screen's top-right). Never the
+      middle of the screen, where SkyCut's questions come up. Then where the person left it, for the run.
     - SkyCut keeps working while it waits.
   - **When** (`AppUpdateCheckFlow`, pure):
     - an answer within 0.5 s opens the window straight on it;
@@ -226,6 +229,12 @@ the replaced app going to the Trash. Every deletion, the download's own file inc
   - **Closing.** The close button, OK, Later and Escape only close or hide the window. A check goes on and its answer never
     brings the window back. **A download is never stopped by the window**; while one runs, the menu item brings the window
     back on it.
+  - **A quit closes it first** (SMK74). The window floats above SkyCut's windows, and SkyCut's questions are `NSAlert`s of
+    normal level in the middle of the screen: one left up covered the quit question's buttons. So any quit (⌘Q, the menu,
+    Restart and Update from the pill or the window) takes it off screen as its first step (`closeForQuit()`, the first
+    line of `applicationShouldTerminate`, before a screen recording's or any project's question). A window chosen but not
+    yet on screen never comes up. Restart and Update in the window closes it before it asks for the restart. If the quit
+    is cancelled the window stays closed, and the menu brings it back.
   - **The keyboard.** It never takes the keyboard: it only comes on screen (`orderFront`), and becomes key when the person
     clicks it. Then Return clicks the filled button, and Escape is the close button in every state (it hides, never cancels).
     When the answer arrives or the download moves on, it never comes forward.
@@ -294,7 +303,10 @@ than the running one stays; the rest goes.
     fresh download's at 1 by the verification; a kept download's 1 from the start of its check, with the file still
     there, through the verification; a same-size damaged one «Verifying…» while its old bytes are checked, then the new
     download up to 1;
-  - the menu item (greyed while any check runs, the percent while a download runs).
+  - the menu item (greyed while any check runs, the percent while a download runs);
+  - a quit in the grace period closes a window not yet shown, which then never comes up (SMK74);
+  - the first place (`AppUpdateCheckPlacement`): the main window's top-right below its toolbar, the screen's without one,
+    clamped whole onto the visible screen, never the middle (SMK74).
 
   Then, against a loopback server and scratch folders: fetch, download (wrong SHA-256, wrong size either way, redirect,
   cancelled, and which of them count), staging from real images, the pipeline (kept downloads, staged copies, what
@@ -335,6 +347,9 @@ than the running one stays; the rest goes.
   - **Tooltips and Return.** Every button is a `secondaryButton` (`.instantHelp`) or a `defaultButton` (Return,
     `.instantHelp(…, shortcut: .defaultAction)`). Restart and Update is a `defaultButton`.
   - **What's new is capped.** The window passes `maxHeight: Self.notesMaxHeight`, and `AppUpdateNotes` scrolls past it.
+  - **A quit closes it first** (SMK74). `closeForQuit()` is the first statement of `applicationShouldTerminate`, its only
+    call. Restart and Update closes the window before `requestRestart()`. The first place comes from
+    `AppUpdateCheckPlacement.origin`.
 - Reverse-verified on 2026-11-27 (#565): replacing the swap with two renames turns the kill loop red (the destination missing
   after kills); removing the cancellation check or the incoming staging folder turns their cases red; each wiring line
   removed turns the guard red. Again for the fixes before the first release (U1b, two rounds): each new case and guard line
@@ -361,6 +376,10 @@ than the running one stays; the rest goes.
     `AppUpdateNotes` not scrolling; Escape cancelling while checking; Restart and Update without Return.
 - Round 3 (review CXU2): 3 sabotages in the check, each red. The kept file's «Verifying…» report moved after staging,
   moved to just after the kept file's check, or removed.
+- Round 4 (smoke SMK74): 6 sabotages, each red:
+  - in the guard: Restart and Update leaving the window up; a quit leaving it up, or closing it only after the
+    recording's question; the first place back in the middle;
+  - in the check: a window in its grace period coming up over the question; the placement rule back to the middle.
 - `scripts/render-app-updates.sh <folder>` (graphical session, not in check-all): the pill states, popovers, the check
   window in each state (the production panel, Classic in light and dark too), the menu item's titles and the Settings
   section in zh-Hans / en / es. It also prints how the check window's frame changes when it grows: its top edge kept in the
@@ -434,7 +453,11 @@ No check reaches a real notarized pair of builds, Gatekeeper on a real download,
     - the window stays above SkyCut's windows; click it, and Escape hides it (the check goes on);
     - when the answer arrives it changes in place;
     - switch to another app: the window hides; come back: it is there;
-    - moved near the bottom of the screen, it stays whole when a taller answer arrives.
+    - moved near the bottom of the screen, it stays whole when a taller answer arrives;
+    - the first time in a run it opens at the top-right of the main window, below the toolbar;
+    - with the window up and an unsaved project, quit with ⌘Q: the window goes away before the question, whose Save /
+      Don't Save / Cancel the mouse reaches. Cancel: the window stays closed, and the menu brings it back. The same with
+      Restart and Update in the window, and from the pill.
 22. A download watched to the end (UPD1). With B offered and auto install on, choose Check for Updates…:
     - the window shows «Downloading n%» and «x MB / y MB» rising with the bar, then «Verifying…», then «SkyCut B is ready»
       with Later / Restart and Update;
