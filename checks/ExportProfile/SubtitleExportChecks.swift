@@ -13,7 +13,8 @@ import SrtFlowCore
 //   is told in an app-level alert (seen even off the Burn In page); the preview moving to a video's row while A stays open
 //   on its own exports A, nothing told;
 // - the video's row gone while Replace is asked: nothing written (before, the standalone file's text went there);
-// - Save writes its own file and marks the subtitle saved;
+// - Save writes its own file and marks the subtitle saved; an export in another format onto its own file leaves it unsaved
+//   (the mark follows the drive, review CXM1);
 // - every alert, "Replace?" included, comes from a run-loop turn, never inside a Swift task (review CXM1).
 @MainActor enum SubtitleExportChecks {
     static func run(root: URL, source: URL, require: (Bool, String) -> Void) async {
@@ -25,6 +26,7 @@ import SrtFlowCore
         await previewMovedToARow(lab, require)
         await rowGone(lab, require)
         await save(lab, require)
+        await otherFormatOntoItsOwnFile(lab, require)
         require(!lab.bench.askedInTask && lab.bench.missingButtons.isEmpty,
                 "every alert, Replace included, came from a run-loop turn, never inside a Swift task: inside a task \(lab.bench.askedInTask), missing \(lab.bench.missingButtons)")
         lab.restore()
@@ -123,6 +125,18 @@ import SrtFlowCore
         let saved = await lab.bench.until { !lab.standalone.hasUnsavedEdits }
         require(saved && lab.bench.text(lab.a).contains("Saved line") && lab.told.isEmpty,
                 "Save writes the subtitle to its own file and marks it saved: \(lab.shown(lab.a))")
+    }
+
+    /// A saved subtitle exported as WebVTT onto its own .srt name (a typed path): the drive no longer holds it.
+    private static func otherFormatOntoItsOwnFile(_ lab: ExportLab, _ require: (Bool, String) -> Void) async {
+        lab.reset()
+        lab.standalone.open(lab.a)
+        lab.export.exportAs(.vtt, boundTo: nil)
+        lab.answer(SaveLocation(url: lab.a, mayReplace: true))
+        let landed = await lab.bench.until { lab.bench.text(lab.a).hasPrefix("WEBVTT") }
+        _ = await lab.bench.until { lab.standalone.hasUnsavedEdits }
+        require(landed && lab.standalone.hasUnsavedEdits && lab.told.isEmpty,
+                "an export in another format onto the subtitle's own file leaves it unsaved: the mark follows the drive")
     }
 }
 

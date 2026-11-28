@@ -16,7 +16,10 @@ import SrtFlowCore
 //   earlier Save-then-attach, so it wins;
 // - every question comes from a run-loop turn, never inside a Swift task;
 // - the open standalone file opened again keeps its unsaved edits, even after it changed on the drive; without edits it is
-//   read again; another file is refused while it has edits (StandaloneSubtitleStore.open, §9 item 4).
+//   read again; another file is refused while it has edits (StandaloneSubtitleStore.open, §9 item 6);
+// - review CXM1: a Save still being written (past its deadline) is asked about with Keep Waiting / Cancel only, never Don't
+//   Save, and nothing is read over the edits; when it lands the row's mark follows the drive; Keep Waiting goes on once it
+//   landed; a file being written is read into a row only once its write landed.
 @MainActor enum SubtitleEditsChecks {
     static func run(root: URL, source: URL, require: (Bool, String) -> Void) async {
         let bench = SubtitleEditsBench(folder: root.appendingPathComponent("subtitle-edits", isDirectory: true))
@@ -29,6 +32,8 @@ import SrtFlowCore
         await anotherFile(bench, videos, require)
         await editDuringSave(bench, videos, require)
         reopen(bench, videos, require)
+        await readsOnlyAfterTheWrite(bench, videos, require)
+        await lateWrite(bench, videos, require)
         require(!bench.askedInTask && bench.missingButtons.isEmpty,
                 "every question came from a run-loop turn with Save / Don't Save / Cancel: inside a task \(bench.askedInTask), missing \(bench.missingButtons)")
         bench.restore()
@@ -212,5 +217,62 @@ import SrtFlowCore
         require(standalone.document?.cues.first?.text == "Changed elsewhere" && !standalone.hasUnsavedEdits,
                 "without unsaved edits the open file is read again (it may have changed elsewhere)")
         standalone.clear()
+    }
+
+    /// B open on its own with an edit, its Save held; B chosen for a video without edits: the video gets B only once B's write
+    /// landed, saved (never what was there before the write).
+    private static func readsOnlyAfterTheWrite(_ bench: SubtitleEditsBench, _ videos: [URL], _ require: (Bool, String) -> Void) async {
+        let a = bench.file("A.srt"), b = bench.file("B.srt"), standalone = StandaloneSubtitleStore.shared
+        let (queue, ids, edits) = page(bench, videos, [a])
+        standalone.open(b)
+        standalone.document?.cues[0].text = "B saved alone"
+        standalone.hasUnsavedEdits = true
+        bench.gate.arm()
+        SubtitleEditorExport(subtitles: BurnInSubtitles(queue: queue, standalone: standalone)).save(boundTo: nil)
+        _ = await bench.until { bench.gate.isHolding }
+        edits.attach(b, to: ids[0])
+        let waited = burnIn(queue, ids[0])?.subtitleURL == a
+        bench.gate.open()
+        await bench.idle(edits)
+        require(waited && burnIn(queue, ids[0])?.subtitleURL == b && burnIn(queue, ids[0])?.document?.cues.first?.text == "B saved alone"
+                && burnIn(queue, ids[0])?.hasUnsavedEdits == false,
+                "a file being written is read into a video only once its write landed, saved: \(burnIn(queue, ids[0])?.subtitleURL?.lastPathComponent ?? "nil") unsaved \(burnIn(queue, ids[0])?.hasUnsavedEdits == true)")
+        standalone.clear()
+    }
+
+    /// The review's sequence (CXM1): every line of A deleted, A chosen again for its video, Save, the write held past the
+    /// deadline. Then the same answered Keep Waiting, the write landing meanwhile.
+    private static func lateWrite(_ bench: SubtitleEditsBench, _ videos: [URL], _ require: (Bool, String) -> Void) async {
+        let deadline = SubtitleFileSave.deadline
+        SubtitleFileSave.deadline = 0.3
+        let a = bench.file("A.srt")
+        var (queue, ids, edits) = page(bench, videos, [a])
+        queue.editBurnInDocument(for: ids[0]) { $0.cues.removeAll() }
+        bench.gate.arm()
+        bench.replies = ["Save", "Cancel"]
+        edits.attach(a, to: ids[0])
+        _ = await bench.until { bench.asked.count == 2 }
+        await bench.idle(edits)
+        let offered = bench.buttons.last ?? []
+        let notReread = burnIn(queue, ids[0])?.document?.cues.isEmpty == true && burnIn(queue, ids[0])?.hasUnsavedEdits == true
+        bench.gate.open()
+        let landed = await bench.until { burnIn(queue, ids[0])?.hasUnsavedEdits == false }
+        require(offered == [L10n("Keep Waiting"), L10n("Cancel")] && notReread
+                && bench.asked.last == String(format: L10n("“%@” is still being saved"), "A.srt"),
+                "a Save still being written is asked about with Keep Waiting / Cancel only, and nothing is read over the edits: offered \(offered)")
+        require(landed && burnIn(queue, ids[0])?.document?.cues.isEmpty == true && !bench.text(a).contains("Line from A"),
+                "when the write lands the video's mark follows the drive: saved, the file holds what was saved")
+
+        (queue, ids, edits) = page(bench, videos, [a])
+        queue.editBurnInDocument(for: ids[0]) { $0.cues.removeAll() }
+        bench.gate.arm()
+        bench.replies = ["Save", "Keep Waiting"]
+        bench.whileAsked = { bench.whileAsked = { bench.gate.open() } }
+        edits.attach(a, to: ids[0])
+        await bench.idle(edits)
+        require(bench.asked.count == 2 && burnIn(queue, ids[0])?.hasUnsavedEdits == false && burnIn(queue, ids[0])?.document?.cues.isEmpty == true
+                && queue.items.first?.errorMessage == String(format: L10n("No subtitle lines found in %@."), "A.srt"),
+                "Keep Waiting waits for the write, then the file is read again once it landed: asked \(bench.asked.count), \(queue.items.first?.errorMessage ?? "no message")")
+        SubtitleFileSave.deadline = deadline
     }
 }

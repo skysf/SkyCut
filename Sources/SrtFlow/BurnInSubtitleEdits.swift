@@ -11,6 +11,10 @@ import SrtFlowCore
 // save was being written is asked about again, never dropped. Page actions run one after another, each after the questions
 // and saves of the ones before it, so an older action never lands after a newer one. With nothing to ask and nothing under
 // way, an action runs at once, as before.
+// While a Save of a subtitle's file is still on its way (SubtitleFileSave.isWriting), Don't Save is never offered — the
+// write would land after it — only Keep Waiting / Cancel; a file is never read into a row while a write to it is on its way;
+// when a write lands, the place's mark follows the drive. Quit takes over: the page's actions under way stand down, and
+// Quit's question is the only one (review CXM1).
 // What it doesn't: the question's alert (SubtitleEditsQuestion); the editor's own Save and Export As (SubtitleEditorExport);
 // the queue (EncodeQueue); the standalone file's ✕, which refuses while it has unsaved edits (SubtitleEditPanel); reopening
 // the open standalone file, which keeps its edits (StandaloneSubtitleStore.open).
@@ -38,6 +42,11 @@ final class BurnInSubtitleEdits {
     /// Page actions still waiting for their questions or saves, and the newest of them (the next one waits for it).
     private var pending = 0
     private var last: Task<Void, Never>?
+    /// Bumped when Quit takes over: page actions started before it ask nothing more and do nothing, so Quit's own
+    /// question is the only one (review CXM1).
+    private var epoch = 0
+    /// Why a Save that had answered "not responding" failed when it ended, per file: told with the next question.
+    private var lateFailures: [String: String] = [:]
 
     init(_ subtitles: BurnInSubtitles) {
         self.subtitles = subtitles
@@ -68,10 +77,13 @@ final class BurnInSubtitleEdits {
     }
 
     /// `subtitle` for the video `id`, read into its row; a row with unsaved edits is asked about first, also when
-    /// `subtitle` is its own file again (Don't Save then reads it from the drive).
+    /// `subtitle` is its own file again (Don't Save then reads it from the drive). Never read while a write to that file is
+    /// still on its way: it waits for it (the editor's deadline), and says the drive is not responding past that.
     func attach(_ subtitle: URL, to id: EncodeItem.ID) {
         let place = BurnInSubtitles.Place.row(id)
-        whenSettled({ [place] }) { [self] discarded in
+        whenSettled({ [place] }, reading: subtitle, stillWriting: { [self] in
+            subtitles.queue.setError(SubtitleFileSave.notRespondingText(subtitle), for: id)
+        }) { [self] discarded in
             guard subtitles.queue.items.contains(where: { $0.id == id }), discarded.allows(place, unsaved(place)) else { return }
             load(subtitle, into: id)
         }
@@ -79,17 +91,17 @@ final class BurnInSubtitleEdits {
 
     // MARK: - Quit
 
-    /// Something to ask at Quit: a subtitle with unsaved edits not given up yet, or a page action still under way.
+    /// Something to ask at Quit: a subtitle with unsaved edits not given up yet.
     func needsAsking(after discarded: Discarded) -> Bool {
-        pending > 0 || subtitles.places.contains { !discarded.allows($0, unsaved($0)) }
+        subtitles.places.contains { !discarded.allows($0, unsaved($0)) }
     }
 
-    /// Quit (ProjectQuit): once the page's actions under way are done, every subtitle with unsaved edits is asked about. A
-    /// Save waits for its drive at most `deadline` (Quit's grace: nothing else on screen moves while Quit waits), then is
-    /// asked about again, saying the drive is not responding. false: Cancel.
+    /// Quit (ProjectQuit): every subtitle with unsaved edits is asked about. Quit takes over from the page's actions under
+    /// way: they stand down, and a Save of theirs still being written is asked about here once, Keep Waiting or Cancel. A Save
+    /// waits for its drive at most `deadline` (Quit's grace: nothing else on screen moves while Quit waits). false: Cancel.
     func settleForQuit(into discarded: inout Discarded, deadline: TimeInterval) async -> Bool {
-        while pending > 0, let running = last { await running.value }
-        return await settle(subtitles.places, into: &discarded, deadline: deadline)
+        epoch += 1
+        return await settle(subtitles.places, into: &discarded, deadline: deadline) { true }
     }
 
     // MARK: - Asking
@@ -100,32 +112,52 @@ final class BurnInSubtitleEdits {
         return held
     }
 
-    /// Runs `action` once the unsaved edits at `places` are settled: at once when nothing there needs asking and no action
-    /// is under way, otherwise after the actions before it. Cancel: it never runs.
+    /// Runs `action` once the unsaved edits at `places` are settled: at once when nothing there needs asking, nothing is
+    /// being written to `reading` and no action is under way; otherwise after the actions before it (and after the write to
+    /// `reading` landed; `stillWriting` when it has not by the editor's deadline). Cancel, or Quit taking over: it never runs.
     private func whenSettled(
-        _ places: @escaping @MainActor () -> [BurnInSubtitles.Place], _ action: @escaping @MainActor (Discarded) -> Void
+        _ places: @escaping @MainActor () -> [BurnInSubtitles.Place], reading file: URL? = nil,
+        stillWriting: @escaping @MainActor () -> Void = {}, _ action: @escaping @MainActor (Discarded) -> Void
     ) {
-        if pending == 0, places().allSatisfy({ unsaved($0) == nil }) { return action(Discarded()) }
+        let writing = file.map(SubtitleFileSave.isWriting) ?? false
+        if pending == 0, !writing, places().allSatisfy({ unsaved($0) == nil }) { return action(Discarded()) }
         pending += 1
-        let previous = last
+        let previous = last, started = epoch
         last = Task { @MainActor [self] in
+            defer { pending -= 1 }
             await previous?.value
+            let current = { [self] in epoch == started }
             var discarded = Discarded()
-            if await settle(places(), into: &discarded) { action(discarded) }
-            pending -= 1
+            guard await settle(places(), into: &discarded, while: current), current() else { return }
+            if let file, !(await SubtitleFileSave.waitUntilWritten(file, deadline: SubtitleFileSave.deadline)) {
+                if current() { stillWriting() }
+                return
+            }
+            if current() { action(discarded) }
         }
     }
 
-    /// Asks about each place's unsaved edits in turn; again after a Save that failed or did not answer within `deadline` (nil:
-    /// the editor's own, SubtitleFileSave.deadline), or when new edits came in while it was written. false: Cancel (nothing
-    /// more is asked).
+    /// Asks about each place's unsaved edits in turn; again after a Save that failed, or when new edits came in while it was
+    /// written. While a Save of a place's file is still on its way (it did not answer within `deadline`, nil: the editor's
+    /// own, or another one started it), Don't Save is not offered: Keep Waiting (up to `deadline` again) or Cancel. Asks
+    /// nothing more once `current` says no. false: Cancel.
     private func settle(
-        _ places: [BurnInSubtitles.Place], into discarded: inout Discarded, deadline: TimeInterval? = nil
+        _ places: [BurnInSubtitles.Place], into discarded: inout Discarded, deadline: TimeInterval? = nil,
+        while current: @escaping @MainActor () -> Bool
     ) async -> Bool {
         for place in places {
             var failure: String?
             while let now = unsaved(place), !discarded.allows(place, now) {
-                switch await SubtitleEditsQuestion.ask(now.url?.lastPathComponent ?? "", failure: failure) {
+                guard current(), let url = now.url else { return false }
+                if SubtitleFileSave.isWriting(url) {
+                    switch await SubtitleEditsQuestion.askWhileWriting(url.lastPathComponent, stillWanted: current) {
+                    case .keepWaiting: _ = await SubtitleFileSave.waitUntilWritten(url, deadline: deadline ?? SubtitleFileSave.deadline)
+                    case .cancel: return false
+                    }
+                    failure = lateFailures.removeValue(forKey: url.standardized.path)
+                    continue
+                }
+                switch await SubtitleEditsQuestion.ask(url.lastPathComponent, failure: failure, stillWanted: current) {
                 case .cancel: return false
                 case .dontSave: discarded.answered[place] = now
                 case .save: failure = await save(now, at: place, deadline: deadline)
@@ -135,20 +167,26 @@ final class BurnInSubtitleEdits {
         return true
     }
 
-    /// `held` written to its own file in its own format, off the main thread (the editor's Save); its place is marked saved
-    /// when the write lands and it still holds exactly that, also after "not responding". nil: written; otherwise why not.
+    /// `held` written to its own file in its own format, off the main thread (the editor's Save). When it lands, the place's
+    /// mark follows the drive (`BurnInSubtitles.follow`), also after "not responding"; a failure that comes after that is
+    /// kept for the next question. nil: written, or still on its way (the loop then asks Keep Waiting / Cancel); otherwise
+    /// why it failed.
     private func save(_ held: BurnInSubtitles.Held, at place: BurnInSubtitles.Place, deadline: TimeInterval?) async -> String? {
         guard let url = held.url else { return nil }
         let data = SubtitleFileSave.data(held.document, format: held.document.format)
+        var answered = false
         let answer = await SubtitleFileSave.write(data, to: url, replacing: true, deadline: deadline) { [self] landed in
-            guard landed == .written, held.sameText(as: subtitles.held(place)) else { return }
-            subtitles.markSaved(place)
+            switch landed {
+            case .written: subtitles.follow(place, written: held)
+            case .failed(let reason) where answered: lateFailures[url.standardized.path] = reason
+            default: break
+            }
         }
+        answered = true
         switch answer {
-        case .written: return nil
+        case .written, .notResponding: return nil
         case .occupied: return NewFileClaim.occupiedReason(url)
         case .failed(let reason): return reason
-        case .notResponding: return SubtitleFileSave.notRespondingText(url)
         }
     }
 

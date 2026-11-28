@@ -20,7 +20,7 @@ final class StandaloneSubtitleStore: ObservableObject {
 
     func open(_ fileURL: URL) {
         // 手里这份还没保存就别悄悄换掉，那等于把用户的编辑扔了。The open file itself, opened again (a double-click, a drop),
-        // keeps its unsaved edits too: it is never read again over them (docs/architecture/export-settings.md §9 item 4;
+        // keeps its unsaved edits too: it is never read again over them (docs/architecture/export-settings.md §9 item 6;
         // docs/bugfixes/2026-11-28-burn-in-subtitle-edits-dropped-unasked.md). Without edits it is read again.
         if hasUnsavedEdits {
             notice = url == fileURL ? nil : String(

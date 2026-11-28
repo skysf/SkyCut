@@ -5,8 +5,8 @@ import SrtFlowCore
 //
 // What it does: names the places a subtitle lives on the Burn In page — a video's row in the queue (`BurnInRequest`), or the
 // standalone file (`StandaloneSubtitleStore`) — and reads what one holds at a moment (its file, its text, whether that text
-// has unsaved edits), so a decision taken earlier can check later that the place still holds exactly that. Marks a place
-// saved once a write of it has landed.
+// has unsaved edits), so a decision taken earlier can check later that the place still holds exactly that. When a write lands
+// on a place's own file, its unsaved mark follows the drive (`follow`).
 // What it doesn't: asking before unsaved edits go away (BurnInSubtitleEdits); the editor's Save and Export As
 // (SubtitleEditorExport); editing the text (SubtitleEditPanel, EncodeQueue.editBurnInDocument).
 //
@@ -60,11 +60,15 @@ struct BurnInSubtitles {
         return .standalone
     }
 
-    /// A write of what `place` holds landed on its own file: no unsaved edits.
-    func markSaved(_ place: Place) {
+    /// A write landed on `place`'s own file: its mark follows the drive. `written`: what was written, in the place's own
+    /// format. Saved when the place holds exactly that now; unsaved when it holds that file with other text (review CXM1:
+    /// never "saved" while the drive holds something else). Nothing when the place holds another file or nothing.
+    func follow(_ place: Place, written: Held, inOwnFormat: Bool = true) {
+        guard let now = held(place), now.url == written.url else { return }
+        let saved = inOwnFormat && now.document == written.document
         switch place {
-        case .row(let id): queue.markBurnInSaved(for: id)
-        case .standalone: standalone.hasUnsavedEdits = false
+        case .row(let id): queue.markBurnInSaved(saved, for: id)
+        case .standalone: standalone.hasUnsavedEdits = !saved
         }
     }
 }

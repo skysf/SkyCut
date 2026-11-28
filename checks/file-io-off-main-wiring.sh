@@ -246,6 +246,11 @@ for f in Sources/SrtFlow/RunLoopAlert.swift Sources/SrtFlow/SubtitleEditsQuestio
     "$f" '^[^/]*(Task \{|Task\.detached|DispatchQueue\.main\.async)'
 done
 require "the question comes through RunLoopAlert" Sources/SrtFlow/SubtitleEditsQuestion.swift 'await RunLoopAlert\.ask\('
+# Review CXM1: while a Save is still being written, only Keep Waiting / Cancel (never Don't Save), and Quit takes over from
+# the page's actions under way (one question, one Cancel).
+require "a subtitle whose Save is still being written is asked Keep Waiting / Cancel, never Don't Save" \
+  Sources/SrtFlow/BurnInSubtitleEdits.swift 'switch await SubtitleEditsQuestion\.askWhileWriting\('
+require "Quit takes over from the page's actions under way" Sources/SrtFlow/BurnInSubtitleEdits.swift '^        epoch \+= 1$'
 
 # Compress / Burn In (2026-11-19, docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md): ffmpeg writes only the
 # job's own claimed file, which is handed over through ExportDelivery as a new file (never replacing); a failed or

@@ -81,10 +81,10 @@ struct SubtitleEditorExport {
         let data = SubtitleFileSave.data(pressed.held.document, format: format)
         Task {
             let answer = await SubtitleFileSave.write(data, to: location.url, replacing: location.mayReplace) { landed in
-                // Its own file in its own format (an export onto it is a save), still holding exactly what was written.
-                guard landed == .written, location.url == pressed.held.url, format == pressed.held.document.format,
-                      pressed.held.sameText(as: subtitles.held(pressed.place)) else { return }
-                subtitles.markSaved(pressed.place)
+                // Landed on its own file (an export onto it is a save): the mark follows the drive — saved only while the
+                // place holds exactly what was written, in its own format.
+                guard landed == .written, location.url == pressed.held.url else { return }
+                subtitles.follow(pressed.place, written: pressed.held, inOwnFormat: format == pressed.held.document.format)
             }
             switch answer {
             case .written: break

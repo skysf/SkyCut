@@ -35,6 +35,23 @@ enum SubtitleFileSave {
     }
     /// One write at a time, in the order asked: two saves of the same file land in order.
     private static let queue = DispatchQueue(label: "SrtFlow.subtitleFile", qos: .userInitiated)
+    /// Writes asked for and not landed yet, per file (also after "not responding": the write goes on).
+    @MainActor private static var writing: [String: Int] = [:]
+
+    /// A write to `url` has not landed yet: nothing may read the file into an editor, or drop what it is writing, before it
+    /// does (BurnInSubtitleEdits, review CXM1).
+    @MainActor
+    static func isWriting(_ url: URL) -> Bool { writing[key(url), default: 0] > 0 }
+
+    /// Waits until no write to `url` is on its way, at most `deadline`. false: one still is.
+    @MainActor
+    static func waitUntilWritten(_ url: URL, deadline: TimeInterval) async -> Bool {
+        let end = ProcessInfo.processInfo.systemUptime + max(0, deadline)
+        while isWriting(url), ProcessInfo.processInfo.systemUptime < end { try? await Task.sleep(nanoseconds: 50_000_000) }
+        return !isWriting(url)
+    }
+
+    private static func key(_ url: URL) -> String { url.standardized.path }
 
     /// What the person is told when the drive with `url` did not answer within the deadline.
     @MainActor
@@ -63,6 +80,8 @@ enum SubtitleFileSave {
         let perform = perform
         let wait = Waiting()
         let seconds = deadline ?? Self.deadline
+        let file = key(url)
+        writing[file, default: 0] += 1
         return await withCheckedContinuation { continuation in
             wait.continuation = continuation
             queue.async {
@@ -74,6 +93,8 @@ enum SubtitleFileSave {
                 }
                 DispatchQueue.main.async {
                     MainActor.assumeIsolated {
+                        writing[file, default: 1] -= 1
+                        if writing[file] == 0 { writing[file] = nil }
                         wait.answer(answer)
                         landed(answer)
                     }

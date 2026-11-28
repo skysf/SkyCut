@@ -46,4 +46,27 @@ enum SubtitleEditsQuestion {
         default: .cancel
         }
     }
+
+    // MARK: - While a Save is still being written
+
+    enum WhileWriting: Equatable {
+        case keepWaiting, cancel
+    }
+
+    /// Asked instead while a Save of `file` has not landed yet (review CXM1): Don't Save is not offered, because that write
+    /// would still land afterwards (over a reload, or with the edits given up). Keep Waiting (the default) or Cancel.
+    static func askWhileWriting(_ file: String, stillWanted: @escaping @MainActor () -> Bool = { true }) async -> WhileWriting {
+        let response = await RunLoopAlert.ask({ writingAlert(file) }, stillWanted: stillWanted)
+        return response == .alertFirstButtonReturn ? .keepWaiting : .cancel
+    }
+
+    /// "“X” is still being saved": Keep Waiting, Cancel (Escape).
+    static func writingAlert(_ file: String) -> NSAlert {
+        let alert = NSAlert()
+        alert.messageText = String(format: L10n("“%@” is still being saved"), file)
+        alert.informativeText = L10n("The drive has not finished writing it. Cancel leaves everything as it is, and the file is still saved when the drive finishes.")
+        alert.addButton(withTitle: L10n("Keep Waiting"))
+        alert.addButton(withTitle: L10n("Cancel")).keyEquivalent = "\u{1b}"
+        return alert
+    }
 }

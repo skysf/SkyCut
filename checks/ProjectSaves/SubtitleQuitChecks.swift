@@ -9,8 +9,10 @@ import SrtFlowCore
 // (SubtitleEditsBench):
 // - Quit no longer quits at once; Cancel stays (Restart and Update is told) and keeps both edits;
 // - Don't Save for each lets the quit go on and writes nothing;
-// - a Save whose drive does not answer within Quit's grace is asked about again, saying so (Cancel stays), and the write
-//   that lands later still marks the subtitle saved; Save writes the other one to its file first;
+// - a Save whose drive does not answer within Quit's grace is asked about again with Keep Waiting / Cancel only (Cancel
+//   stays), and the write that lands later still marks the subtitle saved; Save writes the other one to its file first;
+// - a page ✕ whose Save is still being written when Quit comes: Quit asks once (Keep Waiting / Cancel); after Cancel the
+//   page's action stands down (nothing more asked, the video stays) and the late write still saves (review CXM1);
 // - the questions come from a run-loop turn, never inside a Swift task.
 @MainActor enum SubtitleQuitChecks {
     static func run(_ checks: Checks, root: URL) async {
@@ -49,9 +51,9 @@ import SrtFlowCore
         bench.gate.arm()
         bench.replies = ["Save", "Cancel"]
         let stuck = await ProjectQuit.prepareAll()
-        checks.require(!stuck && bench.asked == [bench.question("A.srt"), bench.question("A.srt")]
-                       && bench.details.last?.contains(SubtitleFileSave.notRespondingText(a)) == true,
-                       "a Save whose drive does not answer within Quit's grace is asked about again, saying so; Cancel stays: \(bench.details.last ?? "nothing asked")")
+        checks.require(!stuck && bench.asked == [bench.question("A.srt"), stillSaving("A.srt")]
+                       && bench.buttons.last == [L10n("Keep Waiting"), L10n("Cancel")],
+                       "a Save whose drive does not answer within Quit's grace is asked about again with Keep Waiting / Cancel only; Cancel stays: \(bench.asked)")
         bench.gate.open()
         let landed = await bench.until { queue.items.first(where: { $0.id == id })?.burnIn?.hasUnsavedEdits == false }
         checks.require(landed && bench.text(a).contains("Row edit"),
@@ -63,6 +65,7 @@ import SrtFlowCore
         checks.require(saved && bench.asked == [bench.question("B.srt")] && bench.text(b).contains("Standalone edit")
                        && !standalone.hasUnsavedEdits,
                        "Save writes the subtitle still unsaved to its file first, then Quit goes on: asked \(bench.asked), \(bench.text(b))")
+        await pageSaveAtQuit(checks, bench, id: id, a: a)
         checks.require(!bench.askedInTask && bench.missingButtons.isEmpty,
                        "the questions came from a run-loop turn with Save / Don't Save / Cancel: inside a task \(bench.askedInTask)")
 
@@ -73,6 +76,29 @@ import SrtFlowCore
         ProjectQuit.quitCancelled = cancelled
         bench.restore()
     }
+
+    /// The row's ✕ answered Save, its write held; Quit comes while it is written, and is cancelled.
+    private static func pageSaveAtQuit(_ checks: Checks, _ bench: SubtitleEditsBench, id: EncodeItem.ID, a: URL) async {
+        let queue = EncodeQueue.burnIn
+        queue.editBurnInDocument(for: id) { $0.cues[0].text = "Saved by the page" }
+        bench.forget()
+        bench.gate.arm()
+        bench.replies = ["Save"]
+        BurnInSubtitleEdits.shared.remove(id)
+        _ = await bench.until { bench.gate.isHolding }
+        bench.replies = ["Cancel"]
+        let quit = await ProjectQuit.prepareAll()
+        let atQuit = Array(bench.asked.dropFirst())
+        bench.gate.open()
+        let saved = await bench.until { queue.items.first(where: { $0.id == id })?.burnIn?.hasUnsavedEdits == false }
+        await bench.idle(BurnInSubtitleEdits.shared)
+        checks.require(!quit && atQuit == [stillSaving("A.srt")] && bench.asked.count == 2,
+                       "Quit during a page's Save asks once, Keep Waiting / Cancel, and Cancel stays: asked at Quit \(atQuit), in all \(bench.asked.count)")
+        checks.require(saved && queue.items.contains { $0.id == id } && bench.text(a).contains("Saved by the page"),
+                       "after that Cancel the page's ✕ stands down (the video stays) and its late write still saves it")
+    }
+
+    private static func stillSaving(_ file: String) -> String { String(format: L10n("“%@” is still being saved"), file) }
 
     private static func rowText(_ queue: EncodeQueue, _ id: EncodeItem.ID) -> String? {
         queue.items.first { $0.id == id }?.burnIn?.document?.cues.first?.text
