@@ -139,8 +139,10 @@ struct AppUpdateFiles: Sendable {
 
     /// A download kept from an earlier run is the feed's DMG: its size and SHA-256 still match. One that doesn't is removed.
     /// Blocking (hashing): AppUpdateWork.queue.
-    func keptDownloadMatches(_ dmg: URL, feed: AppUpdateFeed) -> Bool {
+    /// `checking` is told when a kept file is there and its check begins (the pipeline reports «Verifying…» from then on).
+    func keptDownloadMatches(_ dmg: URL, feed: AppUpdateFeed, checking: () -> Void = {}) -> Bool {
         guard FileManager.default.fileExists(atPath: dmg.path) else { return false }
+        checking()
         let size = (try? FileManager.default.attributesOfItem(atPath: dmg.path)[.size] as? NSNumber)?.int64Value
         if !Self.isLink(dmg), size == feed.dmgSize, AppUpdateDigest.sha256(of: dmg) == feed.dmgSHA256 { return true }
         remove(dmg)

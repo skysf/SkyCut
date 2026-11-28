@@ -40,7 +40,7 @@ struct AppUpdateCheckContent: View {
             switch display {
             case .checking:
                 AppUpdateHeader(icon: nil, title: L10n("Checking for updates…"), subtitle: youreOn)
-                buttonRow { secondaryButton("Cancel", .cancel, help: "Stop checking and close this window") }
+                buttonRow { secondaryButton("Cancel", .cancel, help: AppUpdater.shared.state.sharedWith.isEmpty ? LocalizedStringKey("Stop checking and close this window") : LocalizedStringKey("Close this panel")) }
             case .upToDate:
                 AppUpdateHeader(icon: "checkmark", title: L10n("SkyCut is up to date"),
                                 subtitle: String(format: L10n("%@ is the latest version."), running))

@@ -88,13 +88,15 @@ With auto install on (or after Download and Install), in the background (`AppUpd
 
 1. A copy of this release an earlier run staged is taken as it is. Otherwise, a finished download of its DMG kept from an
    earlier run (a quit during staging, say) is used if its size and SHA-256 still match the feed; one that doesn't is
-   removed. Downloads of other DMGs are removed.
+   removed. Downloads of other DMGs are removed. The kept file's check reports progress 1 as it begins
+   (`keptDownloadMatches(…, checking:)`): the check window says «Verifying…» while the whole file is hashed, and only a
+   new download that follows a failed check shows its own percent.
 2. Else the DMG goes to `Application Support/SrtFlow/Updates/downloads/` (identity-class name,
    [产品名与代码名](product-name.md)). Never more bytes than the feed says; then the size and SHA-256 must match.
-3. Every byte is in (a kept download's too): the progress is 1 from here on. The image is attached read-only with
-   `-nobrowse` at a private mount point (Finder doesn't show it), the app at its top (the running app's bundle id) copied
-   into a folder of its own under `staged.noindex/` (`.noindex`: Spotlight never lists the staged copy), the download
-   quarantine cleared.
+3. Every byte is in (the transfer's last report, or a kept file's check): the progress is 1. The image is attached
+   read-only with `-nobrowse` at a private mount point (Finder doesn't show it), the app at its top (the running app's
+   bundle id) copied into a folder of its own under `staged.noindex/` (`.noindex`: Spotlight never lists the staged
+   copy), the download quarantine cleared.
 4. The copy is verified (`AppUpdateVerifier`): its Info.plist names the running app's bundle id and exactly the feed's
    version (newer than the running one) and build; its signature passes strictly against the **running** app's designated
    requirement with `notarized` in the same requirement (`AppBundleSignature.notarizedRequirement`); and Gatekeeper accepts
@@ -201,8 +203,9 @@ the replaced app going to the Trash. Every deletion, the download's own file inc
   - **What it says** (`AppUpdateCheckContent`): up to date (OK); couldn't check (Cancel / Try Again); a newer version with
     what's new, then followed live from the updater's state (`AppUpdateCheckDisplay`). The progress is
     `AppUpdateState.progress`, the same value as the pill, Settings and get_status; the window never asks the network.
-    - Downloading: «Downloading 29%», «12.3 MB / 42.4 MB», a bar. Then «Verifying…» once every byte is in. The pipeline
-      reports 1 before it stages (§4), so a kept download shows «Verifying…» too, never «Downloading 0%».
+    - Downloading: «Downloading 29%», «12.3 MB / 42.4 MB», a bar. Then «Verifying…» once every byte is in. A kept
+      download reports 1 as its check begins (§4), so it shows «Verifying…» while its SHA-256 is computed and through the
+      staging, never «Downloading 0%». Only a new download after a failed check shows its percent.
     - Ready: the pill popover's ready text (Later / Restart and Update, the filled one). If the restart waits for running
       work, the popover's waiting list and Cancel Restart.
     - The download didn't finish (Later / Try Again). Try Again downloads again after Download and Install's download, and
@@ -212,7 +215,8 @@ the replaced app going to the Trash. Every deletion, the download's own file inc
     - Up to date, once a later check withdraws the release (the newest found is gone: `AppUpdateState.lastFound`), also
       with auto install off and nothing downloaded.
     - What's new scrolls past 200 pt (a feed may hold 8 notes of 300 characters), so the buttons always stay on screen.
-    - Every button has an instant tooltip; the filled one shows its Return key cap.
+    - Every button has an instant tooltip; the filled one shows its Return key cap. While the schedule or Settings shares
+      the check, Cancel's tooltip says it only closes the window («Close this panel»).
   - **Its words** are the old alerts' and the popovers' keys. The failed download has its own note («The download didn't
     finish.»): the popover's «… Try again later.» would contradict the Try Again button below it.
   - **Cancel** (while checking) closes the window. It stops the request (`AppUpdater.cancelCheck`) only when the window's
@@ -286,7 +290,10 @@ than the running one stays; the rest goes.
   - what it draws, from the updater's state alone (the progress, verifying, ready, a restart waiting, both failed
     downloads, the switch turned off, a newer release, a withdrawn one: up to date, also before any download and for a
     copy that only tells), and the whole percents;
-  - the pipeline's progress rising to 1 before staging, a kept download's being just 1 (`PipelineChecks`);
+  - the pipeline's progress, read when each report comes and when the staging's verification runs (`PipelineChecks`): a
+    fresh download's at 1 by the verification; a kept download's 1 from the start of its check, with the file still
+    there, through the verification; a same-size damaged one «Verifying…» while its old bytes are checked, then the new
+    download up to 1;
   - the menu item (greyed while any check runs, the percent while a download runs).
 
   Then, against a loopback server and scratch folders: fetch, download (wrong SHA-256, wrong size either way, redirect,
@@ -352,6 +359,8 @@ than the running one stays; the rest goes.
     still offered;
   - in the guard: the first show taking the keyboard; a button without its tooltip; the window's notes not capped, or
     `AppUpdateNotes` not scrolling; Escape cancelling while checking; Restart and Update without Return.
+- Round 3 (review CXU2): 3 sabotages in the check, each red. The kept file's «Verifying…» report moved after staging,
+  moved to just after the kept file's check, or removed.
 - `scripts/render-app-updates.sh <folder>` (graphical session, not in check-all): the pill states, popovers, the check
   window in each state (the production panel, Classic in light and dark too), the menu item's titles and the Settings
   section in zh-Hans / en / es. It also prints how the check window's frame changes when it grows: its top edge kept in the
@@ -434,8 +443,9 @@ No check reaches a real notarized pair of builds, Gatekeeper on a real download,
       with no new feed request in the test server's log;
     - with a wrong SHA-256 in the test feed: «The download didn't finish.» with Try Again, which checks and downloads
       again;
-    - quit during the staging (as in step 18), open A and choose Check for Updates…: the kept download shows
-      «Verifying…», never «Downloading 0%», then ready;
+    - with auto install off, a complete DMG kept (a quit during the staging after Download and Install, as in step 18),
+      open A, choose Check for Updates… and click Download and Install: «Verifying…» at once while the file is hashed,
+      never «Downloading 0%», then ready;
     - with auto install off, roll the feed back to A's version while the window offers B (nothing downloaded), and let a
       check run (Settings' button): the window turns to up to date;
     - B's feed with 8 notes of 300 characters: what's new scrolls, the buttons stay on screen.

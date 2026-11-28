@@ -21,19 +21,26 @@ enum PipelineChecks {
                                 from: source)!
         }
         let files = AppUpdateFiles(root: root.appendingPathComponent("Updates"))
+        let good = feed()
+        let kept = files.dmg(for: good)
+        // What the check window would show, read at every report and when the staging's verification runs.
         let reported = ProgressLog()
         func fetch(_ feed: AppUpdateFeed, verify extra: @escaping (URL) throws -> Void = { _ in }) async -> AppUpdateFetchOutcome {
             reported.clear()
-            return await AppUpdatePipeline.run(feed, files: files, stager: FlowChecks.stager(files, running: running, verify: extra),
-                                               appName: "SkyCut.app", asked: false) { reported.add($0) }
+            let stager = FlowChecks.stager(files, running: running) { copy in
+                reported.verifying()
+                try extra(copy)
+            }
+            return await AppUpdatePipeline.run(feed, files: files, stager: stager, appName: "SkyCut.app", asked: false) { value in
+                reported.add(value, keptThere: FileManager.default.fileExists(atPath: kept.path))
+            }
         }
-        let good = feed()
-        let kept = files.dmg(for: good)
         try files.makeFolders()
         let other = files.downloads.appendingPathComponent("SkyCut-1.0.5-abababababab.dmg")
         try Data("another release".utf8).write(to: other)
         check(await fetch(good) == .staged && files.readStaged()?.feed.isSameRelease(as: good) == true, "a release downloads, verifies and stages")
-        check(reported.values.last == 1 && reported.values.count >= 2, "its progress rises to 1 before staging (got \(reported.values))")
+        check(reported.values.last == 1 && reported.atVerification == 1,
+              "its progress is at 1 when the copy is verified: the window says «Verifying…» (got \(reported.values))")
         check(UpdateFixture.sha256(kept) == sha, "its DMG is kept until the update is installed")
         check(!FileManager.default.fileExists(atPath: other.path), "a download of another DMG is removed")
         check(await fetch(good) == .staged, "the same release again: its staged copy is taken as it is")
@@ -42,13 +49,18 @@ enum PipelineChecks {
         try FileManager.default.removeItem(at: server.folder.appendingPathComponent("pipeline/SkyCut-1.1.0.dmg"))
         check(await fetch(good) == .staged && files.readStaged() != nil,
               "a finished download kept from an earlier run is staged without downloading it again")
-        // Review CXU1 §4: with no bytes to report, the check window said «Downloading 0%» all through the staging.
-        check(reported.values == [1], "…its progress is 1 for the staging, never a download's (got \(reported.values))")
-        // A kept download that no longer matches the feed: removed, downloaded again.
+        // Reviews CXU1 §4, CXU2: with no bytes to report, the check window said «Downloading 0%» through the kept file's
+        // SHA-256 and the staging. It reports 1 as the check begins (the file still there), long before the verification.
+        check(reported.values == [1] && reported.first?.keptThere == true && reported.atVerification == 1,
+              "…«Verifying…» from the start of its check through the staging, never a download's percent (got \(reported.entries))")
+        // A kept download that no longer matches the feed: removed, downloaded again. As long as the feed's size, so its whole
+        // SHA-256 is computed first: «Verifying…» while the old bytes are still there, then the transfer's own percent.
         try server.copy(dmg, to: "pipeline/SkyCut-1.1.0.dmg")
         files.removeStaged(except: nil)
-        try Data("damaged".utf8).write(to: kept)
+        try Data(count: Int(size)).write(to: kept)
         check(await fetch(good) == .staged && UpdateFixture.sha256(kept) == sha, "a kept download that no longer matches is removed and downloaded again")
+        check(reported.first?.value == 1 && reported.first?.keptThere == true && reported.values.last == 1 && reported.atVerification == 1,
+              "…«Verifying…» while its old bytes are checked, then the new download up to 1 (got \(reported.entries))")
         // Came down whole and failed: rejected (counted), nothing kept. Didn't come down: not counted.
         files.removeStaged(except: nil)
         files.removeDownloads()
@@ -63,12 +75,27 @@ enum PipelineChecks {
         try verifierSteps(root: root, old: old, running: running, check: check)
     }
 
-    /// The progress values a run reported (the callback may come from any thread).
+    /// What a run reported, in order (the callbacks may come from any thread): each progress value with whether the kept
+    /// DMG was on disk then, and the moment the staging's verification ran.
     final class ProgressLog: @unchecked Sendable {
+        struct Entry: Equatable, CustomStringConvertible {
+            let value: Double?
+            let keptThere: Bool
+            var description: String { value.map { "\($0)\(keptThere ? " (file there)" : "")" } ?? "verification" }
+        }
         private let lock = NSLock()
-        private var stored: [Double] = []
-        var values: [Double] { lock.withLock { stored } }
-        func add(_ value: Double) { lock.withLock { stored.append(value) } }
+        private var stored: [Entry] = []
+        var entries: [Entry] { lock.withLock { stored } }
+        var values: [Double] { entries.compactMap(\.value) }
+        var first: Entry? { entries.first { $0.value != nil } }
+        /// The progress when the copy's verification began: what the window showed then (nil: nothing reported before).
+        var atVerification: Double? {
+            let all = entries
+            guard let mark = all.firstIndex(where: { $0.value == nil }) else { return nil }
+            return all[..<mark].last { $0.value != nil }?.value
+        }
+        func add(_ value: Double, keptThere: Bool) { lock.withLock { stored.append(Entry(value: value, keptThere: keptThere)) } }
+        func verifying() { lock.withLock { stored.append(Entry(value: nil, keptThere: false)) } }
         func clear() { lock.withLock { stored.removeAll() } }
     }
 
